@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Expansão CDC — Clínica da Cidade</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --primary: #0D3B66;
+    --secondary: #3FA9F5;
+    --bg: #FFFFFF;
+    --bg2: #F5F7FA;
+    --text: #4A4A4A;
+    --green: #22C55E;
+    --red: #EF4444;
+    --orange: #F59E0B;
+    --purple: #8B5CF6;
+    --teal: #14B8A6;
+    --border: #E2E8F0;
+    --sidebar-w: 220px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg2); color: var(--text); }
+
+  /* SIDEBAR */
+  #sidebar {
+    position: fixed; top: 0; left: 0; width: var(--sidebar-w);
+    height: 100vh; background: var(--primary); color: #fff;
+    display: flex; flex-direction: column; z-index: 100; overflow-y: auto;
+  }
+  #sidebar .logo {
+    padding: 20px 16px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+  }
+  #sidebar .logo h2 { font-size: 14px; font-weight: 700; line-height: 1.3; }
+  #sidebar .logo p { font-size: 11px; opacity: 0.6; margin-top: 3px; }
+  #sidebar nav { flex: 1; padding: 12px 0; }
+  #sidebar nav a {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px; font-size: 13px; color: rgba(255,255,255,0.75);
+    text-decoration: none; cursor: pointer; transition: all 0.15s;
+    border-left: 3px solid transparent;
+  }
+  #sidebar nav a:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  #sidebar nav a.active { background: rgba(63,169,245,0.2); color: #fff; border-left-color: var(--secondary); }
+  #sidebar nav a .icon { width: 16px; text-align: center; font-style: normal; }
+  #sidebar .update-info {
+    padding: 12px 16px; font-size: 10px; opacity: 0.5;
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+
+  /* MAIN */
+  #main { margin-left: var(--sidebar-w); min-height: 100vh; }
+
+  /* TOP BAR */
+  #topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+    padding: 10px 24px; display: flex; align-items: center; gap: 16px;
+    flex-wrap: wrap;
+  }
+  #topbar h1 { font-size: 15px; font-weight: 600; color: var(--primary); flex: 1; }
+  .filter-group { display: flex; align-items: center; gap: 8px; }
+  .filter-group label { font-size: 12px; color: #888; white-space: nowrap; }
+  .filter-group select, .filter-group input {
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 5px 10px; font-size: 12px; color: var(--text);
+    background: var(--bg); cursor: pointer;
+  }
+  .btn-filter {
+    background: var(--primary); color: #fff; border: none;
+    border-radius: 6px; padding: 6px 14px; font-size: 12px;
+    cursor: pointer; transition: opacity 0.15s;
+  }
+  .btn-filter:hover { opacity: 0.85; }
+
+  /* CONTENT */
+  #content { padding: 24px; }
+  .section { display: none; }
+  .section.active { display: block; }
+  .section-title {
+    font-size: 18px; font-weight: 700; color: var(--primary);
+    margin-bottom: 20px; padding-bottom: 10px;
+    border-bottom: 2px solid var(--secondary);
+  }
+
+  /* KPI CARDS */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 16px; margin-bottom: 28px;
+  }
+  .kpi-card {
+    background: var(--bg); border-radius: 10px;
+    padding: 16px; border: 1px solid var(--border);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .kpi-card .kpi-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi-card .kpi-value { font-size: 26px; font-weight: 700; color: var(--primary); margin: 6px 0 4px; line-height: 1; }
+  .kpi-card .kpi-sub { font-size: 11px; color: #aaa; }
+  .kpi-card.green .kpi-value { color: var(--green); }
+  .kpi-card.red .kpi-value { color: var(--red); }
+  .kpi-card.blue .kpi-value { color: var(--secondary); }
+  .kpi-card.orange .kpi-value { color: var(--orange); }
+
+  /* CHARTS */
+  .charts-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;
+  }
+  .charts-row.full { grid-template-columns: 1fr; }
+  .charts-row.triple { grid-template-columns: 1fr 1fr 1fr; }
+  .chart-card {
+    background: var(--bg); border-radius: 10px; padding: 20px;
+    border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .chart-card h3 { font-size: 13px; font-weight: 600; color: var(--primary); margin-bottom: 16px; }
+  .chart-wrap { position: relative; height: 260px; }
+  .chart-wrap.tall { height: 340px; }
+  .chart-wrap.short { height: 200px; }
+
+  /* TABLES */
+  .table-card {
+    background: var(--bg); border-radius: 10px; padding: 20px;
+    border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    margin-bottom: 24px; overflow-x: auto;
+  }
+  .table-card h3 { font-size: 13px; font-weight: 600; color: var(--primary); margin-bottom: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead th {
+    text-align: left; padding: 8px 10px;
+    background: var(--bg2); color: var(--primary);
+    font-weight: 600; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.3px; border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tbody td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--bg2); }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 20px;
+    font-size: 10px; font-weight: 600; white-space: nowrap;
+  }
+  .badge.expansao { background: #DBEAFE; color: #1D4ED8; }
+  .badge.repasse { background: #FEF3C7; color: #92400E; }
+  .badge.won { background: #DCFCE7; color: #15803D; }
+  .badge.lost { background: #FEE2E2; color: #B91C1C; }
+  .badge.open { background: #F1F5F9; color: #475569; }
+
+  /* FUNNEL */
+  .funnel-bar-container { margin-bottom: 10px; }
+  .funnel-bar-label {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; margin-bottom: 4px;
+  }
+  .funnel-bar-label .stage-name { font-weight: 500; }
+  .funnel-bar-label .stage-count { color: #888; }
+  .funnel-bar-track { background: var(--bg2); border-radius: 4px; height: 10px; }
+  .funnel-bar-fill { height: 10px; border-radius: 4px; background: var(--secondary); transition: width 0.4s; }
+
+  /* THUMBNAIL */
+  .thumb-img {
+    width: 48px; height: 48px; object-fit: cover; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--bg2);
+  }
+  .no-thumb {
+    width: 48px; height: 48px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg2); display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  /* LOADING */
+  #loading {
+    position: fixed; inset: 0; background: var(--primary);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 9999; color: #fff;
+  }
+  #loading h2 { font-size: 22px; margin-bottom: 12px; }
+  #loading p { opacity: 0.6; font-size: 14px; }
+  .spinner {
+    width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.2);
+    border-top-color: var(--secondary); border-radius: 50%;
+    animation: spin 0.8s linear infinite; margin-bottom: 20px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* EMPTY STATE */
+  .empty { text-align: center; padding: 48px 24px; color: #aaa; font-size: 14px; }
+
+  /* ALERT CARD */
+  .alert-card {
+    border-radius: 8px; padding: 12px 16px; margin-bottom: 12px;
+    font-size: 13px; display: flex; align-items: flex-start; gap: 10px;
+  }
+  .alert-card.warn { background: #FEF3C7; border-left: 4px solid var(--orange); color: #78350F; }
+  .alert-card.danger { background: #FEE2E2; border-left: 4px solid var(--red); color: #7F1D1D; }
+  .alert-card.ok { background: #DCFCE7; border-left: 4px solid var(--green); color: #14532D; }
+
+  /* RESPONSIVE */
+  @media (max-width: 900px) {
+    .charts-row { grid-template-columns: 1fr; }
+    .charts-row.triple { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 700px) {
+    #sidebar { width: 60px; }
+    #sidebar nav a span.nav-label { display: none; }
+    #sidebar .logo { padding: 12px 8px; }
+    #sidebar .logo h2, #sidebar .logo p { display: none; }
+    #main { margin-left: 60px; }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <h2>Carregando dashboard...</h2>
+  <p>Buscando dados consolidados</p>
+</div>
+
+<!-- SIDEBAR -->
+<aside id="sidebar">
+  <div class="logo">
+    <h2>Clínica da Cidade</h2>
+    <p>Dashboard Expansão CDC</p>
+  </div>
+  <nav>
+    <a href="#" class="active" data-section="executivo">
+      <i class="icon">📊</i><span class="nav-label">Visão Executiva</span>
+    </a>
+    <a href="#" data-section="evolucao">
+      <i class="icon">📈</i><span class="nav-label">Evolução Mensal</span>
+    </a>
+    <a href="#" data-section="crm">
+      <i class="icon">🔄</i><span class="nav-label">Funil CRM</span>
+    </a>
+    <a href="#" data-section="perdas">
+      <i class="icon">⚠️</i><span class="nav-label">Gargalos & Perdas</span>
+    </a>
+    <a href="#" data-section="meta">
+      <i class="icon">📘</i><span class="nav-label">Meta Ads</span>
+    </a>
+    <a href="#" data-section="google">
+      <i class="icon">🔍</i><span class="nav-label">Google Ads</span>
+    </a>
+    <a href="#" data-section="criativos">
+      <i class="icon">🎨</i><span class="nav-label">Criativos</span>
+    </a>
+    <a href="#" data-section="utm">
+      <i class="icon">🔗</i><span class="nav-label">UTM / Atribuição</span>
+    </a>
+    <a href="#" data-section="ga4">
+      <i class="icon">🌐</i><span class="nav-label">Google Analytics</span>
+    </a>
+  </nav>
+  <div class="update-info" id="sidebar-update">Carregando...</div>
+</aside>
+
+<!-- MAIN -->
+<div id="main">
+  <!-- TOP BAR -->
+  <div id="topbar">
+    <h1>Dashboard Marketing — Expansão CDC</h1>
+    <div class="filter-group">
+      <label>Período</label>
+      <select id="filter-period">
+        <option value="all">Todo período</option>
+        <option value="30d">Últimos 30 dias</option>
+        <option value="3m" selected>Últimos 3 meses</option>
+        <option value="6m">Últimos 6 meses</option>
+        <option value="2026">2026</option>
+        <option value="2025">2025</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Tipo (Meta Ads)</label>
+      <select id="filter-tipo">
+        <option value="all">Todos</option>
+        <option value="Expansão">Expansão</option>
+        <option value="Repasse">Repasse</option>
+      </select>
+    </div>
+    <button class="btn-filter" onclick="applyFilters()">Aplicar</button>
+  </div>
+
+  <!-- CONTENT -->
+  <div id="content">
+
+    <!-- VISÃO EXECUTIVA -->
+    <div id="sec-executivo" class="section active">
+      <div class="section-title">Visão Executiva</div>
+      <div class="kpi-grid" id="kpi-grid"></div>
+      <div class="charts-row">
+        <div class="chart-card">
+          <h3>Leads vs Gasto — Visão Geral</h3>
+          <div class="chart-wrap"><canvas id="chart-exec-leads"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Distribuição de Investimento</h3>
+          <div class="chart-wrap"><canvas id="chart-exec-invest"></canvas></div>
+        </div>
+      </div>
+      <div id="exec-alerts"></div>
+    </div>
+
+    <!-- EVOLUÇÃO MENSAL -->
+    <div id="sec-evolucao" class="section">
+      <div class="section-title">Evolução Mensal</div>
+      <div class="charts-row full">
+        <div class="chart-card">
+          <h3>Leads Captados por Mês</h3>
+          <div class="chart-wrap tall"><canvas id="chart-leads-monthly"></canvas></div>
+        </div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-card">
+          <h3>Investimento Mensal — Meta Ads</h3>
+          <div class="chart-wrap"><canvas id="chart-meta-monthly-spend"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Investimento Mensal — Google Ads</h3>
+          <div class="chart-wrap"><canvas id="chart-google-monthly-spend"></canvas></div>
+        </div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-card">
+          <h3>CPL Mensal — Meta Ads</h3>
+          <div class="chart-wrap"><canvas id="chart-meta-cpl"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>CPL Mensal — Google Ads</h3>
+          <div class="chart-wrap"><canvas id="chart-google-cpl"></canvas></div>
+        </div>
+      </div>
+      <div class="charts-row full">
+        <div class="chart-card">
+          <h3>Sessões GA4 por Mês</h3>
+          <div class="chart-wrap"><canvas id="chart-ga4-monthly"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FUNIL CRM -->
+    <div id="sec-crm" class="section">
+      <div class="section-title">Funil CRM</div>
+      <div class="kpi-grid" id="kpi-crm"></div>
+      <div class="charts-row">
+        <div class="chart-card">
+          <h3>Negócios por Etapa</h3>
+          <div id="crm-funnel-bars" style="padding: 8px 0;"></div>
+        </div>
+        <div class="chart-card">
+          <h3>Negócios Ganhos por Mês</h3>
+          <div class="chart-wrap"><canvas id="chart-crm-won"></canvas></div>
+        </div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-card">
+          <h3>Por Responsável</h3>
+          <div class="chart-wrap"><canvas id="chart-crm-resp"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Capital Disponível dos Leads</h3>
+          <div class="chart-wrap"><canvas id="chart-capital"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GARGALOS & PERDAS -->
+    <div id="sec-perdas" class="section">
+      <div class="section-title">Gargalos & Perdas</div>
+      <div class="charts-row">
+        <div class="chart-card">
+          <h3>Motivos de Perda (CRM)</h3>
+          <div class="chart-wrap tall"><canvas id="chart-losses"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Prazo para Abertura de Franquia</h3>
+          <div class="chart-wrap tall"><canvas id="chart-prazo"></canvas></div>
+        </div>
+      </div>
+      <div class="table-card">
+        <h3>Detalhamento de Motivos de Perda</h3>
+        <table>
+          <thead><tr><th>#</th><th>Motivo</th><th>Negócios perdidos</th><th>% do total</th></tr></thead>
+          <tbody id="table-losses"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- META ADS -->
+    <div id="sec-meta" class="section">
+      <div class="section-title">Meta Ads</div>
+      <div class="kpi-grid" id="kpi-meta"></div>
+      <div class="charts-row">
+        <div class="chart-card">
+          <h3>Gasto Mensal — Expansão vs Repasse</h3>
+          <div class="chart-wrap tall"><canvas id="chart-meta-expansao"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Leads Mensais — Expansão vs Repasse</h3>
+          <div class="chart-wrap tall"><canvas id="chart-meta-leads-tipo"></canvas></div>
+        </div>
+      </div>
+      <div class="table-card">
+        <h3>Campanhas — Performance Consolidada</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Campanha</th><th>Tipo</th><th>Gasto</th><th>Leads</th>
+              <th>CPL</th><th>Impressões</th><th>Cliques</th><th>CTR</th>
+            </tr>
+          </thead>
+          <tbody id="table-meta-campaigns"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- GOOGLE ADS -->
+    <div id="sec-google" class="section">
+      <div class="section-title">Google Ads</div>
+      <div class="kpi-grid" id="kpi-google"></div>
+      <div class="charts-row">
+        <div class="chart-card">
+          <h3>Gasto vs Conversões por Mês</h3>
+          <div class="chart-wrap tall"><canvas id="chart-google-perf"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>CTR por Mês</h3>
+          <div class="chart-wrap tall"><canvas id="chart-google-ctr"></canvas></div>
+        </div>
+      </div>
+      <div class="table-card">
+        <h3>Campanhas — Performance Consolidada</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Campanha</th><th>Gasto</th><th>Conversões</th>
+              <th>CPL</th><th>Impressões</th><th>Cliques</th><th>CTR</th>
+            </tr>
+          </thead>
+          <tbody id="table-google-campaigns"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CRIATIVOS -->
+    <div id="sec-criativos" class="section">
+      <div class="section-title">Criativos — Meta Ads</div>
+      <div class="filter-group" style="margin-bottom:20px;">
+        <label>Ordenar por</label>
+        <select id="creative-sort" onchange="renderCreatives()">
+          <option value="gasto">Maior Gasto</option>
+          <option value="leads">Mais Leads</option>
+          <option value="cpl_asc">Menor CPL</option>
+          <option value="ctr">Maior CTR</option>
+        </select>
+        <label style="margin-left:16px;">Tipo</label>
+        <select id="creative-tipo" onchange="renderCreatives()">
+          <option value="all">Todos</option>
+          <option value="Expansão">Expansão</option>
+          <option value="Repasse">Repasse</option>
+        </select>
+      </div>
+      <div class="table-card">
+        <h3>Top Criativos por Performance</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Criativo</th><th>Campanha</th><th>Tipo</th><th>Gasto</th>
+              <th>Leads</th><th>CPL</th><th>Impressões</th><th>CTR</th>
+            </tr>
+          </thead>
+          <tbody id="table-creatives"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- UTM / ATRIBUIÇÃO -->
+    <div id="sec-utm" class="section">
+      <div class="section-title">UTM / Atribuição</div>
+      <div class="charts-row triple">
+        <div class="chart-card">
+          <h3>Leads por Fonte (utm_source)</h3>
+          <div class="chart-wrap"><canvas id="chart-utm-source"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Leads por Mídia (utm_medium)</h3>
+          <div class="chart-wrap"><canvas id="chart-utm-medium"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Leads por Canal (RD Station)</h3>
+          <div class="chart-wrap"><canvas id="chart-canal"></canvas></div>
+        </div>
+      </div>
+      <div class="table-card">
+        <h3>Top Campanhas UTM</h3>
+        <table>
+          <thead><tr><th>#</th><th>Campanha (utm_campaign)</th><th>Leads</th><th>%</th></tr></thead>
+          <tbody id="table-utm-campaigns"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- GOOGLE ANALYTICS -->
+    <div id="sec-ga4" class="section">
+      <div class="section-title">Google Analytics 4</div>
+      <div class="kpi-grid" id="kpi-ga4"></div>
+      <div class="charts-row">
+        <div class="chart-card">
+          <h3>Sessões por Canal</h3>
+          <div class="chart-wrap tall"><canvas id="chart-ga4-channels"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Dispositivos</h3>
+          <div class="chart-wrap tall"><canvas id="chart-ga4-devices"></canvas></div>
+        </div>
+      </div>
+      <div class="table-card">
+        <h3>Top Páginas por Visualizações</h3>
+        <table>
+          <thead><tr><th>#</th><th>Página</th><th>Visualizações</th></tr></thead>
+          <tbody id="table-ga4-pages"></tbody>
+        </table>
+      </div>
+      <div class="table-card">
+        <h3>Top Fontes de Tráfego</h3>
+        <table>
+          <thead><tr><th>#</th><th>Fonte</th><th>Sessões</th><th>%</th></tr></thead>
+          <tbody id="table-ga4-sources"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<script>
+// ─── GLOBALS ──────────────────────────────────────────────────────────────────
+let DATA = null;
+let CHARTS = {};
+const COLORS = {
+  primary: '#0D3B66', secondary: '#3FA9F5',
+  green: '#22C55E', red: '#EF4444', orange: '#F59E0B',
+  purple: '#8B5CF6', teal: '#14B8A6', pink: '#EC4899',
+};
+const PALETTE = [
+  '#3FA9F5','#0D3B66','#22C55E','#F59E0B','#EF4444',
+  '#8B5CF6','#14B8A6','#EC4899','#F97316','#6366F1',
+];
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+const fmt = {
+  currency: v => 'R$ ' + (v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}),
+  num: v => (v || 0).toLocaleString('pt-BR'),
+  pct: v => (v || 0).toFixed(1) + '%',
+  k: v => v >= 1000 ? (v/1000).toFixed(1)+'k' : String(v),
+};
+
+function getFilteredMonths() {
+  const period = document.getElementById('filter-period').value;
+  const now = new Date();
+  const allMonths = [...new Set([
+    ...(DATA.meta_ads.monthly || []).map(r => r.mes),
+    ...(DATA.google_ads.monthly || []).map(r => r.mes),
+    ...(DATA.leads.monthly || []).map(r => r.mes),
+    ...(DATA.ga4.monthly || []).map(r => r.mes),
+  ])].sort();
+
+  if (period === 'all') return null; // no filter
+  if (period === '2026') return m => m.startsWith('2026');
+  if (period === '2025') return m => m.startsWith('2025');
+
+  const cutoff = new Date(now);
+  if (period === '30d') cutoff.setDate(cutoff.getDate() - 30);
+  else if (period === '3m') cutoff.setMonth(cutoff.getMonth() - 3);
+  else if (period === '6m') cutoff.setMonth(cutoff.getMonth() - 6);
+
+  const cutoffStr = cutoff.toISOString().slice(0, 7);
+  return m => m >= cutoffStr;
+}
+
+function filterMonthly(arr, pred) {
+  if (!pred) return arr;
+  return (arr || []).filter(r => pred(r.mes));
+}
+
+function getTipo() {
+  return document.getElementById('filter-tipo').value;
+}
+
+function mesLabel(m) {
+  const [y, mo] = m.split('-');
+  const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  return months[parseInt(mo) - 1] + '/' + y.slice(2);
+}
+
+function destroyChart(id) {
+  if (CHARTS[id]) { CHARTS[id].destroy(); delete CHARTS[id]; }
+}
+
+function makeChart(id, config) {
+  destroyChart(id);
+  const el = document.getElementById(id);
+  if (!el) return;
+  CHARTS[id] = new Chart(el, config);
+}
+
+function isRepasse(name) {
+  if (!name) return false;
+  const n = name.toLowerCase();
+  return ['taguatinga','maringá','maringa','praia grande'].some(k => n.includes(k));
+}
+
+// ─── NAVIGATION ───────────────────────────────────────────────────────────────
+document.querySelectorAll('#sidebar nav a').forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    const sec = link.dataset.section;
+    document.querySelectorAll('#sidebar nav a').forEach(l => l.classList.remove('active'));
+    link.classList.add('active');
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    document.getElementById('sec-' + sec).classList.add('active');
+    renderSection(sec);
+  });
+});
+
+function currentSection() {
+  const active = document.querySelector('#sidebar nav a.active');
+  return active ? active.dataset.section : 'executivo';
+}
+
+// ─── APPLY FILTERS ────────────────────────────────────────────────────────────
+function applyFilters() {
+  renderSection(currentSection());
+}
+
+// ─── RENDER DISPATCHER ────────────────────────────────────────────────────────
+const rendered = {};
+function renderSection(sec) {
+  rendered[sec] = false; // always re-render on filter change
+  switch (sec) {
+    case 'executivo': renderExecutivo(); break;
+    case 'evolucao':  renderEvolucao(); break;
+    case 'crm':       renderCRM(); break;
+    case 'perdas':    renderPerdas(); break;
+    case 'meta':      renderMeta(); break;
+    case 'google':    renderGoogle(); break;
+    case 'criativos': renderCreatives(); break;
+    case 'utm':       renderUTM(); break;
+    case 'ga4':       renderGA4(); break;
+  }
+}
+
+// ─── SECTION: EXECUTIVO ───────────────────────────────────────────────────────
+function renderExecutivo() {
+  const pred = getFilteredMonths();
+  const tipo = getTipo();
+
+  const leads = filterMonthly(DATA.leads.monthly, pred).reduce((s, r) => s + r.total, 0);
+  const metaRows = filterMonthly(DATA.meta_ads.monthly, pred).filter(r => tipo === 'all' || true);
+
+  let metaGasto = 0, metaLeads = 0;
+  filterMonthly(DATA.meta_ads.monthly, pred).forEach(r => {
+    if (tipo === 'all') { metaGasto += r.gasto; metaLeads += r.leads; }
+    else if (tipo === 'Expansão') { metaGasto += r.expansao_gasto; metaLeads += r.expansao_leads; }
+    else { metaGasto += r.repasse_gasto; metaLeads += r.repasse_leads; }
+  });
+
+  let googleGasto = 0, googleConv = 0;
+  filterMonthly(DATA.google_ads.monthly, pred).forEach(r => {
+    googleGasto += r.gasto; googleConv += r.conversoes;
+  });
+
+  let ga4Sessions = 0;
+  filterMonthly(DATA.ga4.monthly, pred).forEach(r => { ga4Sessions += r.sessions; });
+
+  const crm = DATA.crm;
+  const totalGasto = metaGasto + googleGasto;
+  const metaCPL = metaLeads > 0 ? metaGasto / metaLeads : 0;
+  const googleCPL = googleConv > 0 ? googleGasto / googleConv : 0;
+
+  const kpis = [
+    { label: 'Total de Leads (RD)', value: fmt.num(leads), sub: 'período selecionado', cls: '' },
+    { label: 'Negócios CRM', value: fmt.num(crm.total_deals), sub: `${crm.total_won} ganhos`, cls: '' },
+    { label: 'Negócios Ganhos', value: fmt.num(crm.total_won), sub: fmt.pct(crm.taxa_fechamento) + ' de fechamento', cls: 'green' },
+    { label: 'Valor Ganho (CRM)', value: fmt.currency(crm.total_value_won), sub: 'total histórico', cls: 'blue' },
+    { label: 'Gasto Meta Ads', value: fmt.currency(metaGasto), sub: 'período selecionado', cls: '' },
+    { label: 'CPL Meta Ads', value: fmt.currency(metaCPL), sub: fmt.num(metaLeads) + ' leads', cls: 'orange' },
+    { label: 'Gasto Google Ads', value: fmt.currency(googleGasto), sub: 'período selecionado', cls: '' },
+    { label: 'CPL Google Ads', value: fmt.currency(googleCPL), sub: fmt.num(googleConv) + ' conversões', cls: 'orange' },
+    { label: 'Investimento Total', value: fmt.currency(totalGasto), sub: 'Meta + Google', cls: '' },
+    { label: 'Sessões GA4', value: fmt.k(ga4Sessions), sub: 'período selecionado', cls: 'blue' },
+  ];
+
+  document.getElementById('kpi-grid').innerHTML = kpis.map(k =>
+    `<div class="kpi-card ${k.cls}">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>`
+  ).join('');
+
+  // Chart: leads + gasto linha do tempo
+  const leadsData = filterMonthly(DATA.leads.monthly, pred);
+  makeChart('chart-exec-leads', {
+    type: 'bar',
+    data: {
+      labels: leadsData.map(r => mesLabel(r.mes)),
+      datasets: [{
+        label: 'Leads', data: leadsData.map(r => r.total),
+        backgroundColor: COLORS.secondary + 'CC', borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+
+  // Chart: investimento pizza
+  makeChart('chart-exec-invest', {
+    type: 'doughnut',
+    data: {
+      labels: ['Meta Ads', 'Google Ads'],
+      datasets: [{ data: [metaGasto, googleGasto], backgroundColor: [COLORS.secondary, COLORS.primary], borderWidth: 2 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } }
+    }
+  });
+
+  // Alerts
+  const alerts = [];
+  if (metaCPL > 300) alerts.push({ type: 'warn', msg: `CPL Meta Ads elevado: ${fmt.currency(metaCPL)}. Revisar segmentações e criativos.` });
+  if (googleCPL > 500) alerts.push({ type: 'warn', msg: `CPL Google Ads elevado: ${fmt.currency(googleCPL)}. Verificar palavras-chave e conversões.` });
+  if (crm.taxa_fechamento < 10) alerts.push({ type: 'warn', msg: `Taxa de fechamento baixa: ${fmt.pct(crm.taxa_fechamento)}. Verificar qualidade dos leads e processo de vendas.` });
+  if (crm.total_lost > crm.total_won) alerts.push({ type: 'danger', msg: `Mais negócios perdidos (${crm.total_lost}) do que ganhos (${crm.total_won}). Analisar motivos de perda.` });
+  if (alerts.length === 0) alerts.push({ type: 'ok', msg: 'Nenhum alerta crítico identificado no período selecionado.' });
+
+  document.getElementById('exec-alerts').innerHTML = alerts.map(a =>
+    `<div class="alert-card ${a.type}"><strong>${a.type === 'ok' ? '✅' : a.type === 'danger' ? '🚨' : '⚠️'}</strong> ${a.msg}</div>`
+  ).join('');
+}
+
+// ─── SECTION: EVOLUÇÃO ────────────────────────────────────────────────────────
+function renderEvolucao() {
+  const pred = getFilteredMonths();
+
+  const leadsData = filterMonthly(DATA.leads.monthly, pred);
+  makeChart('chart-leads-monthly', {
+    type: 'bar',
+    data: {
+      labels: leadsData.map(r => mesLabel(r.mes)),
+      datasets: [
+        { label: 'Total Leads', data: leadsData.map(r => r.total), backgroundColor: COLORS.secondary + 'CC', borderRadius: 4 },
+        { label: 'Qualificados', data: leadsData.map(r => r.qualificados), backgroundColor: COLORS.green + 'CC', borderRadius: 4 },
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }
+  });
+
+  const metaData = filterMonthly(DATA.meta_ads.monthly, pred);
+  makeChart('chart-meta-monthly-spend', {
+    type: 'bar',
+    data: {
+      labels: metaData.map(r => mesLabel(r.mes)),
+      datasets: [{ label: 'Gasto (R$)', data: metaData.map(r => r.gasto), backgroundColor: COLORS.secondary + 'CC', borderRadius: 4 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+  });
+
+  const googleData = filterMonthly(DATA.google_ads.monthly, pred);
+  makeChart('chart-google-monthly-spend', {
+    type: 'bar',
+    data: {
+      labels: googleData.map(r => mesLabel(r.mes)),
+      datasets: [{ label: 'Gasto (R$)', data: googleData.map(r => r.gasto), backgroundColor: COLORS.primary + 'CC', borderRadius: 4 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+  });
+
+  makeChart('chart-meta-cpl', {
+    type: 'line',
+    data: {
+      labels: metaData.map(r => mesLabel(r.mes)),
+      datasets: [{ label: 'CPL (R$)', data: metaData.map(r => r.cpl), borderColor: COLORS.orange, backgroundColor: COLORS.orange + '22', fill: true, tension: 0.3 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+  });
+
+  makeChart('chart-google-cpl', {
+    type: 'line',
+    data: {
+      labels: googleData.map(r => mesLabel(r.mes)),
+      datasets: [{ label: 'CPL (R$)', data: googleData.map(r => r.cpl), borderColor: COLORS.purple, backgroundColor: COLORS.purple + '22', fill: true, tension: 0.3 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+  });
+
+  const ga4Data = filterMonthly(DATA.ga4.monthly, pred);
+  makeChart('chart-ga4-monthly', {
+    type: 'line',
+    data: {
+      labels: ga4Data.map(r => mesLabel(r.mes)),
+      datasets: [
+        { label: 'Sessões', data: ga4Data.map(r => r.sessions), borderColor: COLORS.teal, backgroundColor: COLORS.teal + '22', fill: true, tension: 0.3, yAxisID: 'y' },
+        { label: 'Usuários', data: ga4Data.map(r => r.users), borderColor: COLORS.primary, tension: 0.3, yAxisID: 'y' },
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+  });
+}
+
+// ─── SECTION: CRM ─────────────────────────────────────────────────────────────
+function renderCRM() {
+  const crm = DATA.crm;
+
+  document.getElementById('kpi-crm').innerHTML = [
+    { label: 'Total de Negócios', value: fmt.num(crm.total_deals), sub: 'no CRM', cls: '' },
+    { label: 'Negócios Abertos', value: fmt.num(crm.total_open), sub: 'em andamento', cls: 'blue' },
+    { label: 'Negócios Ganhos', value: fmt.num(crm.total_won), sub: fmt.currency(crm.total_value_won), cls: 'green' },
+    { label: 'Negócios Perdidos', value: fmt.num(crm.total_lost), sub: 'com motivo registrado', cls: 'red' },
+    { label: 'Taxa de Fechamento', value: fmt.pct(crm.taxa_fechamento), sub: 'ganhos / total', cls: 'orange' },
+    { label: 'Valor Total Ganho', value: fmt.currency(crm.total_value_won), sub: 'histórico', cls: '' },
+  ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
+
+  // Funnel bars
+  const maxTotal = Math.max(...crm.funnel.map(s => s.total), 1);
+  document.getElementById('crm-funnel-bars').innerHTML = crm.funnel.slice(0, 10).map(s => `
+    <div class="funnel-bar-container">
+      <div class="funnel-bar-label">
+        <span class="stage-name">${s.etapa}</span>
+        <span class="stage-count">${fmt.num(s.total)} negócios — ${fmt.currency(s.valor)}</span>
+      </div>
+      <div class="funnel-bar-track">
+        <div class="funnel-bar-fill" style="width:${(s.total/maxTotal*100).toFixed(1)}%"></div>
+      </div>
+    </div>`).join('');
+
+  // Won by month
+  const pred = getFilteredMonths();
+  const wonData = filterMonthly(DATA.crm.monthly_won || [], pred);
+  makeChart('chart-crm-won', {
+    type: 'bar',
+    data: {
+      labels: wonData.map(r => mesLabel(r.mes)),
+      datasets: [{ label: 'Negócios Ganhos', data: wonData.map(r => r.total), backgroundColor: COLORS.green + 'CC', borderRadius: 4 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+  });
+
+  // Responsável
+  const resp = crm.by_responsavel.slice(0, 8);
+  makeChart('chart-crm-resp', {
+    type: 'bar',
+    data: {
+      labels: resp.map(r => r.responsavel),
+      datasets: [
+        { label: 'Total', data: resp.map(r => r.total), backgroundColor: COLORS.secondary + 'CC', borderRadius: 4 },
+        { label: 'Ganhos', data: resp.map(r => r.ganhos), backgroundColor: COLORS.green + 'CC', borderRadius: 4 },
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { position: 'bottom' } } }
+  });
+
+  // Capital
+  const cap = DATA.leads.by_capital.slice(0, 8);
+  makeChart('chart-capital', {
+    type: 'doughnut',
+    data: { labels: cap.map(r => r.capital), datasets: [{ data: cap.map(r => r.total), backgroundColor: PALETTE }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
+  });
+}
+
+// ─── SECTION: PERDAS ──────────────────────────────────────────────────────────
+function renderPerdas() {
+  const losses = DATA.crm.losses || [];
+  const totalLost = losses.reduce((s, r) => s + r.total, 0) || 1;
+
+  makeChart('chart-losses', {
+    type: 'bar',
+    data: {
+      labels: losses.slice(0, 10).map(r => r.motivo),
+      datasets: [{ data: losses.slice(0, 10).map(r => r.total), backgroundColor: COLORS.red + 'CC', borderRadius: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } }
+    }
+  });
+
+  const prazo = DATA.leads.by_prazo || [];
+  makeChart('chart-prazo', {
+    type: 'doughnut',
+    data: { labels: prazo.map(r => r.prazo), datasets: [{ data: prazo.map(r => r.total), backgroundColor: PALETTE }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
+  });
+
+  document.getElementById('table-losses').innerHTML = losses.map((r, i) =>
+    `<tr><td>${i+1}</td><td>${r.motivo}</td><td><strong>${r.total}</strong></td><td>${(r.total/totalLost*100).toFixed(1)}%</td></tr>`
+  ).join('') || '<tr><td colspan="4" class="empty">Sem dados</td></tr>';
+}
+
+// ─── SECTION: META ADS ────────────────────────────────────────────────────────
+function renderMeta() {
+  const pred = getFilteredMonths();
+  const tipo = getTipo();
+
+  let totalGasto = 0, totalLeads = 0;
+  const monthly = filterMonthly(DATA.meta_ads.monthly, pred);
+  monthly.forEach(r => {
+    if (tipo === 'all') { totalGasto += r.gasto; totalLeads += r.leads; }
+    else if (tipo === 'Expansão') { totalGasto += r.expansao_gasto; totalLeads += r.expansao_leads; }
+    else { totalGasto += r.repasse_gasto; totalLeads += r.repasse_leads; }
+  });
+
+  const totalImpr = monthly.reduce((s, r) => s + r.impressoes, 0);
+  const totalCliques = monthly.reduce((s, r) => s + r.cliques, 0);
+  const cpl = totalLeads > 0 ? totalGasto / totalLeads : 0;
+  const ctr = totalImpr > 0 ? totalCliques / totalImpr * 100 : 0;
+
+  document.getElementById('kpi-meta').innerHTML = [
+    { label: 'Gasto Total', value: fmt.currency(totalGasto), sub: 'período', cls: '' },
+    { label: 'Leads Gerados', value: fmt.num(totalLeads), sub: 'período', cls: 'blue' },
+    { label: 'CPL Médio', value: fmt.currency(cpl), sub: 'custo por lead', cls: 'orange' },
+    { label: 'Impressões', value: fmt.k(totalImpr), sub: 'período', cls: '' },
+    { label: 'Cliques no Link', value: fmt.k(totalCliques), sub: 'período', cls: '' },
+    { label: 'CTR Médio', value: fmt.pct(ctr), sub: 'cliques/impressões', cls: 'green' },
+  ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
+
+  makeChart('chart-meta-expansao', {
+    type: 'bar',
+    data: {
+      labels: monthly.map(r => mesLabel(r.mes)),
+      datasets: [
+        { label: 'Expansão', data: monthly.map(r => r.expansao_gasto), backgroundColor: COLORS.secondary + 'CC', borderRadius: 4, stack: 's' },
+        { label: 'Repasse', data: monthly.map(r => r.repasse_gasto), backgroundColor: COLORS.orange + 'CC', borderRadius: 4, stack: 's' },
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } }
+  });
+
+  makeChart('chart-meta-leads-tipo', {
+    type: 'bar',
+    data: {
+      labels: monthly.map(r => mesLabel(r.mes)),
+      datasets: [
+        { label: 'Expansão', data: monthly.map(r => r.expansao_leads), backgroundColor: COLORS.secondary + 'CC', borderRadius: 4, stack: 's' },
+        { label: 'Repasse', data: monthly.map(r => r.repasse_leads), backgroundColor: COLORS.orange + 'CC', borderRadius: 4, stack: 's' },
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } }
+  });
+
+  let campaigns = DATA.meta_ads.campaigns;
+  if (tipo !== 'all') campaigns = campaigns.filter(c => c.tipo === tipo);
+  if (pred) campaigns = campaigns; // campaigns not filtered by date (already total)
+
+  document.getElementById('table-meta-campaigns').innerHTML = campaigns.slice(0, 30).map(c =>
+    `<tr>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.campanha}">${c.campanha}</td>
+      <td><span class="badge ${c.tipo === 'Repasse' ? 'repasse' : 'expansao'}">${c.tipo}</span></td>
+      <td>${fmt.currency(c.gasto)}</td>
+      <td>${fmt.num(c.leads)}</td>
+      <td>${fmt.currency(c.cpl)}</td>
+      <td>${fmt.k(c.impressoes)}</td>
+      <td>${fmt.k(c.cliques)}</td>
+      <td>${fmt.pct(c.ctr)}</td>
+    </tr>`
+  ).join('') || '<tr><td colspan="8" class="empty">Sem dados</td></tr>';
+}
+
+// ─── SECTION: GOOGLE ADS ──────────────────────────────────────────────────────
+function renderGoogle() {
+  const pred = getFilteredMonths();
+  const monthly = filterMonthly(DATA.google_ads.monthly, pred);
+
+  const totalGasto = monthly.reduce((s, r) => s + r.gasto, 0);
+  const totalConv = monthly.reduce((s, r) => s + r.conversoes, 0);
+  const totalImpr = monthly.reduce((s, r) => s + r.impressoes, 0);
+  const totalCliques = monthly.reduce((s, r) => s + r.cliques, 0);
+  const cpl = totalConv > 0 ? totalGasto / totalConv : 0;
+  const ctr = totalImpr > 0 ? totalCliques / totalImpr * 100 : 0;
+
+  document.getElementById('kpi-google').innerHTML = [
+    { label: 'Gasto Total', value: fmt.currency(totalGasto), sub: 'período', cls: '' },
+    { label: 'Conversões', value: fmt.num(totalConv), sub: 'período', cls: 'blue' },
+    { label: 'CPL Médio', value: fmt.currency(cpl), sub: 'custo por conversão', cls: 'orange' },
+    { label: 'Impressões', value: fmt.k(totalImpr), sub: 'período', cls: '' },
+    { label: 'Cliques', value: fmt.k(totalCliques), sub: 'período', cls: '' },
+    { label: 'CTR Médio', value: fmt.pct(ctr), sub: 'cliques/impressões', cls: 'green' },
+  ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
+
+  makeChart('chart-google-perf', {
+    type: 'bar',
+    data: {
+      labels: monthly.map(r => mesLabel(r.mes)),
+      datasets: [
+        { label: 'Gasto (R$)', data: monthly.map(r => r.gasto), backgroundColor: COLORS.primary + 'CC', borderRadius: 4, yAxisID: 'y' },
+        { type: 'line', label: 'Conversões', data: monthly.map(r => r.conversoes), borderColor: COLORS.green, backgroundColor: COLORS.green + '22', tension: 0.3, yAxisID: 'y2' },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: {
+        y: { beginAtZero: true, position: 'left' },
+        y2: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false } }
+      }
+    }
+  });
+
+  makeChart('chart-google-ctr', {
+    type: 'line',
+    data: {
+      labels: monthly.map(r => mesLabel(r.mes)),
+      datasets: [{ label: 'CTR (%)', data: monthly.map(r => r.ctr), borderColor: COLORS.teal, backgroundColor: COLORS.teal + '22', fill: true, tension: 0.3 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+  });
+
+  document.getElementById('table-google-campaigns').innerHTML = DATA.google_ads.campaigns.slice(0, 30).map(c =>
+    `<tr>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.campanha}">${c.campanha}</td>
+      <td>${fmt.currency(c.gasto)}</td>
+      <td>${fmt.num(c.conversoes)}</td>
+      <td>${fmt.currency(c.cpl)}</td>
+      <td>${fmt.k(c.impressoes)}</td>
+      <td>${fmt.k(c.cliques)}</td>
+      <td>${fmt.pct(c.ctr)}</td>
+    </tr>`
+  ).join('') || '<tr><td colspan="7" class="empty">Sem dados</td></tr>';
+}
+
+// ─── SECTION: CRIATIVOS ───────────────────────────────────────────────────────
+function renderCreatives() {
+  const sort = document.getElementById('creative-sort').value;
+  const tipoFilt = document.getElementById('creative-tipo').value;
+
+  let creatives = [...DATA.meta_ads.creatives];
+
+  if (tipoFilt !== 'all') {
+    creatives = creatives.filter(c => isRepasse(c.campanha) ? tipoFilt === 'Repasse' : tipoFilt === 'Expansão');
+  }
+
+  if (sort === 'leads') creatives.sort((a, b) => b.leads - a.leads);
+  else if (sort === 'cpl_asc') creatives.sort((a, b) => (a.cpl || 99999) - (b.cpl || 99999));
+  else if (sort === 'ctr') creatives.sort((a, b) => b.ctr - a.ctr);
+  else creatives.sort((a, b) => b.gasto - a.gasto);
+
+  document.getElementById('table-creatives').innerHTML = creatives.slice(0, 30).map(c => {
+    const tipo = isRepasse(c.campanha) ? 'Repasse' : 'Expansão';
+    const thumb = c.thumbnail
+      ? `<img class="thumb-img" src="${c.thumbnail}" onerror="this.style.display='none'" loading="lazy">`
+      : `<div class="no-thumb">🖼️</div>`;
+    return `<tr>
+      <td style="display:flex;align-items:center;gap:8px;max-width:240px;">
+        ${thumb}
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px" title="${c.anuncio}">${c.anuncio}</span>
+      </td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px" title="${c.campanha}">${c.campanha}</td>
+      <td><span class="badge ${tipo === 'Repasse' ? 'repasse' : 'expansao'}">${tipo}</span></td>
+      <td>${fmt.currency(c.gasto)}</td>
+      <td>${fmt.num(c.leads)}</td>
+      <td>${c.cpl > 0 ? fmt.currency(c.cpl) : '—'}</td>
+      <td>${fmt.k(c.impressoes)}</td>
+      <td>${fmt.pct(c.ctr)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="8" class="empty">Sem criativos</td></tr>';
+}
+
+// ─── SECTION: UTM ─────────────────────────────────────────────────────────────
+function renderUTM() {
+  const sources = DATA.utm.sources.slice(0, 10);
+  makeChart('chart-utm-source', {
+    type: 'doughnut',
+    data: { labels: sources.map(r => r.source), datasets: [{ data: sources.map(r => r.total), backgroundColor: PALETTE }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
+  });
+
+  const mediums = DATA.utm.mediums.slice(0, 8);
+  makeChart('chart-utm-medium', {
+    type: 'doughnut',
+    data: { labels: mediums.map(r => r.medium), datasets: [{ data: mediums.map(r => r.total), backgroundColor: PALETTE }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
+  });
+
+  const canal = DATA.leads.by_canal.slice(0, 8);
+  makeChart('chart-canal', {
+    type: 'doughnut',
+    data: { labels: canal.map(r => r.canal), datasets: [{ data: canal.map(r => r.total), backgroundColor: PALETTE }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
+  });
+
+  const totalCamp = DATA.utm.campaigns.reduce((s, r) => s + r.total, 0) || 1;
+  document.getElementById('table-utm-campaigns').innerHTML = DATA.utm.campaigns.map((r, i) =>
+    `<tr><td>${i+1}</td><td>${r.campaign}</td><td><strong>${r.total}</strong></td><td>${(r.total/totalCamp*100).toFixed(1)}%</td></tr>`
+  ).join('') || '<tr><td colspan="4" class="empty">Sem dados UTM</td></tr>';
+}
+
+// ─── SECTION: GA4 ─────────────────────────────────────────────────────────────
+function renderGA4() {
+  const pred = getFilteredMonths();
+  const monthly = filterMonthly(DATA.ga4.monthly, pred);
+
+  const totalSessions = monthly.reduce((s, r) => s + r.sessions, 0);
+  const totalUsers = monthly.reduce((s, r) => s + r.users, 0);
+  const totalNew = monthly.reduce((s, r) => s + r.new_users, 0);
+  const totalConv = monthly.reduce((s, r) => s + r.conversions, 0);
+  const avgBounce = monthly.length > 0
+    ? monthly.reduce((s, r) => s + r.bounce_rate * r.sessions, 0) / (totalSessions || 1)
+    : 0;
+
+  document.getElementById('kpi-ga4').innerHTML = [
+    { label: 'Sessões', value: fmt.k(totalSessions), sub: 'período', cls: '' },
+    { label: 'Usuários', value: fmt.k(totalUsers), sub: 'período', cls: 'blue' },
+    { label: 'Novos Usuários', value: fmt.k(totalNew), sub: 'período', cls: '' },
+    { label: 'Conversões GA4', value: fmt.num(totalConv), sub: 'período', cls: 'green' },
+    { label: 'Taxa de Rejeição', value: fmt.pct(avgBounce), sub: 'média ponderada', cls: avgBounce > 70 ? 'red' : 'orange' },
+  ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
+
+  const channels = DATA.ga4.channels.slice(0, 10);
+  makeChart('chart-ga4-channels', {
+    type: 'bar',
+    data: {
+      labels: channels.map(r => r.channel),
+      datasets: [{ label: 'Sessões', data: channels.map(r => r.sessions), backgroundColor: COLORS.teal + 'CC', borderRadius: 4 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } } }
+  });
+
+  const devices = DATA.ga4.devices;
+  makeChart('chart-ga4-devices', {
+    type: 'doughnut',
+    data: { labels: devices.map(r => r.device), datasets: [{ data: devices.map(r => r.sessions), backgroundColor: [COLORS.primary, COLORS.secondary, COLORS.teal] }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+  });
+
+  const totalViews = DATA.ga4.top_pages.reduce((s, r) => s + r.views, 0) || 1;
+  document.getElementById('table-ga4-pages').innerHTML = DATA.ga4.top_pages.map((r, i) =>
+    `<tr><td>${i+1}</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.page}</td><td>${fmt.num(r.views)}</td></tr>`
+  ).join('') || '<tr><td colspan="3" class="empty">Sem dados</td></tr>';
+
+  const totalSrc = DATA.ga4.sources.reduce((s, r) => s + r.sessions, 0) || 1;
+  document.getElementById('table-ga4-sources').innerHTML = DATA.ga4.sources.map((r, i) =>
+    `<tr><td>${i+1}</td><td>${r.source}</td><td>${fmt.num(r.sessions)}</td><td>${(r.sessions/totalSrc*100).toFixed(1)}%</td></tr>`
+  ).join('') || '<tr><td colspan="4" class="empty">Sem dados</td></tr>';
+}
+
+// ─── BOOT ─────────────────────────────────────────────────────────────────────
+async function loadData() {
+  try {
+    const res = await fetch('data/summary.json?v=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    DATA = await res.json();
+
+    document.getElementById('sidebar-update').textContent = 'Atualizado: ' + (DATA.last_update || '—');
+    document.getElementById('loading').style.display = 'none';
+    renderExecutivo();
+  } catch (err) {
+    document.getElementById('loading').innerHTML =
+      `<div style="text-align:center;padding:24px;">
+        <div style="font-size:40px;margin-bottom:16px;">⚠️</div>
+        <h2>Erro ao carregar dados</h2>
+        <p style="margin-top:8px;opacity:0.7">${err.message}</p>
+        <p style="margin-top:16px;font-size:12px;opacity:0.5">
+          Execute <strong>python scripts/generate_dashboard_data.py</strong> para gerar os dados.
+        </p>
+      </div>`;
+  }
+}
+
+loadData();
+</script>
+</body>
+</html>
