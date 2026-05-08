@@ -1,4 +1,4 @@
-from collectors import rdstation, google_ads, meta_ads
+from collectors import rdstation, rdcrm, google_ads, meta_ads
 from sheets import writer
 from datetime import datetime
 
@@ -17,8 +17,18 @@ def run():
     except Exception as e:
         print(f"  ERRO RD Station: {e}")
 
+    # RD CRM
+    print("\n[2/4] RD Station CRM")
+    try:
+        crm_data = rdcrm.get_all_crm_data()
+        writer.write_sheet("crm_deals", crm_data["deals"])
+        writer.write_sheet("crm_atividades", crm_data["atividades"])
+        writer.write_sheet("crm_tarefas", crm_data["tarefas"])
+    except Exception as e:
+        print(f"  ERRO RD CRM: {e}")
+
     # Google Ads
-    print("\n[2/3] Google Ads")
+    print("\n[3/4] Google Ads")
     try:
         google_data = google_ads.get_campaign_data(days_back=90)
         writer.write_sheet("google_ads", google_data)
@@ -26,7 +36,7 @@ def run():
         print(f"  ERRO Google Ads: {e}")
 
     # Meta Ads
-    print("\n[3/3] Meta Ads")
+    print("\n[4/4] Meta Ads")
     try:
         meta_data = meta_ads.get_campaign_data(days_back=90)
         writer.write_sheet("meta_ads", meta_data)

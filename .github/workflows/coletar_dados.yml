@@ -27,6 +27,7 @@ jobs:
           RD_CLIENT_ID=${{ secrets.RD_CLIENT_ID }}
           RD_CLIENT_SECRET=${{ secrets.RD_CLIENT_SECRET }}
           RD_REFRESH_TOKEN=${{ secrets.RD_REFRESH_TOKEN }}
+          RD_CRM_TOKEN=${{ secrets.RD_CRM_TOKEN }}
           GOOGLE_SHEET_ID=${{ secrets.GOOGLE_SHEET_ID }}
           EOF
 
