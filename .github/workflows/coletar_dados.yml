@@ -1,48 +1,48 @@
-name: Coletar Dados Marketing
+name: Coletar Dados RD Station
 
 on:
   schedule:
-    - cron: "30 10 * * *"  # 07:30 horário de Brasília (UTC-3) = 10:30 UTC
-  workflow_dispatch:         # permite rodar manualmente com 1 clique
+    - cron: '30 10 * * *'  # 07:30 BRT (UTC-3)
+  workflow_dispatch:
 
 jobs:
   coletar:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout do repositório
+      - name: Checkout repositorio
         uses: actions/checkout@v4
 
       - name: Configurar Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
-      - name: Instalar dependências
+      - name: Instalar dependencias
         run: pip install -r requirements.txt
-
-      - name: Criar arquivo de credenciais Google
-        run: |
-          mkdir -p credentials
-          echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}' > credentials/google_service_account.json
 
       - name: Criar arquivo .env
         run: |
-          cat <<EOF > .env
+          cat > .env << 'EOF'
           RD_CLIENT_ID=${{ secrets.RD_CLIENT_ID }}
           RD_CLIENT_SECRET=${{ secrets.RD_CLIENT_SECRET }}
           RD_REFRESH_TOKEN=${{ secrets.RD_REFRESH_TOKEN }}
-          GOOGLE_ADS_DEVELOPER_TOKEN=${{ secrets.GOOGLE_ADS_DEVELOPER_TOKEN }}
-          GOOGLE_ADS_CLIENT_ID=${{ secrets.GOOGLE_ADS_CLIENT_ID }}
-          GOOGLE_ADS_CLIENT_SECRET=${{ secrets.GOOGLE_ADS_CLIENT_SECRET }}
-          GOOGLE_ADS_REFRESH_TOKEN=${{ secrets.GOOGLE_ADS_REFRESH_TOKEN }}
-          GOOGLE_ADS_CUSTOMER_ID=${{ secrets.GOOGLE_ADS_CUSTOMER_ID }}
-          META_APP_ID=${{ secrets.META_APP_ID }}
-          META_APP_SECRET=${{ secrets.META_APP_SECRET }}
-          META_ACCESS_TOKEN=${{ secrets.META_ACCESS_TOKEN }}
-          META_AD_ACCOUNT_ID=${{ secrets.META_AD_ACCOUNT_ID }}
           GOOGLE_SHEET_ID=${{ secrets.GOOGLE_SHEET_ID }}
           EOF
 
+      - name: Criar credenciais Google
+        run: |
+          mkdir -p credentials
+          echo '${{ secrets.GOOGLE_CREDENTIALS_JSON }}' > credentials/google_service_account.json
+
       - name: Executar coleta de dados
         run: python main.py
+
+      - name: Verificar rotacao do refresh token
+        if: always()
+        run: |
+          NEW_TOKEN=$(grep "RD_REFRESH_TOKEN=" .env | cut -d'=' -f2 | tr -d ' ')
+          CURRENT_TOKEN="${{ secrets.RD_REFRESH_TOKEN }}"
+          if [ "$NEW_TOKEN" != "$CURRENT_TOKEN" ] && [ -n "$NEW_TOKEN" ]; then
+            echo "::warning::Refresh token foi rotacionado. Atualize o secret RD_REFRESH_TOKEN para: $NEW_TOKEN"
+          fi
