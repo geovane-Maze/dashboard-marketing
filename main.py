@@ -12,6 +12,7 @@ def run():
     print("\n[1/3] RD Station")
     try:
         leads = rdstation.get_all_leads()
+        leads.sort(key=lambda x: x.get("criado_em") or "", reverse=True)
         writer.write_sheet("leads", leads)
     except Exception as e:
         print(f"  ERRO RD Station: {e}")
