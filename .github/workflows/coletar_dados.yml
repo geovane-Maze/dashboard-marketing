@@ -1,4 +1,4 @@
-name: Coletar Dados RD Station
+name: Coletar Dados Dashboard Marketing
 
 on:
   schedule:
@@ -35,6 +35,7 @@ jobs:
         run: |
           mkdir -p credentials
           echo '${{ secrets.GOOGLE_CREDENTIALS_JSON }}' > credentials/google_service_account.json
+          echo '${{ secrets.GA4_TOKEN_JSON }}' > credentials/ga4_token.json
 
       - name: Executar coleta de dados
         run: python main.py

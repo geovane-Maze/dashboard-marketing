@@ -1,4 +1,4 @@
-from collectors import rdstation, rdcrm, ads_sheets, google_ads, meta_ads
+from collectors import rdstation, rdcrm, ads_sheets, ga4, google_ads, meta_ads
 from sheets import writer
 from datetime import datetime
 
@@ -27,8 +27,16 @@ def run():
     except Exception as e:
         print(f"  ERRO RD CRM: {e}")
 
+    # Google Analytics 4
+    print("\n[3/6] Google Analytics 4")
+    try:
+        ga4_data = ga4.get_ga4_data()
+        writer.write_sheet("ga4_sessions", ga4_data)
+    except Exception as e:
+        print(f"  ERRO GA4: {e}")
+
     # Ads (Meta + Google via planilha)
-    print("\n[3/5] Meta Ads + Google Ads (planilha)")
+    print("\n[4/6] Meta Ads + Google Ads (planilha)")
     try:
         meta_data, google_data = ads_sheets.get_ads_data()
         writer.write_sheet("meta_ads", meta_data)
@@ -37,7 +45,7 @@ def run():
         print(f"  ERRO Ads Sheets: {e}")
 
     # Google Ads API (legado)
-    print("\n[4/5] Google Ads API")
+    print("\n[5/6] Google Ads API")
     try:
         google_data = google_ads.get_campaign_data(days_back=90)
         writer.write_sheet("google_ads", google_data)
@@ -45,7 +53,7 @@ def run():
         print(f"  ERRO Google Ads: {e}")
 
     # Meta Ads API (legado)
-    print("\n[5/5] Meta Ads API")
+    print("\n[6/6] Meta Ads API")
     try:
         meta_data = meta_ads.get_campaign_data(days_back=90)
         writer.write_sheet("meta_ads", meta_data)

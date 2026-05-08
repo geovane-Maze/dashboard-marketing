@@ -1,6 +1,8 @@
 requests
 gspread
 google-auth
+google-auth-oauthlib
+google-analytics-data
 google-ads
 facebook-business
 python-dotenv
