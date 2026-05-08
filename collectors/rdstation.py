@@ -1,6 +1,9 @@
 import os
 import time
+import base64
+import json
 import requests
+from urllib.parse import parse_qs, unquote
 import config
 
 BASE_URL = "https://api.rd.services"
@@ -71,8 +74,69 @@ def _get_contact_details(uuid, headers):
     if response.status_code != 200:
         return {}
     data = response.json()
-    # A API pode retornar o contato diretamente ou dentro de "contact"
     return data.get("contact", data)
+
+
+def _decode_traffic_source(traffic_source_raw):
+    """Decodifica o campo traffic_source (Base64) e extrai UTMs da sessao atual."""
+    if not traffic_source_raw:
+        return {}
+    try:
+        encoded = traffic_source_raw.replace("encoded_", "", 1)
+        # Adiciona padding se necessario
+        padded = encoded + "=" * (-len(encoded) % 4)
+        decoded = base64.b64decode(padded).decode("utf-8")
+        data = json.loads(decoded)
+
+        # Usa current_session; fallback para first_session
+        session = data.get("current_session") or data.get("first_session") or {}
+        value = session.get("value", "")
+
+        if not value or value in ("(none)", ""):
+            return {}
+
+        # Remove "+" inicial se houver
+        value = value.lstrip("+")
+
+        # Parseia query string: utm_source=x&utm_medium=y...
+        params = parse_qs(value, keep_blank_values=False)
+        result = {
+            "utm_source": params.get("utm_source", [None])[0],
+            "utm_medium": params.get("utm_medium", [None])[0],
+            "utm_campaign": params.get("utm_campaign", [None])[0],
+            "utm_term": params.get("utm_term", [None])[0],
+            "utm_content": params.get("utm_content", [None])[0],
+            "utm_id": params.get("utm_id", [None])[0],
+            "origem_detalhes": value,
+        }
+        return result
+    except Exception:
+        return {}
+
+
+def _get_conversion_utms(uuid, headers):
+    """Busca eventos de conversao do contato e extrai UTMs."""
+    try:
+        response = requests.get(
+            f"{BASE_URL}/platform/contacts/{uuid}/events",
+            headers=headers,
+            params={"event_type": "CONVERSION"},
+        )
+        if response.status_code != 200:
+            return {}
+        events = response.json()
+        if not events:
+            return {}
+
+        # Pega o evento de conversao mais recente com traffic_source
+        for event in events:
+            payload = event.get("payload", {})
+            traffic_source = payload.get("traffic_source", "")
+            if traffic_source and traffic_source.startswith("encoded_"):
+                return _decode_traffic_source(traffic_source)
+        return {}
+    except Exception:
+        return {}
 
 
 def get_all_leads():
@@ -106,10 +170,8 @@ def get_all_leads():
         for contact in contacts:
             uuid = contact.get("uuid")
             details = _get_contact_details(uuid, headers)
-            time.sleep(0.1)
-
-            # UTMs podem estar em campos aninhados na v2
-            personal_fields = details.get("personal_fields", {})
+            utms = _get_conversion_utms(uuid, headers)
+            time.sleep(0.15)
 
             origem_raw = details.get("cf_plug_opportunity_origin") or ""
             partes = [p.strip() for p in origem_raw.split("|")] if "|" in origem_raw else [origem_raw.strip(), ""]
@@ -130,6 +192,13 @@ def get_all_leads():
                 "canal": canal,
                 "fonte": fonte,
                 "origem_completa": origem_raw or None,
+                "utm_source": utms.get("utm_source"),
+                "utm_medium": utms.get("utm_medium"),
+                "utm_campaign": utms.get("utm_campaign"),
+                "utm_term": utms.get("utm_term"),
+                "utm_content": utms.get("utm_content"),
+                "utm_id": utms.get("utm_id"),
+                "origem_detalhes": utms.get("origem_detalhes"),
                 "estagio_funil": details.get("cf_plug_funnel_stage"),
                 "responsavel": details.get("cf_plug_contact_owner"),
                 "pipeline": details.get("cf_plug_deal_pipeline"),
