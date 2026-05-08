@@ -111,27 +111,33 @@ def get_all_leads():
             # UTMs podem estar em campos aninhados na v2
             personal_fields = details.get("personal_fields", {})
 
+            origem_raw = details.get("cf_plug_opportunity_origin") or ""
+            partes = [p.strip() for p in origem_raw.split("|")] if "|" in origem_raw else [origem_raw.strip(), ""]
+            canal = partes[0] if partes[0] else None
+            fonte = partes[1] if len(partes) > 1 and partes[1] else None
+
             lead = {
                 "id": uuid,
                 "nome": details.get("name") or contact.get("name"),
                 "email": details.get("email") or contact.get("email"),
                 "telefone": details.get("mobile_phone") or details.get("personal_phone"),
-                "empresa": details.get("company_name"),
-                "cargo": details.get("job_title"),
                 "cidade": details.get("city"),
                 "estado": details.get("state"),
                 "criado_em": details.get("created_at") or contact.get("created_at"),
                 "atualizado_em": details.get("updated_at"),
                 "tags": ", ".join(details.get("tags", [])),
                 "lifecycle_stage": details.get("lifecycle_stage"),
-                "oportunidade": details.get("opportunity"),
-                "utm_source": details.get("traffic_source"),
-                "utm_medium": details.get("traffic_medium"),
-                "utm_campaign": details.get("traffic_campaign"),
-                "utm_content": details.get("traffic_content"),
-                "utm_term": details.get("traffic_term"),
-                "landing_page": details.get("traffic_referrer"),
-                "origem_custom": details.get("cf_plug_opportunity_origin"),
+                "canal": canal,
+                "fonte": fonte,
+                "origem_completa": origem_raw or None,
+                "estagio_funil": details.get("cf_plug_funnel_stage"),
+                "responsavel": details.get("cf_plug_contact_owner"),
+                "pipeline": details.get("cf_plug_deal_pipeline"),
+                "score": details.get("cf_plug_opportunity_score"),
+                "valor_oportunidade": details.get("cf_plug_opportunity_value"),
+                "capital_disponivel": details.get("cf_faixa_de_capital_disponivel"),
+                "prazo_abertura": details.get("cf_em_quanto_tempo_pretende_abrir_a_sua_franquia_2"),
+                "meio_contato": details.get("cf_melhor_meio_para_contato"),
             }
             leads.append(lead)
 
