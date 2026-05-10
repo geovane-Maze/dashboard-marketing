@@ -263,23 +263,24 @@
   <div id="topbar">
     <h1>Dashboard Marketing — Expansão CDC</h1>
     <div class="filter-group">
-      <label>Período</label>
-      <select id="filter-period">
-        <option value="all">Todo período</option>
+      <label>Atalho</label>
+      <select id="filter-preset" onchange="applyPreset()">
+        <option value="">Personalizado</option>
         <option value="30d">Últimos 30 dias</option>
-        <option value="3m" selected>Últimos 3 meses</option>
+        <option value="3m">Últimos 3 meses</option>
         <option value="6m">Últimos 6 meses</option>
         <option value="2026">2026</option>
         <option value="2025">2025</option>
+        <option value="all">Todo período</option>
       </select>
     </div>
     <div class="filter-group">
-      <label>Tipo (Meta Ads)</label>
-      <select id="filter-tipo">
-        <option value="all">Todos</option>
-        <option value="Expansão">Expansão</option>
-        <option value="Repasse">Repasse</option>
-      </select>
+      <label>De</label>
+      <input type="date" id="filter-date-start" onchange="clearPreset()">
+    </div>
+    <div class="filter-group">
+      <label>Até</label>
+      <input type="date" id="filter-date-end" onchange="clearPreset()">
     </div>
     <button class="btn-filter" onclick="applyFilters()">Aplicar</button>
   </div>
@@ -392,6 +393,14 @@
     <!-- META ADS -->
     <div id="sec-meta" class="section">
       <div class="section-title">Meta Ads</div>
+      <div class="filter-group" style="margin-bottom:20px;">
+        <label>Tipo de Campanha</label>
+        <select id="filter-tipo" onchange="renderMeta()">
+          <option value="all">Todos (Expansão + Repasse)</option>
+          <option value="Expansão">Expansão</option>
+          <option value="Repasse">Repasse</option>
+        </select>
+      </div>
       <div class="kpi-grid" id="kpi-meta"></div>
       <div class="charts-row">
         <div class="chart-card">
@@ -559,26 +568,44 @@ const fmt = {
 };
 
 function getFilteredMonths() {
-  const period = document.getElementById('filter-period').value;
+  const startVal = document.getElementById('filter-date-start').value;
+  const endVal   = document.getElementById('filter-date-end').value;
+  if (!startVal && !endVal) return null;
+  const startMonth = startVal ? startVal.slice(0, 7) : '2000-01';
+  const endMonth   = endVal   ? endVal.slice(0, 7)   : '2099-12';
+  return m => m >= startMonth && m <= endMonth;
+}
+
+function applyPreset() {
+  const preset = document.getElementById('filter-preset').value;
+  if (!preset) return;
   const now = new Date();
-  const allMonths = [...new Set([
-    ...(DATA.meta_ads.monthly || []).map(r => r.mes),
-    ...(DATA.google_ads.monthly || []).map(r => r.mes),
-    ...(DATA.leads.monthly || []).map(r => r.mes),
-    ...(DATA.ga4.monthly || []).map(r => r.mes),
-  ])].sort();
+  let start, end = now.toISOString().slice(0, 10);
+  if (preset === '30d') {
+    const d = new Date(now); d.setDate(d.getDate() - 30);
+    start = d.toISOString().slice(0, 10);
+  } else if (preset === '3m') {
+    const d = new Date(now); d.setMonth(d.getMonth() - 3); d.setDate(1);
+    start = d.toISOString().slice(0, 10);
+  } else if (preset === '6m') {
+    const d = new Date(now); d.setMonth(d.getMonth() - 6); d.setDate(1);
+    start = d.toISOString().slice(0, 10);
+  } else if (preset === '2026') {
+    start = '2026-01-01'; end = '2026-12-31';
+  } else if (preset === '2025') {
+    start = '2025-01-01'; end = '2025-12-31';
+  } else if (preset === 'all') {
+    start = '2020-01-01'; end = '2030-12-31';
+  }
+  if (start) {
+    document.getElementById('filter-date-start').value = start;
+    document.getElementById('filter-date-end').value = end;
+  }
+  applyFilters();
+}
 
-  if (period === 'all') return null; // no filter
-  if (period === '2026') return m => m.startsWith('2026');
-  if (period === '2025') return m => m.startsWith('2025');
-
-  const cutoff = new Date(now);
-  if (period === '30d') cutoff.setDate(cutoff.getDate() - 30);
-  else if (period === '3m') cutoff.setMonth(cutoff.getMonth() - 3);
-  else if (period === '6m') cutoff.setMonth(cutoff.getMonth() - 6);
-
-  const cutoffStr = cutoff.toISOString().slice(0, 7);
-  return m => m >= cutoffStr;
+function clearPreset() {
+  document.getElementById('filter-preset').value = '';
 }
 
 function filterMonthly(arr, pred) {
@@ -587,7 +614,8 @@ function filterMonthly(arr, pred) {
 }
 
 function getTipo() {
-  return document.getElementById('filter-tipo').value;
+  const el = document.getElementById('filter-tipo');
+  return el ? el.value : 'all';
 }
 
 function mesLabel(m) {
@@ -656,16 +684,12 @@ function renderSection(sec) {
 // ─── SECTION: EXECUTIVO ───────────────────────────────────────────────────────
 function renderExecutivo() {
   const pred = getFilteredMonths();
-  const tipo = getTipo();
 
   const leads = filterMonthly(DATA.leads.monthly, pred).reduce((s, r) => s + r.total, 0);
-  const metaRows = filterMonthly(DATA.meta_ads.monthly, pred).filter(r => tipo === 'all' || true);
 
   let metaGasto = 0, metaLeads = 0;
   filterMonthly(DATA.meta_ads.monthly, pred).forEach(r => {
-    if (tipo === 'all') { metaGasto += r.gasto; metaLeads += r.leads; }
-    else if (tipo === 'Expansão') { metaGasto += r.expansao_gasto; metaLeads += r.expansao_leads; }
-    else { metaGasto += r.repasse_gasto; metaLeads += r.repasse_leads; }
+    metaGasto += r.gasto; metaLeads += r.leads;
   });
 
   let googleGasto = 0, googleConv = 0;
@@ -1159,6 +1183,15 @@ async function loadData() {
     DATA = await res.json();
 
     document.getElementById('sidebar-update').textContent = 'Atualizado: ' + (DATA.last_update || '—');
+
+    // Inicializa datas: padrão = últimos 3 meses até hoje
+    const today = new Date();
+    const threeMonthsAgo = new Date(today);
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    threeMonthsAgo.setDate(1);
+    document.getElementById('filter-date-start').value = threeMonthsAgo.toISOString().slice(0, 10);
+    document.getElementById('filter-date-end').value = today.toISOString().slice(0, 10);
+
     document.getElementById('loading').style.display = 'none';
     renderExecutivo();
   } catch (err) {
