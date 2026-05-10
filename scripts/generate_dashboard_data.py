@@ -245,6 +245,9 @@ def aggregate_meta_ads(rows):
     campaigns = defaultdict(lambda: {
         "gasto": 0.0, "leads": 0.0, "impressoes": 0.0, "cliques": 0.0, "tipo": "Expansão"
     })
+    camp_monthly = defaultdict(lambda: defaultdict(lambda: {
+        "gasto": 0.0, "leads": 0.0, "impressoes": 0.0, "cliques": 0.0,
+    }))
     creatives = defaultdict(lambda: {
         "gasto": 0.0, "leads": 0.0, "impressoes": 0.0, "cliques": 0.0,
         "thumbnail": "", "campanha": "",
@@ -280,6 +283,11 @@ def aggregate_meta_ads(rows):
             campaigns[campanha]["impressoes"] += impressoes
             campaigns[campanha]["cliques"] += cliques
             campaigns[campanha]["tipo"] = tipo
+
+            camp_monthly[campanha][mes]["gasto"] += gasto
+            camp_monthly[campanha][mes]["leads"] += leads
+            camp_monthly[campanha][mes]["impressoes"] += impressoes
+            camp_monthly[campanha][mes]["cliques"] += cliques
 
         anuncio = row.get("anuncio") or ""
         if anuncio:
@@ -333,6 +341,16 @@ def aggregate_meta_ads(rows):
             "cliques": int(round(d["cliques"])), "ctr": ctr,
         })
 
+    campaign_monthly_list = []
+    for camp, months in sorted(camp_monthly.items()):
+        tipo = "Repasse" if is_repasse(camp) else "Expansão"
+        for mes, d in sorted(months.items()):
+            campaign_monthly_list.append({
+                "campanha": camp, "mes": mes, "tipo": tipo,
+                "gasto": round(d["gasto"], 2), "leads": int(round(d["leads"])),
+                "impressoes": int(round(d["impressoes"])), "cliques": int(round(d["cliques"])),
+            })
+
     total_gasto = sum(d["gasto"] for d in monthly.values())
     total_leads = sum(d["leads"] for d in monthly.values())
 
@@ -342,6 +360,8 @@ def aggregate_meta_ads(rows):
         "cpl_geral": round(total_gasto / total_leads, 2) if total_leads > 0 else 0,
         "monthly": monthly_list,
         "campaigns": campaigns_list,
+        "campaign_monthly": campaign_monthly_list,
+        "campaign_names": sorted(camp_monthly.keys()),
         "creatives": creatives_list,
     }
 
@@ -353,6 +373,9 @@ def aggregate_google_ads(rows):
     campaigns = defaultdict(lambda: {
         "gasto": 0.0, "conversoes": 0.0, "impressoes": 0.0, "cliques": 0.0
     })
+    camp_monthly = defaultdict(lambda: defaultdict(lambda: {
+        "gasto": 0.0, "conversoes": 0.0, "impressoes": 0.0, "cliques": 0.0,
+    }))
 
     for row in rows:
         mes = parse_date_to_month(row.get("data"))
@@ -375,6 +398,11 @@ def aggregate_google_ads(rows):
             campaigns[campanha]["conversoes"] += conversoes
             campaigns[campanha]["impressoes"] += impressoes
             campaigns[campanha]["cliques"] += cliques
+
+            camp_monthly[campanha][mes]["gasto"] += gasto
+            camp_monthly[campanha][mes]["conversoes"] += conversoes
+            camp_monthly[campanha][mes]["impressoes"] += impressoes
+            camp_monthly[campanha][mes]["cliques"] += cliques
 
     monthly_list = []
     for mes, d in sorted(monthly.items()):
@@ -401,6 +429,15 @@ def aggregate_google_ads(rows):
             "cliques": int(round(d["cliques"])), "ctr": ctr,
         })
 
+    campaign_monthly_list = []
+    for camp, months in sorted(camp_monthly.items()):
+        for mes, d in sorted(months.items()):
+            campaign_monthly_list.append({
+                "campanha": camp, "mes": mes,
+                "gasto": round(d["gasto"], 2), "conversoes": int(round(d["conversoes"])),
+                "impressoes": int(round(d["impressoes"])), "cliques": int(round(d["cliques"])),
+            })
+
     total_gasto = sum(d["gasto"] for d in monthly.values())
     total_conversoes = sum(d["conversoes"] for d in monthly.values())
 
@@ -410,6 +447,8 @@ def aggregate_google_ads(rows):
         "cpl_geral": round(total_gasto / total_conversoes, 2) if total_conversoes > 0 else 0,
         "monthly": monthly_list,
         "campaigns": campaigns_list,
+        "campaign_monthly": campaign_monthly_list,
+        "campaign_names": sorted(camp_monthly.keys()),
     }
 
 

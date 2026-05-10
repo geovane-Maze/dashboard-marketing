@@ -75,6 +75,60 @@
   }
   .btn-filter:hover { opacity: 0.85; }
 
+  /* CAMPAIGN FILTER DROPDOWN */
+  .camp-toggle {
+    display: flex; align-items: center; gap: 6px;
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 5px 10px; font-size: 12px; color: var(--text);
+    background: var(--bg); cursor: pointer; min-width: 180px;
+    justify-content: space-between; user-select: none;
+  }
+  .camp-toggle.active { border-color: var(--secondary); }
+  .camp-wrapper { position: relative; }
+  .camp-menu {
+    position: absolute; top: calc(100% + 6px); right: 0;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.14);
+    z-index: 300; width: 320px; display: none;
+  }
+  .camp-menu.open { display: block; }
+  .camp-tabs {
+    display: flex; border-bottom: 1px solid var(--border);
+  }
+  .camp-tab {
+    flex: 1; padding: 8px 12px; font-size: 12px; font-weight: 600;
+    cursor: pointer; text-align: center; color: #888;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .camp-tab.active { color: var(--primary); border-bottom-color: var(--secondary); }
+  .camp-search-wrap { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  .camp-search-wrap input {
+    width: 100%; padding: 6px 10px; border: 1px solid var(--border);
+    border-radius: 6px; font-size: 12px; outline: none;
+  }
+  .camp-actions {
+    padding: 6px 12px; border-bottom: 1px solid var(--border);
+    display: flex; gap: 8px; align-items: center;
+  }
+  .camp-actions button {
+    font-size: 11px; padding: 3px 8px; border-radius: 4px;
+    border: 1px solid var(--border); background: var(--bg2);
+    cursor: pointer; color: var(--text);
+  }
+  .camp-actions .camp-count { font-size: 11px; color: #888; margin-left: auto; }
+  .camp-list { max-height: 220px; overflow-y: auto; padding: 4px 0; }
+  .camp-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 12px; font-size: 12px; cursor: pointer;
+  }
+  .camp-item:hover { background: var(--bg2); }
+  .camp-item input[type=checkbox] { cursor: pointer; flex-shrink: 0; }
+  .camp-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .camp-apply {
+    padding: 10px 12px; border-top: 1px solid var(--border);
+    display: flex; gap: 8px; justify-content: flex-end;
+  }
+
   /* CONTENT */
   #content { padding: 24px; }
   .section { display: none; }
@@ -281,6 +335,30 @@
     <div class="filter-group">
       <label>Até</label>
       <input type="date" id="filter-date-end" onchange="clearPreset()">
+    </div>
+    <div class="filter-group camp-wrapper">
+      <label>Campanhas</label>
+      <div class="camp-toggle" id="camp-toggle" onclick="toggleCampMenu()">
+        <span id="camp-toggle-label">Todas as campanhas</span>
+        <span>▼</span>
+      </div>
+      <div class="camp-menu" id="camp-menu">
+        <div class="camp-tabs">
+          <div class="camp-tab active" id="tab-meta" onclick="switchCampTab('meta')">Meta Ads</div>
+          <div class="camp-tab" id="tab-google" onclick="switchCampTab('google')">Google Ads</div>
+        </div>
+        <div class="camp-search-wrap">
+          <input type="text" id="camp-search" placeholder="Buscar campanha..." oninput="renderCampList()">
+        </div>
+        <div class="camp-actions">
+          <button onclick="clearCampSelection()">Limpar seleção</button>
+          <span class="camp-count" id="camp-count"></span>
+        </div>
+        <div class="camp-list" id="camp-list"></div>
+        <div class="camp-apply">
+          <button class="btn-filter" onclick="applyCampFilter()">Aplicar filtro</button>
+        </div>
+      </div>
     </div>
     <button class="btn-filter" onclick="applyFilters()">Aplicar</button>
   </div>
@@ -549,6 +627,9 @@
 // ─── GLOBALS ──────────────────────────────────────────────────────────────────
 let DATA = null;
 let CHARTS = {};
+let activeCampTab = 'meta';
+let selectedMeta = new Set();
+let selectedGoogle = new Set();
 const COLORS = {
   primary: '#0D3B66', secondary: '#3FA9F5',
   green: '#22C55E', red: '#EF4444', orange: '#F59E0B',
@@ -664,6 +745,119 @@ function applyFilters() {
   renderSection(currentSection());
 }
 
+// ─── CAMPAIGN FILTER ──────────────────────────────────────────────────────────
+function toggleCampMenu() {
+  const menu = document.getElementById('camp-menu');
+  const toggle = document.getElementById('camp-toggle');
+  const isOpen = menu.classList.contains('open');
+  menu.classList.toggle('open', !isOpen);
+  toggle.classList.toggle('active', !isOpen);
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.camp-wrapper')) {
+    document.getElementById('camp-menu')?.classList.remove('open');
+    document.getElementById('camp-toggle')?.classList.remove('active');
+  }
+});
+
+function switchCampTab(tab) {
+  activeCampTab = tab;
+  document.getElementById('tab-meta').classList.toggle('active', tab === 'meta');
+  document.getElementById('tab-google').classList.toggle('active', tab === 'google');
+  document.getElementById('camp-search').value = '';
+  renderCampList();
+}
+
+function renderCampList() {
+  if (!DATA) return;
+  const q = (document.getElementById('camp-search').value || '').toLowerCase();
+  const names = activeCampTab === 'meta'
+    ? (DATA.meta_ads.campaign_names || [])
+    : (DATA.google_ads.campaign_names || []);
+  const selected = activeCampTab === 'meta' ? selectedMeta : selectedGoogle;
+
+  const filtered = names.filter(n => n.toLowerCase().includes(q)).slice(0, 80);
+  document.getElementById('camp-list').innerHTML = filtered.length
+    ? filtered.map(n => `
+        <label class="camp-item">
+          <input type="checkbox" value="${n.replace(/"/g,'&quot;')}"
+            ${selected.has(n) ? 'checked' : ''}
+            onchange="toggleCamp(this, '${activeCampTab}')">
+          <span title="${n}">${n}</span>
+        </label>`).join('')
+    : '<div style="padding:12px;color:#aaa;font-size:12px;text-align:center">Nenhuma campanha encontrada</div>';
+
+  updateCampCount();
+}
+
+function toggleCamp(el, source) {
+  const set = source === 'meta' ? selectedMeta : selectedGoogle;
+  if (el.checked) set.add(el.value);
+  else set.delete(el.value);
+  updateCampCount();
+}
+
+function updateCampCount() {
+  const total = selectedMeta.size + selectedGoogle.size;
+  document.getElementById('camp-count').textContent =
+    total > 0 ? `${total} selecionada(s)` : '';
+  document.getElementById('camp-toggle-label').textContent =
+    total > 0 ? `${total} campanha(s)` : 'Todas as campanhas';
+}
+
+function clearCampSelection() {
+  selectedMeta.clear();
+  selectedGoogle.clear();
+  renderCampList();
+  updateCampCount();
+}
+
+function applyCampFilter() {
+  document.getElementById('camp-menu').classList.remove('open');
+  document.getElementById('camp-toggle').classList.remove('active');
+  applyFilters();
+}
+
+// Returns monthly data for Meta Ads, applying campaign filter if active
+function getMetaMonthly(pred) {
+  if (selectedMeta.size === 0) return filterMonthly(DATA.meta_ads.monthly, pred);
+  const rows = (DATA.meta_ads.campaign_monthly || []).filter(r =>
+    selectedMeta.has(r.campanha) && (!pred || pred(r.mes))
+  );
+  const byMonth = {};
+  rows.forEach(r => {
+    if (!byMonth[r.mes]) byMonth[r.mes] = {
+      mes: r.mes, gasto: 0, leads: 0, impressoes: 0, cliques: 0,
+      expansao_gasto: 0, repasse_gasto: 0, expansao_leads: 0, repasse_leads: 0,
+    };
+    const m = byMonth[r.mes];
+    m.gasto += r.gasto; m.leads += r.leads;
+    m.impressoes += r.impressoes; m.cliques += r.cliques;
+    if (r.tipo === 'Repasse') { m.repasse_gasto += r.gasto; m.repasse_leads += r.leads; }
+    else { m.expansao_gasto += r.gasto; m.expansao_leads += r.leads; }
+  });
+  return Object.values(byMonth).sort((a, b) => a.mes.localeCompare(b.mes));
+}
+
+// Returns monthly data for Google Ads, applying campaign filter if active
+function getGoogleMonthly(pred) {
+  if (selectedGoogle.size === 0) return filterMonthly(DATA.google_ads.monthly, pred);
+  const rows = (DATA.google_ads.campaign_monthly || []).filter(r =>
+    selectedGoogle.has(r.campanha) && (!pred || pred(r.mes))
+  );
+  const byMonth = {};
+  rows.forEach(r => {
+    if (!byMonth[r.mes]) byMonth[r.mes] = {
+      mes: r.mes, gasto: 0, conversoes: 0, impressoes: 0, cliques: 0,
+    };
+    const m = byMonth[r.mes];
+    m.gasto += r.gasto; m.conversoes += r.conversoes;
+    m.impressoes += r.impressoes; m.cliques += r.cliques;
+  });
+  return Object.values(byMonth).sort((a, b) => a.mes.localeCompare(b.mes));
+}
+
 // ─── RENDER DISPATCHER ────────────────────────────────────────────────────────
 const rendered = {};
 function renderSection(sec) {
@@ -688,12 +882,12 @@ function renderExecutivo() {
   const leads = filterMonthly(DATA.leads.monthly, pred).reduce((s, r) => s + r.total, 0);
 
   let metaGasto = 0, metaLeads = 0;
-  filterMonthly(DATA.meta_ads.monthly, pred).forEach(r => {
+  getMetaMonthly(pred).forEach(r => {
     metaGasto += r.gasto; metaLeads += r.leads;
   });
 
   let googleGasto = 0, googleConv = 0;
-  filterMonthly(DATA.google_ads.monthly, pred).forEach(r => {
+  getGoogleMonthly(pred).forEach(r => {
     googleGasto += r.gasto; googleConv += r.conversoes;
   });
 
@@ -787,7 +981,7 @@ function renderEvolucao() {
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }
   });
 
-  const metaData = filterMonthly(DATA.meta_ads.monthly, pred);
+  const metaData = getMetaMonthly(pred);
   makeChart('chart-meta-monthly-spend', {
     type: 'bar',
     data: {
@@ -797,7 +991,7 @@ function renderEvolucao() {
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
   });
 
-  const googleData = filterMonthly(DATA.google_ads.monthly, pred);
+  const googleData = getGoogleMonthly(pred);
   makeChart('chart-google-monthly-spend', {
     type: 'bar',
     data: {
@@ -935,7 +1129,7 @@ function renderMeta() {
   const tipo = getTipo();
 
   let totalGasto = 0, totalLeads = 0;
-  const monthly = filterMonthly(DATA.meta_ads.monthly, pred);
+  const monthly = getMetaMonthly(pred);
   monthly.forEach(r => {
     if (tipo === 'all') { totalGasto += r.gasto; totalLeads += r.leads; }
     else if (tipo === 'Expansão') { totalGasto += r.expansao_gasto; totalLeads += r.expansao_leads; }
@@ -1001,7 +1195,7 @@ function renderMeta() {
 // ─── SECTION: GOOGLE ADS ──────────────────────────────────────────────────────
 function renderGoogle() {
   const pred = getFilteredMonths();
-  const monthly = filterMonthly(DATA.google_ads.monthly, pred);
+  const monthly = getGoogleMonthly(pred);
 
   const totalGasto = monthly.reduce((s, r) => s + r.gasto, 0);
   const totalConv = monthly.reduce((s, r) => s + r.conversoes, 0);
@@ -1192,6 +1386,7 @@ async function loadData() {
     document.getElementById('filter-date-start').value = threeMonthsAgo.toISOString().slice(0, 10);
     document.getElementById('filter-date-end').value = today.toISOString().slice(0, 10);
 
+    renderCampList();
     document.getElementById('loading').style.display = 'none';
     renderExecutivo();
   } catch (err) {
