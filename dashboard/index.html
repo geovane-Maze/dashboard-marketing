@@ -749,6 +749,7 @@ function currentSection() {
 
 // ─── APPLY FILTERS ────────────────────────────────────────────────────────────
 function applyFilters() {
+  renderCampList();
   renderSection(currentSection());
 }
 
@@ -778,16 +779,25 @@ function switchCampTab(tab) {
 
 function renderCampList() {
   if (!DATA) return;
+  const pred = getFilteredMonths();
   const q = (document.getElementById('camp-search').value || '').toLowerCase();
   const selected = activeCampTab === 'meta' ? selectedMeta : selectedGoogle;
 
   let items = [];
   if (activeCampTab === 'meta') {
-    const names = DATA.meta_ads.campaign_names || [];
-    items = names.map(n => ({ name: n, tipo: isRepasse(n) ? 'Repasse' : 'Expansão' }));
+    const activeCamps = new Set(
+      (DATA.meta_ads.campaign_monthly || [])
+        .filter(r => !pred || pred(r.mes))
+        .map(r => r.campanha)
+    );
+    items = [...activeCamps].sort().map(n => ({ name: n, tipo: isRepasse(n) ? 'Repasse' : 'Expansão' }));
   } else {
-    const names = DATA.google_ads.campaign_names || [];
-    items = names.map(n => ({ name: n, tipo: null }));
+    const activeCamps = new Set(
+      (DATA.google_ads.campaign_monthly || [])
+        .filter(r => !pred || pred(r.mes))
+        .map(r => r.campanha)
+    );
+    items = [...activeCamps].sort().map(n => ({ name: n, tipo: null }));
   }
 
   const filtered = q ? items.filter(c => c.name.toLowerCase().includes(q)) : items;
