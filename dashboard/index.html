@@ -89,7 +89,7 @@
     position: absolute; top: calc(100% + 6px); right: 0;
     background: var(--bg); border: 1px solid var(--border);
     border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.14);
-    z-index: 300; width: 320px; display: none;
+    z-index: 300; width: 380px; display: none;
   }
   .camp-menu.open { display: block; }
   .camp-tabs {
@@ -116,18 +116,25 @@
     cursor: pointer; color: var(--text);
   }
   .camp-actions .camp-count { font-size: 11px; color: #888; margin-left: auto; }
-  .camp-list { max-height: 220px; overflow-y: auto; padding: 4px 0; }
+  .camp-list { max-height: 260px; overflow-y: auto; padding: 4px 0; }
   .camp-item {
-    display: flex; align-items: center; gap: 8px;
-    padding: 6px 12px; font-size: 12px; cursor: pointer;
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 14px; font-size: 12px; cursor: pointer;
+    border-bottom: 1px solid var(--border);
   }
-  .camp-item:hover { background: var(--bg2); }
-  .camp-item input[type=checkbox] { cursor: pointer; flex-shrink: 0; }
-  .camp-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .camp-item:last-child { border-bottom: none; }
+  .camp-item:hover { background: #EFF6FF; }
+  .camp-item.checked { background: #DBEAFE; }
+  .camp-item input[type=checkbox] { cursor: pointer; flex-shrink: 0; width: 15px; height: 15px; accent-color: var(--secondary); }
+  .camp-item .camp-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .camp-item .camp-tipo { font-size: 10px; padding: 2px 6px; border-radius: 10px; flex-shrink: 0; }
+  .camp-item .camp-tipo.expansao { background: #DBEAFE; color: #1D4ED8; }
+  .camp-item .camp-tipo.repasse { background: #FEF3C7; color: #92400E; }
   .camp-apply {
     padding: 10px 12px; border-top: 1px solid var(--border);
-    display: flex; gap: 8px; justify-content: flex-end;
+    display: flex; gap: 8px; justify-content: space-between; align-items: center;
   }
+  .camp-apply .camp-sel-info { font-size: 11px; color: #888; }
 
   /* CONTENT */
   #content { padding: 24px; }
@@ -772,21 +779,35 @@ function switchCampTab(tab) {
 function renderCampList() {
   if (!DATA) return;
   const q = (document.getElementById('camp-search').value || '').toLowerCase();
-  const names = activeCampTab === 'meta'
-    ? (DATA.meta_ads.campaign_names || [])
-    : (DATA.google_ads.campaign_names || []);
   const selected = activeCampTab === 'meta' ? selectedMeta : selectedGoogle;
 
-  const filtered = names.filter(n => n.toLowerCase().includes(q)).slice(0, 80);
+  let items = [];
+  if (activeCampTab === 'meta') {
+    const names = DATA.meta_ads.campaign_names || [];
+    items = names.map(n => ({ name: n, tipo: isRepasse(n) ? 'Repasse' : 'Expansão' }));
+  } else {
+    const names = DATA.google_ads.campaign_names || [];
+    items = names.map(n => ({ name: n, tipo: null }));
+  }
+
+  const filtered = q ? items.filter(c => c.name.toLowerCase().includes(q)) : items;
+
   document.getElementById('camp-list').innerHTML = filtered.length
-    ? filtered.map(n => `
-        <label class="camp-item">
-          <input type="checkbox" value="${n.replace(/"/g,'&quot;')}"
-            ${selected.has(n) ? 'checked' : ''}
+    ? filtered.map(c => {
+        const checked = selected.has(c.name);
+        const tipoHtml = c.tipo
+          ? `<span class="camp-tipo ${c.tipo === 'Repasse' ? 'repasse' : 'expansao'}">${c.tipo}</span>`
+          : '';
+        const safe = c.name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        return `<label class="camp-item${checked ? ' checked' : ''}">
+          <input type="checkbox" value="${safe}"
+            ${checked ? 'checked' : ''}
             onchange="toggleCamp(this, '${activeCampTab}')">
-          <span title="${n}">${n}</span>
-        </label>`).join('')
-    : '<div style="padding:12px;color:#aaa;font-size:12px;text-align:center">Nenhuma campanha encontrada</div>';
+          <span class="camp-name" title="${safe}">${c.name}</span>
+          ${tipoHtml}
+        </label>`;
+      }).join('')
+    : '<div style="padding:16px;color:#aaa;font-size:12px;text-align:center">Nenhuma campanha encontrada</div>';
 
   updateCampCount();
 }
@@ -795,6 +816,7 @@ function toggleCamp(el, source) {
   const set = source === 'meta' ? selectedMeta : selectedGoogle;
   if (el.checked) set.add(el.value);
   else set.delete(el.value);
+  el.closest('.camp-item').classList.toggle('checked', el.checked);
   updateCampCount();
 }
 
