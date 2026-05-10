@@ -15,7 +15,7 @@ def get_client():
     return GoogleAdsClient.load_from_dict(credentials)
 
 
-def get_campaign_data(days_back=30):
+def get_campaign_data(days_back=90):
     client = get_client()
     service = client.get_service("GoogleAdsService")
     customer_id = config.GOOGLE_ADS_CUSTOMER_ID.replace("-", "")
@@ -23,26 +23,26 @@ def get_campaign_data(days_back=30):
     date_end = datetime.today().strftime("%Y-%m-%d")
     date_start = (datetime.today() - timedelta(days=days_back)).strftime("%Y-%m-%d")
 
+    # Query FROM campaign instead of ad_group so Performance Max campaigns are included.
+    # PMax campaigns have no traditional ad groups and are invisible in ad_group queries.
     query = f"""
         SELECT
             campaign.id,
             campaign.name,
             campaign.status,
-            ad_group.name,
             metrics.impressions,
             metrics.clicks,
             metrics.cost_micros,
             metrics.conversions,
-            metrics.ctr,
-            metrics.average_cpc,
             segments.date
-        FROM ad_group
+        FROM campaign
         WHERE segments.date BETWEEN '{date_start}' AND '{date_end}'
-          AND campaign.status = 'ENABLED'
+          AND campaign.status != 'REMOVED'
+          AND metrics.cost_micros > 0
         ORDER BY segments.date DESC
     """
 
-    print("Coletando dados do Google Ads...")
+    print("Coletando dados do Google Ads (API)...")
     rows = []
 
     try:
@@ -50,15 +50,11 @@ def get_campaign_data(days_back=30):
         for row in response:
             rows.append({
                 "data": row.segments.date,
-                "campanha_id": row.campaign.id,
-                "campanha_nome": row.campaign.name,
-                "conjunto_anuncio": row.ad_group.name,
-                "impressoes": row.metrics.impressions,
+                "campanha": row.campaign.name,
+                "gasto": round(row.metrics.cost_micros / 1_000_000, 2),
                 "cliques": row.metrics.clicks,
-                "custo_brl": round(row.metrics.cost_micros / 1_000_000, 2),
+                "impressoes": row.metrics.impressions,
                 "conversoes": row.metrics.conversions,
-                "ctr": round(row.metrics.ctr * 100, 2),
-                "cpc_medio": round(row.metrics.average_cpc / 1_000_000, 2),
             })
     except GoogleAdsException as ex:
         print(f"Erro Google Ads: {ex.error.code().name}")
