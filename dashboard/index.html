@@ -257,6 +257,38 @@
   .alert-card.danger { background: #FEE2E2; border-left: 4px solid var(--red); color: #7F1D1D; }
   .alert-card.ok { background: #DCFCE7; border-left: 4px solid var(--green); color: #14532D; }
 
+  /* KPI GRID 5 COLUNAS */
+  .kpi-grid-5 {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 16px; margin-bottom: 24px;
+  }
+
+  /* ADS COMPARISON */
+  .ads-comparison {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 20px; margin-bottom: 24px;
+  }
+  .ads-group {
+    background: var(--bg); border-radius: 10px;
+    border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    overflow: hidden;
+  }
+  .ads-group-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px; font-size: 13px; font-weight: 700; color: #fff;
+  }
+  .ads-group-header.google { background: var(--primary); }
+  .ads-group-header.meta { background: #1877F2; }
+  .ads-group-kpis { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .ads-kpi {
+    padding: 14px 16px; border-right: 1px solid var(--border);
+  }
+  .ads-kpi:last-child { border-right: none; }
+  .ads-kpi .ads-kpi-label { font-size: 10px; text-transform: uppercase; color: #888; letter-spacing: 0.5px; }
+  .ads-kpi .ads-kpi-value { font-size: 20px; font-weight: 700; color: var(--primary); margin: 4px 0 2px; line-height: 1.1; }
+  .ads-kpi .ads-kpi-sub { font-size: 10px; color: #aaa; }
+
   /* RESPONSIVE */
   @media (max-width: 900px) {
     .charts-row { grid-template-columns: 1fr; }
@@ -376,17 +408,66 @@
     <!-- VISÃO EXECUTIVA -->
     <div id="sec-executivo" class="section active">
       <div class="section-title">Visão Executiva</div>
-      <div class="kpi-grid" id="kpi-grid"></div>
+
+      <!-- Bloco 1: KPIs de Leads -->
+      <div class="kpi-grid-5" id="kpi-leads-exec"></div>
+
+      <!-- Bloco 2: Google + Meta Ads -->
+      <div class="ads-comparison" id="ads-comparison"></div>
+
+      <!-- Bloco 3: Evolução Mensal de Leads -->
+      <div class="chart-card" style="margin-bottom:24px">
+        <h3>Evolução Mensal de Leads — Últimos 4 Meses</h3>
+        <div class="chart-wrap tall"><canvas id="chart-exec-evolucao"></canvas></div>
+      </div>
+
+      <!-- Bloco 4: Funil CRM + Por Responsável -->
       <div class="charts-row">
         <div class="chart-card">
-          <h3>Leads vs Gasto — Visão Geral</h3>
-          <div class="chart-wrap"><canvas id="chart-exec-leads"></canvas></div>
+          <h3>Negócios por Etapa</h3>
+          <div id="exec-funnel-bars" style="padding:8px 0;"></div>
         </div>
         <div class="chart-card">
-          <h3>Distribuição de Investimento</h3>
-          <div class="chart-wrap"><canvas id="chart-exec-invest"></canvas></div>
+          <h3>Por Responsável</h3>
+          <div class="chart-wrap tall"><canvas id="chart-exec-resp"></canvas></div>
         </div>
       </div>
+
+      <!-- Bloco 5: Capital + Motivos de Perda -->
+      <div class="charts-row">
+        <div class="chart-card">
+          <h3>Capital Disponível dos Leads</h3>
+          <div class="chart-wrap"><canvas id="chart-exec-capital"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Motivos de Perda (CRM)</h3>
+          <div class="chart-wrap tall"><canvas id="chart-exec-losses"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Bloco 6: UTM / Atribuição -->
+      <div class="charts-row triple">
+        <div class="chart-card">
+          <h3>Leads por Fonte (utm_source)</h3>
+          <div class="chart-wrap"><canvas id="chart-exec-utm-source"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Leads por Mídia (utm_medium)</h3>
+          <div class="chart-wrap"><canvas id="chart-exec-utm-medium"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Leads por Canal (RD Station)</h3>
+          <div class="chart-wrap"><canvas id="chart-exec-canal"></canvas></div>
+        </div>
+      </div>
+      <div class="table-card">
+        <h3>Top Campanhas UTM</h3>
+        <table>
+          <thead><tr><th>#</th><th>Campanha (utm_campaign)</th><th>Leads</th><th>%</th></tr></thead>
+          <tbody id="exec-table-utm"></tbody>
+        </table>
+      </div>
+
       <div id="exec-alerts"></div>
     </div>
 
@@ -908,89 +989,178 @@ function renderSection(sec) {
 }
 
 // ─── SECTION: EXECUTIVO ───────────────────────────────────────────────────────
+const FUNNEL_ORDER = [
+  'entrada de lead', 'contato inicial', 'nutrição 1', 'nutricao 1',
+  'nutrição 2', 'nutricao 2', 'pré-qualificado', 'pre-qualificado',
+  'reunião pdf', 'reuniao pdf', 'reunião de pdf',
+  'apresentação do business plan', 'apresentacao do business plan',
+  'envio de cof', 'workshop', 'aprovação final', 'aprovacao final',
+];
+
+function funnelSortIndex(etapa) {
+  const el = (etapa || '').toLowerCase().trim();
+  for (let i = 0; i < FUNNEL_ORDER.length; i++) {
+    if (el === FUNNEL_ORDER[i] || el.includes(FUNNEL_ORDER[i]) || FUNNEL_ORDER[i].includes(el)) return i;
+  }
+  return 999;
+}
+
 function renderExecutivo() {
   const pred = getFilteredMonths();
-
-  const leads = filterMonthly(DATA.leads.monthly, pred).reduce((s, r) => s + r.total, 0);
-
-  let metaGasto = 0, metaLeads = 0;
-  getMetaMonthly(pred).forEach(r => {
-    metaGasto += r.gasto; metaLeads += r.leads;
-  });
-
-  let googleGasto = 0, googleConv = 0;
-  getGoogleMonthly(pred).forEach(r => {
-    googleGasto += r.gasto; googleConv += r.conversoes;
-  });
-
-  let ga4Sessions = 0;
-  filterMonthly(DATA.ga4.monthly, pred).forEach(r => { ga4Sessions += r.sessions; });
-
   const crm = DATA.crm;
-  const totalGasto = metaGasto + googleGasto;
-  const metaCPL = metaLeads > 0 ? metaGasto / metaLeads : 0;
-  const googleCPL = googleConv > 0 ? googleGasto / googleConv : 0;
 
-  const kpis = [
-    { label: 'Total de Leads (RD)', value: fmt.num(leads), sub: 'período selecionado', cls: '' },
-    { label: 'Negócios CRM', value: fmt.num(crm.total_deals), sub: `${crm.total_won} ganhos`, cls: '' },
-    { label: 'Negócios Ganhos', value: fmt.num(crm.total_won), sub: fmt.pct(crm.taxa_fechamento) + ' de fechamento', cls: 'green' },
-    { label: 'Valor Ganho (CRM)', value: fmt.currency(crm.total_value_won), sub: 'total histórico', cls: 'blue' },
-    { label: 'Gasto Meta Ads', value: fmt.currency(metaGasto), sub: 'período selecionado', cls: '' },
-    { label: 'CPL Meta Ads', value: fmt.currency(metaCPL), sub: fmt.num(metaLeads) + ' leads', cls: 'orange' },
-    { label: 'Gasto Google Ads', value: fmt.currency(googleGasto), sub: 'período selecionado', cls: '' },
-    { label: 'CPL Google Ads', value: fmt.currency(googleCPL), sub: fmt.num(googleConv) + ' conversões', cls: 'orange' },
-    { label: 'Investimento Total', value: fmt.currency(totalGasto), sub: 'Meta + Google', cls: '' },
-    { label: 'Sessões GA4', value: fmt.k(ga4Sessions), sub: 'período selecionado', cls: 'blue' },
-  ];
-
-  document.getElementById('kpi-grid').innerHTML = kpis.map(k =>
-    `<div class="kpi-card ${k.cls}">
-      <div class="kpi-label">${k.label}</div>
-      <div class="kpi-value">${k.value}</div>
-      <div class="kpi-sub">${k.sub}</div>
-    </div>`
-  ).join('');
-
-  // Chart: leads + gasto linha do tempo
+  // Totais de leads no período
   const leadsData = filterMonthly(DATA.leads.monthly, pred);
-  makeChart('chart-exec-leads', {
+  const totalLeadsPeriodo = leadsData.reduce((s, r) => s + r.total, 0);
+
+  // Pagos / Orgânicos (dados históricos do RD Station)
+  const totalLeadsAll = DATA.leads.total || 0;
+  const pagos = DATA.leads.pagos || 0;
+  const organicos = DATA.leads.organicos || (totalLeadsAll - pagos);
+  const pct = (v, t) => t > 0 ? ' (' + (v / t * 100).toFixed(0) + '%)' : '';
+
+  // Google Ads no período
+  let googleGasto = 0, googleLeads = 0;
+  getGoogleMonthly(pred).forEach(r => { googleGasto += r.gasto; googleLeads += r.conversoes; });
+  const googleCPL = googleLeads > 0 ? googleGasto / googleLeads : 0;
+
+  // Meta Ads no período
+  let metaGasto = 0, metaLeads = 0;
+  getMetaMonthly(pred).forEach(r => { metaGasto += r.gasto; metaLeads += r.leads; });
+  const metaCPL = metaLeads > 0 ? metaGasto / metaLeads : 0;
+
+  // ── Bloco 1: KPI leads ───────────────────────────────────────────────────────
+  document.getElementById('kpi-leads-exec').innerHTML = [
+    { label: 'Total de Leads Gerados', value: fmt.num(totalLeadsPeriodo), sub: 'período selecionado', cls: '' },
+    { label: 'Leads Pagos', value: fmt.num(pagos), sub: pct(pagos, totalLeadsAll) + ' do total', cls: 'blue' },
+    { label: 'Leads Orgânicos', value: fmt.num(organicos), sub: pct(organicos, totalLeadsAll) + ' do total', cls: 'green' },
+    { label: 'Leads Abertos (Ativos)', value: fmt.num(crm.total_open), sub: pct(crm.total_open, crm.total_deals) + ' dos negócios', cls: 'orange' },
+    { label: 'Leads Perdidos', value: fmt.num(crm.total_lost), sub: pct(crm.total_lost, crm.total_deals) + ' dos negócios', cls: 'red' },
+  ].map(k => `<div class="kpi-card ${k.cls}">
+    <div class="kpi-label">${k.label}</div>
+    <div class="kpi-value">${k.value}</div>
+    <div class="kpi-sub">${k.sub}</div>
+  </div>`).join('');
+
+  // ── Bloco 2: Ads comparison ──────────────────────────────────────────────────
+  document.getElementById('ads-comparison').innerHTML = `
+    <div class="ads-group">
+      <div class="ads-group-header google">🔍 Google Ads</div>
+      <div class="ads-group-kpis">
+        <div class="ads-kpi"><div class="ads-kpi-label">Qtd. de Leads</div><div class="ads-kpi-value">${fmt.num(googleLeads)}</div><div class="ads-kpi-sub">conversões</div></div>
+        <div class="ads-kpi"><div class="ads-kpi-label">Valor Investido</div><div class="ads-kpi-value">${fmt.currency(googleGasto)}</div><div class="ads-kpi-sub">período</div></div>
+        <div class="ads-kpi"><div class="ads-kpi-label">Custo por Lead</div><div class="ads-kpi-value">${fmt.currency(googleCPL)}</div><div class="ads-kpi-sub">CPL</div></div>
+      </div>
+    </div>
+    <div class="ads-group">
+      <div class="ads-group-header meta">📘 Meta Ads</div>
+      <div class="ads-group-kpis">
+        <div class="ads-kpi"><div class="ads-kpi-label">Qtd. de Leads</div><div class="ads-kpi-value">${fmt.num(metaLeads)}</div><div class="ads-kpi-sub">leads</div></div>
+        <div class="ads-kpi"><div class="ads-kpi-label">Valor Investido</div><div class="ads-kpi-value">${fmt.currency(metaGasto)}</div><div class="ads-kpi-sub">período</div></div>
+        <div class="ads-kpi"><div class="ads-kpi-label">Custo por Lead</div><div class="ads-kpi-value">${fmt.currency(metaCPL)}</div><div class="ads-kpi-sub">CPL</div></div>
+      </div>
+    </div>`;
+
+  // ── Bloco 3: Evolução Mensal ─────────────────────────────────────────────────
+  const last4 = leadsData.slice(-4);
+  const stageByMes = {};
+  (crm.monthly_stages || []).forEach(r => { stageByMes[r.mes] = r; });
+
+  makeChart('chart-exec-evolucao', {
     type: 'bar',
     data: {
-      labels: leadsData.map(r => mesLabel(r.mes)),
-      datasets: [{
-        label: 'Leads', data: leadsData.map(r => r.total),
-        backgroundColor: COLORS.secondary + 'CC', borderRadius: 4,
-      }]
+      labels: last4.map(r => mesLabel(r.mes)),
+      datasets: [
+        { label: 'Total de Leads',        data: last4.map(r => r.total),                                  backgroundColor: COLORS.secondary + 'CC', borderRadius: 4 },
+        { label: 'Reunião PDF',            data: last4.map(r => (stageByMes[r.mes]?.reuniao_pdf     || 0)), backgroundColor: COLORS.green   + 'CC', borderRadius: 4 },
+        { label: 'Apresentação BP',        data: last4.map(r => (stageByMes[r.mes]?.apresentacao_bp || 0)), backgroundColor: COLORS.orange  + 'CC', borderRadius: 4 },
+        { label: 'Perdidos',               data: last4.map(r => (stageByMes[r.mes]?.perdidos        || 0)), backgroundColor: COLORS.red     + 'CC', borderRadius: 4 },
+      ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: { legend: { position: 'bottom' } },
       scales: { y: { beginAtZero: true } }
     }
   });
 
-  // Chart: investimento pizza
-  makeChart('chart-exec-invest', {
-    type: 'doughnut',
+  // ── Bloco 4: Funil na ordem correta ─────────────────────────────────────────
+  const sortedFunnel = [...crm.funnel].sort((a, b) => funnelSortIndex(a.etapa) - funnelSortIndex(b.etapa));
+  const maxFunnel = Math.max(...sortedFunnel.map(s => s.total), 1);
+  document.getElementById('exec-funnel-bars').innerHTML = sortedFunnel.map(s => `
+    <div class="funnel-bar-container">
+      <div class="funnel-bar-label">
+        <span class="stage-name">${s.etapa}</span>
+        <span class="stage-count">${fmt.num(s.total)} negócios — ${fmt.currency(s.valor)}</span>
+      </div>
+      <div class="funnel-bar-track"><div class="funnel-bar-fill" style="width:${(s.total/maxFunnel*100).toFixed(1)}%"></div></div>
+    </div>`).join('');
+
+  // Por Responsável
+  const resp = crm.by_responsavel.slice(0, 8);
+  makeChart('chart-exec-resp', {
+    type: 'bar',
     data: {
-      labels: ['Meta Ads', 'Google Ads'],
-      datasets: [{ data: [metaGasto, googleGasto], backgroundColor: [COLORS.secondary, COLORS.primary], borderWidth: 2 }]
+      labels: resp.map(r => r.responsavel),
+      datasets: [
+        { label: 'Total',  data: resp.map(r => r.total),  backgroundColor: COLORS.secondary + 'CC', borderRadius: 4 },
+        { label: 'Ganhos', data: resp.map(r => r.ganhos), backgroundColor: COLORS.green     + 'CC', borderRadius: 4 },
+      ]
     },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom' } }
-    }
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { position: 'bottom' } } }
   });
 
-  // Alerts
+  // ── Bloco 5: Capital + Motivos de Perda ──────────────────────────────────────
+  const cap = DATA.leads.by_capital.slice(0, 8);
+  makeChart('chart-exec-capital', {
+    type: 'doughnut',
+    data: { labels: cap.map(r => r.capital), datasets: [{ data: cap.map(r => r.total), backgroundColor: PALETTE }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
+  });
+
+  const losses = crm.losses || [];
+  makeChart('chart-exec-losses', {
+    type: 'bar',
+    data: {
+      labels: losses.slice(0, 10).map(r => r.motivo),
+      datasets: [{ data: losses.slice(0, 10).map(r => r.total), backgroundColor: COLORS.red + 'CC', borderRadius: 4 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
+  });
+
+  // ── Bloco 6: UTM / Atribuição ────────────────────────────────────────────────
+  const sources = DATA.utm.sources.slice(0, 10);
+  makeChart('chart-exec-utm-source', {
+    type: 'doughnut',
+    data: { labels: sources.map(r => r.source), datasets: [{ data: sources.map(r => r.total), backgroundColor: PALETTE }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
+  });
+
+  const mediums = DATA.utm.mediums.slice(0, 8);
+  makeChart('chart-exec-utm-medium', {
+    type: 'doughnut',
+    data: { labels: mediums.map(r => r.medium), datasets: [{ data: mediums.map(r => r.total), backgroundColor: PALETTE }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
+  });
+
+  const canal = DATA.leads.by_canal.slice(0, 8);
+  makeChart('chart-exec-canal', {
+    type: 'doughnut',
+    data: { labels: canal.map(r => r.canal), datasets: [{ data: canal.map(r => r.total), backgroundColor: PALETTE }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
+  });
+
+  const totalCamp = DATA.utm.campaigns.reduce((s, r) => s + r.total, 0) || 1;
+  document.getElementById('exec-table-utm').innerHTML = DATA.utm.campaigns.map((r, i) =>
+    `<tr><td>${i+1}</td><td>${r.campaign}</td><td><strong>${r.total}</strong></td><td>${(r.total/totalCamp*100).toFixed(1)}%</td></tr>`
+  ).join('') || '<tr><td colspan="4" class="empty">Sem dados UTM</td></tr>';
+
+  // Alertas
   const alerts = [];
   if (metaCPL > 300) alerts.push({ type: 'warn', msg: `CPL Meta Ads elevado: ${fmt.currency(metaCPL)}. Revisar segmentações e criativos.` });
   if (googleCPL > 500) alerts.push({ type: 'warn', msg: `CPL Google Ads elevado: ${fmt.currency(googleCPL)}. Verificar palavras-chave e conversões.` });
-  if (crm.taxa_fechamento < 10) alerts.push({ type: 'warn', msg: `Taxa de fechamento baixa: ${fmt.pct(crm.taxa_fechamento)}. Verificar qualidade dos leads e processo de vendas.` });
-  if (crm.total_lost > crm.total_won) alerts.push({ type: 'danger', msg: `Mais negócios perdidos (${crm.total_lost}) do que ganhos (${crm.total_won}). Analisar motivos de perda.` });
+  if (crm.total_lost > crm.total_won * 5) alerts.push({ type: 'danger', msg: `Muitos negócios perdidos (${crm.total_lost}) vs ganhos (${crm.total_won}). Analisar motivos de perda.` });
   if (alerts.length === 0) alerts.push({ type: 'ok', msg: 'Nenhum alerta crítico identificado no período selecionado.' });
-
   document.getElementById('exec-alerts').innerHTML = alerts.map(a =>
     `<div class="alert-card ${a.type}"><strong>${a.type === 'ok' ? '✅' : a.type === 'danger' ? '🚨' : '⚠️'}</strong> ${a.msg}</div>`
   ).join('');

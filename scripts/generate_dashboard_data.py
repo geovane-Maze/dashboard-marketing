@@ -138,8 +138,13 @@ def aggregate_leads(leads):
         prazo = lead.get("prazo_abertura") or "não informado"
         by_prazo[prazo] += 1
 
+    pagos = sum(v for k, v in by_canal.items() if any(kw in k.lower() for kw in ["busca paga", "paid", "cpc", " paga"]))
+    organicos = len(leads) - pagos
+
     return {
         "total": len(leads),
+        "pagos": pagos,
+        "organicos": organicos,
         "monthly": [{"mes": k, **v} for k, v in sorted(monthly.items())],
         "by_source": [
             {"source": k, "total": v}
@@ -171,6 +176,7 @@ def aggregate_crm(deals):
     by_loss_reason = defaultdict(int)
     by_responsavel = defaultdict(lambda: {"total": 0, "ganhos": 0, "valor": 0.0})
     monthly_won = defaultdict(lambda: {"total": 0, "valor": 0.0})
+    monthly_stages = defaultdict(lambda: {"reuniao_pdf": 0, "apresentacao_bp": 0, "perdidos": 0})
 
     total_won = 0
     total_lost = 0
@@ -199,6 +205,16 @@ def aggregate_crm(deals):
         if motivo:
             by_loss_reason[motivo] += 1
             total_lost += 1
+
+        mes_criado = parse_date_to_month(deal.get("criado_em"))
+        if mes_criado:
+            etapa_lower = etapa.lower()
+            if "reunião pdf" in etapa_lower or "reuniao pdf" in etapa_lower:
+                monthly_stages[mes_criado]["reuniao_pdf"] += 1
+            if "apresentação do business plan" in etapa_lower or "apresentacao do business plan" in etapa_lower:
+                monthly_stages[mes_criado]["apresentacao_bp"] += 1
+            if motivo:
+                monthly_stages[mes_criado]["perdidos"] += 1
 
         resp = deal.get("responsavel") or "sem responsável"
         by_responsavel[resp]["total"] += 1
@@ -232,6 +248,10 @@ def aggregate_crm(deals):
         "monthly_won": [
             {"mes": k, "total": v["total"], "valor": round(v["valor"], 2)}
             for k, v in sorted(monthly_won.items())
+        ],
+        "monthly_stages": [
+            {"mes": k, "reuniao_pdf": v["reuniao_pdf"], "apresentacao_bp": v["apresentacao_bp"], "perdidos": v["perdidos"]}
+            for k, v in sorted(monthly_stages.items())
         ],
     }
 
