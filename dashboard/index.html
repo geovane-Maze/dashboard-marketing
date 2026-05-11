@@ -1019,14 +1019,16 @@ function renderExecutivo() {
   const organicos = DATA.leads.organicos || (totalLeadsAll - pagos);
   const pct = (v, t) => t > 0 ? ' (' + (v / t * 100).toFixed(0) + '%)' : '';
 
-  // Google Ads no período
-  let googleGasto = 0, googleLeads = 0;
-  getGoogleMonthly(pred).forEach(r => { googleGasto += r.gasto; googleLeads += r.conversoes; });
+  // Google Ads no período — investimento da API, leads do UTM (utm_source = googlecpc)
+  let googleGasto = 0;
+  getGoogleMonthly(pred).forEach(r => { googleGasto += r.gasto; });
+  const googleLeads = (DATA.utm.sources.find(s => s.source === 'googlecpc') || {}).total || 0;
   const googleCPL = googleLeads > 0 ? googleGasto / googleLeads : 0;
 
-  // Meta Ads no período
-  let metaGasto = 0, metaLeads = 0;
-  getMetaMonthly(pred).forEach(r => { metaGasto += r.gasto; metaLeads += r.leads; });
+  // Meta Ads no período — investimento da API, leads do UTM (utm_source = metaads)
+  let metaGasto = 0;
+  getMetaMonthly(pred).forEach(r => { metaGasto += r.gasto; });
+  const metaLeads = (DATA.utm.sources.find(s => s.source === 'metaads') || {}).total || 0;
   const metaCPL = metaLeads > 0 ? metaGasto / metaLeads : 0;
 
   // ── Bloco 1: KPI leads ───────────────────────────────────────────────────────
