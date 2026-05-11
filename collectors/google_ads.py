@@ -10,6 +10,7 @@ def get_client():
         "client_id": config.GOOGLE_ADS_CLIENT_ID,
         "client_secret": config.GOOGLE_ADS_CLIENT_SECRET,
         "refresh_token": config.GOOGLE_ADS_REFRESH_TOKEN,
+        "login_customer_id": "2891779593",  # MCC customer ID (289-177-9593)
         "use_proto_plus": True,
     }
     return GoogleAdsClient.load_from_dict(credentials)

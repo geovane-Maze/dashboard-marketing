@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pages: write
+      id-token: write
 
     steps:
       - name: Checkout repositorio
@@ -61,6 +63,14 @@ jobs:
           git add dashboard/data/summary.json
           git diff --cached --quiet || git commit -m "chore: atualiza dados do dashboard [$(date +'%d/%m/%Y %H:%M')]"
           git push
+
+      - name: Publicar dashboard no GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dashboard/
+
+      - name: Deploy para GitHub Pages
+        uses: actions/deploy-pages@v4
 
       - name: Verificar rotacao do refresh token
         if: always()

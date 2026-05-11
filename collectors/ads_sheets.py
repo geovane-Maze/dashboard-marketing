@@ -10,6 +10,10 @@ SCOPES = [
 ADS_SHEET_ID = "1GC9-gtQM--sgpEejMGh2_pfibIt9w_511cJ7Ct3ACYA"
 ADS_TAB_NAME = "[CDC -B2B Franquadora] Criativos Facebook/Google"
 
+# Planilha Google Ads com dados diários (inclui campanhas Performance Max)
+GOOGLE_ADS_SHEET_ID = "1u6SL_U_X_frwduiWzq9ktvcrFD99ViBrBH2h0TtDVb4"
+GOOGLE_ADS_TAB_NAME = "Google ads atualizado"
+
 
 def _get_client():
     creds = Credentials.from_service_account_file(
@@ -82,3 +86,44 @@ def get_ads_data():
     print(f"  Meta Ads: {len(meta_ads)} linhas")
     print(f"  Google Ads: {len(google_ads)} linhas")
     return meta_ads, google_ads
+
+
+def get_google_ads_sheet_data():
+    """
+    Lê dados do Google Ads da planilha exportada diariamente pelo Google Ads.
+    Inclui campanhas Performance Max (invisíveis em ad_group queries da API).
+    Cabeçalhos na linha 3, dados a partir da linha 4.
+    Colunas: [0] Dia, [2] Campanha, [12] Conversões, [14] Custo, [19] Cliques, [21] Impr.
+    """
+    print("Coletando Google Ads da planilha diária (inclui PMax)...")
+    gc = _get_client()
+    spreadsheet = gc.open_by_key(GOOGLE_ADS_SHEET_ID)
+    ws = spreadsheet.worksheet(GOOGLE_ADS_TAB_NAME)
+    rows = ws.get_all_values()
+
+    google_ads = []
+    # Cabeçalhos na linha 3 (índice 2), dados a partir da linha 4 (índice 3)
+    for row in rows[3:]:
+        while len(row) < 22:
+            row.append("")
+
+        dia = row[0].strip()
+        campanha = row[2].strip()
+        if not dia or not campanha or dia.lower() in ("dia", "total") or campanha == "--":
+            continue
+
+        gasto = _parse_number(row[14])
+        if not gasto:
+            continue
+
+        google_ads.append({
+            "data": dia,
+            "campanha": campanha,
+            "gasto": gasto,
+            "cliques": _parse_number(row[19]) or 0,
+            "impressoes": _parse_number(row[21]) or 0,
+            "conversoes": _parse_number(row[12]) or 0,
+        })
+
+    print(f"  Google Ads (planilha diária): {len(google_ads)} linhas")
+    return google_ads

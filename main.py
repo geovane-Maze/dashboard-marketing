@@ -59,17 +59,23 @@ def run():
 
     # Planilha externa como fallback se APIs falharam
     if not google_api_ok or not meta_api_ok:
-        print("\n[6/6] Meta Ads + Google Ads (planilha fallback)")
-        try:
-            meta_data, google_data = ads_sheets.get_ads_data()
-            if not meta_api_ok:
+        print("\n[6/6] Planilhas fallback")
+        if not google_api_ok:
+            try:
+                google_data = ads_sheets.get_google_ads_sheet_data()
+                if google_data:
+                    writer.write_sheet("google_ads", google_data)
+                    google_api_ok = True
+            except Exception as e:
+                print(f"  ERRO Google Ads planilha diária: {e}")
+        if not meta_api_ok:
+            try:
+                meta_data, _ = ads_sheets.get_ads_data()
                 writer.write_sheet("meta_ads", meta_data)
-            if not google_api_ok:
-                writer.write_sheet("google_ads", google_data)
-        except Exception as e:
-            print(f"  ERRO Ads Sheets: {e}")
+            except Exception as e:
+                print(f"  ERRO Meta Ads planilha: {e}")
     else:
-        print("\n[6/6] APIs OK — planilha fallback não necessária")
+        print("\n[6/6] APIs OK — planilhas fallback não necessárias")
 
     print("\n" + "=" * 50)
     print("Coleta finalizada com sucesso!")
