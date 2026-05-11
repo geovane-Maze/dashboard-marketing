@@ -557,6 +557,7 @@ def aggregate_utm(leads):
     sources = defaultdict(int)
     mediums = defaultdict(int)
     campaigns_utm = defaultdict(int)
+    sources_monthly = defaultdict(lambda: defaultdict(int))
 
     for lead in leads:
         src = lead.get("utm_source") or "direto"
@@ -567,6 +568,10 @@ def aggregate_utm(leads):
         mediums[med] += 1
         if camp:
             campaigns_utm[camp] += 1
+
+        mes = parse_date_to_month(lead.get("criado_em"))
+        if mes:
+            sources_monthly[mes][src] += 1
 
     return {
         "sources": [
@@ -580,6 +585,11 @@ def aggregate_utm(leads):
         "campaigns": [
             {"campaign": k, "total": v}
             for k, v in sorted(campaigns_utm.items(), key=lambda x: -x[1])[:20]
+        ],
+        "sources_monthly": [
+            {"mes": mes, "source": src, "total": count}
+            for mes, srcs in sorted(sources_monthly.items())
+            for src, count in srcs.items()
         ],
     }
 

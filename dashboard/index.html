@@ -1019,16 +1019,20 @@ function renderExecutivo() {
   const organicos = DATA.leads.organicos || (totalLeadsAll - pagos);
   const pct = (v, t) => t > 0 ? ' (' + (v / t * 100).toFixed(0) + '%)' : '';
 
-  // Google Ads no período — investimento da API, leads do UTM (utm_source = googlecpc)
+  // Google Ads no período — investimento da API, leads do UTM filtrados por período
   let googleGasto = 0;
   getGoogleMonthly(pred).forEach(r => { googleGasto += r.gasto; });
-  const googleLeads = (DATA.utm.sources.find(s => s.source === 'googlecpc') || {}).total || 0;
+  const googleLeads = (DATA.utm.sources_monthly || [])
+    .filter(r => r.source === 'googlecpc' && (!pred || pred(r.mes)))
+    .reduce((s, r) => s + r.total, 0);
   const googleCPL = googleLeads > 0 ? googleGasto / googleLeads : 0;
 
-  // Meta Ads no período — investimento da API, leads do UTM (utm_source = metaads)
+  // Meta Ads no período — investimento da API, leads do UTM filtrados por período
   let metaGasto = 0;
   getMetaMonthly(pred).forEach(r => { metaGasto += r.gasto; });
-  const metaLeads = (DATA.utm.sources.find(s => s.source === 'metaads') || {}).total || 0;
+  const metaLeads = (DATA.utm.sources_monthly || [])
+    .filter(r => r.source === 'metaads' && (!pred || pred(r.mes)))
+    .reduce((s, r) => s + r.total, 0);
   const metaCPL = metaLeads > 0 ? metaGasto / metaLeads : 0;
 
   // ── Bloco 1: KPI leads ───────────────────────────────────────────────────────
