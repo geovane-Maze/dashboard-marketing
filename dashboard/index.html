@@ -1096,15 +1096,23 @@ function renderExecutivo() {
     </div>`;
 
   // ── Bloco 3: Evolução Mensal — sempre últimos 4 meses (independe do filtro) ──
-  const last4 = DATA.leads.monthly.slice(-4);   // últimos 4 meses fixos
+  // Monta índices por mês de cada fonte
+  const leadsByMes = {};
+  (DATA.leads.monthly || []).forEach(r => { leadsByMes[r.mes] = r; });
   const stageByMes = {};
   (crm.monthly_stages || []).forEach(r => { stageByMes[r.mes] = r; });
-
-  // Investimento mensal por plataforma
   const metaByMes = {};
   (DATA.meta_ads.monthly || []).forEach(r => { metaByMes[r.mes] = r.gasto || 0; });
   const googleByMes = {};
   (DATA.google_ads.monthly || []).forEach(r => { googleByMes[r.mes] = r.gasto || 0; });
+
+  // União de todos os meses disponíveis (ads têm histórico mais longo que leads)
+  const allMeses = [...new Set([
+    ...(DATA.google_ads.monthly || []).map(r => r.mes),
+    ...(DATA.meta_ads.monthly || []).map(r => r.mes),
+    ...(DATA.leads.monthly || []).map(r => r.mes),
+  ])].sort();
+  const last4 = allMeses.slice(-4).map(mes => ({ mes }));
 
   makeChart('chart-exec-evolucao', {
     type: 'bar',
@@ -1113,7 +1121,7 @@ function renderExecutivo() {
       datasets: [
         {
           label: 'Total de Leads',
-          data: last4.map(r => r.total),
+          data: last4.map(r => leadsByMes[r.mes]?.total || 0),
           backgroundColor: COLORS.secondary + 'CC', borderRadius: 4, yAxisID: 'y',
         },
         {
