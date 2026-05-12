@@ -55,12 +55,10 @@ def parse_num(v):
         return 0.0
 
 
-def parse_date_to_month(date_str):
+def _parse_dt(date_str):
     if not date_str:
         return None
     date_str = str(date_str).strip()
-
-    # ISO: 2026-01-15T10:30:00...
     for fmt in [
         "%Y-%m-%dT%H:%M:%S.%fZ",
         "%Y-%m-%dT%H:%M:%SZ",
@@ -68,36 +66,30 @@ def parse_date_to_month(date_str):
         "%Y-%m-%dT%H:%M:%S.%f",
     ]:
         try:
-            return datetime.strptime(date_str, fmt).strftime("%Y-%m")
+            return datetime.strptime(date_str, fmt)
         except ValueError:
             pass
-
-    # GA4: 20251006
     if len(date_str) == 8 and date_str.isdigit():
         try:
-            return datetime.strptime(date_str, "%Y%m%d").strftime("%Y-%m")
+            return datetime.strptime(date_str, "%Y%m%d")
         except ValueError:
             pass
-
-    # DD/MM/YYYY
-    try:
-        return datetime.strptime(date_str[:10], "%d/%m/%Y").strftime("%Y-%m")
-    except ValueError:
-        pass
-
-    # YYYY-MM-DD
-    try:
-        return datetime.strptime(date_str[:10], "%Y-%m-%d").strftime("%Y-%m")
-    except ValueError:
-        pass
-
-    # MM/DD/YYYY
-    try:
-        return datetime.strptime(date_str[:10], "%m/%d/%Y").strftime("%Y-%m")
-    except ValueError:
-        pass
-
+    for fmt in ["%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y"]:
+        try:
+            return datetime.strptime(date_str[:10], fmt)
+        except ValueError:
+            pass
     return None
+
+
+def parse_date_to_month(date_str):
+    dt = _parse_dt(date_str)
+    return dt.strftime("%Y-%m") if dt else None
+
+
+def parse_date_to_day(date_str):
+    dt = _parse_dt(date_str)
+    return dt.strftime("%Y-%m-%d") if dt else None
 
 
 def is_repasse(campaign_name):
@@ -109,20 +101,30 @@ def is_repasse(campaign_name):
 
 def aggregate_leads(leads):
     monthly = defaultdict(lambda: {"total": 0, "qualificados": 0})
+    daily = defaultdict(lambda: {"total": 0, "qualificados": 0})
     by_source = defaultdict(int)
     by_canal = defaultdict(int)
     by_lifecycle = defaultdict(int)
     by_capital = defaultdict(int)
     by_prazo = defaultdict(int)
     canal_monthly = defaultdict(lambda: defaultdict(int))
+    canal_daily = defaultdict(lambda: defaultdict(int))
 
     for lead in leads:
-        mes = parse_date_to_month(lead.get("criado_em"))
+        criado = lead.get("criado_em")
+        mes = parse_date_to_month(criado)
+        dia = parse_date_to_day(criado)
+        lc = str(lead.get("lifecycle_stage") or "").lower()
+        qualif = "qualif" in lc or "mql" in lc
+
         if mes:
             monthly[mes]["total"] += 1
-            lc = str(lead.get("lifecycle_stage") or "").lower()
-            if "qualif" in lc or "mql" in lc:
+            if qualif:
                 monthly[mes]["qualificados"] += 1
+        if dia:
+            daily[dia]["total"] += 1
+            if qualif:
+                daily[dia]["qualificados"] += 1
 
         src = lead.get("utm_source") or lead.get("canal") or "direto"
         by_source[src] += 1
@@ -130,12 +132,13 @@ def aggregate_leads(leads):
         canal = lead.get("canal") or "sem canal"
         by_canal[canal] += 1
 
-        mes_lead = parse_date_to_month(lead.get("criado_em"))
-        if mes_lead:
-            canal_monthly[mes_lead][canal] += 1
+        if mes:
+            canal_monthly[mes][canal] += 1
+        if dia:
+            canal_daily[dia][canal] += 1
 
-        lc = lead.get("lifecycle_stage") or "sem estágio"
-        by_lifecycle[lc] += 1
+        lc2 = lead.get("lifecycle_stage") or "sem estágio"
+        by_lifecycle[lc2] += 1
 
         capital = lead.get("capital_disponivel") or "não informado"
         by_capital[capital] += 1
@@ -151,6 +154,7 @@ def aggregate_leads(leads):
         "pagos": pagos,
         "organicos": organicos,
         "monthly": [{"mes": k, **v} for k, v in sorted(monthly.items())],
+        "daily": [{"data": k, **v} for k, v in sorted(daily.items())],
         "by_source": [
             {"source": k, "total": v}
             for k, v in sorted(by_source.items(), key=lambda x: -x[1])[:15]
@@ -176,6 +180,11 @@ def aggregate_leads(leads):
         "canal_monthly": [
             {"mes": mes, "canal": c, "total": count}
             for mes, canals in sorted(canal_monthly.items())
+            for c, count in canals.items()
+        ],
+        "canal_daily": [
+            {"data": dia, "canal": c, "total": count}
+            for dia, canals in sorted(canal_daily.items())
             for c, count in canals.items()
         ],
     }
@@ -272,6 +281,7 @@ def aggregate_meta_ads(rows):
         "expansao_gasto": 0.0, "repasse_gasto": 0.0,
         "expansao_leads": 0.0, "repasse_leads": 0.0,
     })
+    daily = defaultdict(lambda: {"gasto": 0.0, "leads": 0.0, "impressoes": 0.0, "cliques": 0.0})
     campaigns = defaultdict(lambda: {
         "gasto": 0.0, "leads": 0.0, "impressoes": 0.0, "cliques": 0.0, "tipo": "Expansão"
     })
@@ -285,6 +295,7 @@ def aggregate_meta_ads(rows):
 
     for row in rows:
         mes = parse_date_to_month(row.get("data"))
+        dia = parse_date_to_day(row.get("data"))
         if not mes:
             continue
 
@@ -299,6 +310,12 @@ def aggregate_meta_ads(rows):
         monthly[mes]["leads"] += leads
         monthly[mes]["impressoes"] += impressoes
         monthly[mes]["cliques"] += cliques
+
+        if dia:
+            daily[dia]["gasto"] += gasto
+            daily[dia]["leads"] += leads
+            daily[dia]["impressoes"] += impressoes
+            daily[dia]["cliques"] += cliques
 
         if tipo == "Repasse":
             monthly[mes]["repasse_gasto"] += gasto
@@ -384,11 +401,18 @@ def aggregate_meta_ads(rows):
     total_gasto = sum(d["gasto"] for d in monthly.values())
     total_leads = sum(d["leads"] for d in monthly.values())
 
+    daily_list = [
+        {"data": d, "gasto": round(v["gasto"], 2), "leads": int(round(v["leads"])),
+         "impressoes": int(round(v["impressoes"])), "cliques": int(round(v["cliques"]))}
+        for d, v in sorted(daily.items())
+    ]
+
     return {
         "total_gasto": round(total_gasto, 2),
         "total_leads": int(round(total_leads)),
         "cpl_geral": round(total_gasto / total_leads, 2) if total_leads > 0 else 0,
         "monthly": monthly_list,
+        "daily": daily_list,
         "campaigns": campaigns_list,
         "campaign_monthly": campaign_monthly_list,
         "campaign_names": sorted(camp_monthly.keys()),
@@ -400,6 +424,7 @@ def aggregate_google_ads(rows):
     monthly = defaultdict(lambda: {
         "gasto": 0.0, "conversoes": 0.0, "impressoes": 0.0, "cliques": 0.0
     })
+    daily = defaultdict(lambda: {"gasto": 0.0, "conversoes": 0.0, "impressoes": 0.0, "cliques": 0.0})
     campaigns = defaultdict(lambda: {
         "gasto": 0.0, "conversoes": 0.0, "impressoes": 0.0, "cliques": 0.0
     })
@@ -409,6 +434,7 @@ def aggregate_google_ads(rows):
 
     for row in rows:
         mes = parse_date_to_month(row.get("data"))
+        dia = parse_date_to_day(row.get("data"))
         if not mes:
             continue
 
@@ -422,6 +448,12 @@ def aggregate_google_ads(rows):
         monthly[mes]["conversoes"] += conversoes
         monthly[mes]["impressoes"] += impressoes
         monthly[mes]["cliques"] += cliques
+
+        if dia:
+            daily[dia]["gasto"] += gasto
+            daily[dia]["conversoes"] += conversoes
+            daily[dia]["impressoes"] += impressoes
+            daily[dia]["cliques"] += cliques
 
         if campanha:
             campaigns[campanha]["gasto"] += gasto
@@ -471,11 +503,18 @@ def aggregate_google_ads(rows):
     total_gasto = sum(d["gasto"] for d in monthly.values())
     total_conversoes = sum(d["conversoes"] for d in monthly.values())
 
+    daily_list = [
+        {"data": d, "gasto": round(v["gasto"], 2), "conversoes": int(round(v["conversoes"])),
+         "impressoes": int(round(v["impressoes"])), "cliques": int(round(v["cliques"]))}
+        for d, v in sorted(daily.items())
+    ]
+
     return {
         "total_gasto": round(total_gasto, 2),
         "total_conversoes": int(round(total_conversoes)),
         "cpl_geral": round(total_gasto / total_conversoes, 2) if total_conversoes > 0 else 0,
         "monthly": monthly_list,
+        "daily": daily_list,
         "campaigns": campaigns_list,
         "campaign_monthly": campaign_monthly_list,
         "campaign_names": sorted(camp_monthly.keys()),
@@ -570,6 +609,9 @@ def aggregate_utm(leads):
     sources_monthly = defaultdict(lambda: defaultdict(int))
     mediums_monthly = defaultdict(lambda: defaultdict(int))
     campaigns_monthly = defaultdict(lambda: defaultdict(int))
+    sources_daily = defaultdict(lambda: defaultdict(int))
+    mediums_daily = defaultdict(lambda: defaultdict(int))
+    campaigns_daily = defaultdict(lambda: defaultdict(int))
 
     for lead in leads:
         src = lead.get("utm_source") or "direto"
@@ -582,11 +624,18 @@ def aggregate_utm(leads):
             campaigns_utm[camp] += 1
 
         mes = parse_date_to_month(lead.get("criado_em"))
+        dia = parse_date_to_day(lead.get("criado_em"))
+
         if mes:
             sources_monthly[mes][src] += 1
             mediums_monthly[mes][med] += 1
             if camp:
                 campaigns_monthly[mes][camp] += 1
+        if dia:
+            sources_daily[dia][src] += 1
+            mediums_daily[dia][med] += 1
+            if camp:
+                campaigns_daily[dia][camp] += 1
 
     return {
         "sources": [
@@ -614,6 +663,21 @@ def aggregate_utm(leads):
         "campaigns_monthly": [
             {"mes": mes, "campaign": c, "total": count}
             for mes, camps in sorted(campaigns_monthly.items())
+            for c, count in camps.items()
+        ],
+        "sources_daily": [
+            {"data": dia, "source": src, "total": count}
+            for dia, srcs in sorted(sources_daily.items())
+            for src, count in srcs.items()
+        ],
+        "mediums_daily": [
+            {"data": dia, "medium": m, "total": count}
+            for dia, meds in sorted(mediums_daily.items())
+            for m, count in meds.items()
+        ],
+        "campaigns_daily": [
+            {"data": dia, "campaign": c, "total": count}
+            for dia, camps in sorted(campaigns_daily.items())
             for c, count in camps.items()
         ],
     }
