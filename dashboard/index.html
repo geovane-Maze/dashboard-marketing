@@ -1019,6 +1019,9 @@ function renderExecutivo() {
   const datePred = getDateFilter();   // para KPIs e UTM (granularidade diária)
   const crm = DATA.crm;
 
+  // leadsData mensal — usado pelo gráfico de evolução
+  const leadsData = filterMonthly(DATA.leads.monthly, pred);
+
   // Totais de leads no período — usa dados diários para precisão exata
   const totalLeadsPeriodo = (DATA.leads.daily || [])
     .filter(r => !datePred || datePred(r.data))
