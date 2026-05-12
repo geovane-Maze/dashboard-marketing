@@ -11,8 +11,8 @@ ADS_SHEET_ID = "1GC9-gtQM--sgpEejMGh2_pfibIt9w_511cJ7Ct3ACYA"
 ADS_TAB_NAME = "[CDC -B2B Franquadora] Criativos Facebook/Google"
 
 # Planilha Google Ads com dados diários (inclui campanhas Performance Max)
-GOOGLE_ADS_SHEET_ID = "1u6SL_U_X_frwduiWzq9ktvcrFD99ViBrBH2h0TtDVb4"
-GOOGLE_ADS_TAB_NAME = "Google ads atualizado"
+GOOGLE_ADS_SHEET_ID = "1sRk65FVxVVGbSxYkNCmm28Qxi3KzJWWe8GJ--saEZ3U"
+GOOGLE_ADS_TAB_NAME = "Google Ads - Relatório Programado "
 
 
 def _get_client():
