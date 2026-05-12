@@ -114,6 +114,7 @@ def aggregate_leads(leads):
     by_lifecycle = defaultdict(int)
     by_capital = defaultdict(int)
     by_prazo = defaultdict(int)
+    canal_monthly = defaultdict(lambda: defaultdict(int))
 
     for lead in leads:
         mes = parse_date_to_month(lead.get("criado_em"))
@@ -128,6 +129,10 @@ def aggregate_leads(leads):
 
         canal = lead.get("canal") or "sem canal"
         by_canal[canal] += 1
+
+        mes_lead = parse_date_to_month(lead.get("criado_em"))
+        if mes_lead:
+            canal_monthly[mes_lead][canal] += 1
 
         lc = lead.get("lifecycle_stage") or "sem estágio"
         by_lifecycle[lc] += 1
@@ -167,6 +172,11 @@ def aggregate_leads(leads):
             {"prazo": k, "total": v}
             for k, v in sorted(by_prazo.items(), key=lambda x: -x[1])
             if k != "não informado"
+        ],
+        "canal_monthly": [
+            {"mes": mes, "canal": c, "total": count}
+            for mes, canals in sorted(canal_monthly.items())
+            for c, count in canals.items()
         ],
     }
 
@@ -558,6 +568,8 @@ def aggregate_utm(leads):
     mediums = defaultdict(int)
     campaigns_utm = defaultdict(int)
     sources_monthly = defaultdict(lambda: defaultdict(int))
+    mediums_monthly = defaultdict(lambda: defaultdict(int))
+    campaigns_monthly = defaultdict(lambda: defaultdict(int))
 
     for lead in leads:
         src = lead.get("utm_source") or "direto"
@@ -572,6 +584,9 @@ def aggregate_utm(leads):
         mes = parse_date_to_month(lead.get("criado_em"))
         if mes:
             sources_monthly[mes][src] += 1
+            mediums_monthly[mes][med] += 1
+            if camp:
+                campaigns_monthly[mes][camp] += 1
 
     return {
         "sources": [
@@ -590,6 +605,16 @@ def aggregate_utm(leads):
             {"mes": mes, "source": src, "total": count}
             for mes, srcs in sorted(sources_monthly.items())
             for src, count in srcs.items()
+        ],
+        "mediums_monthly": [
+            {"mes": mes, "medium": m, "total": count}
+            for mes, meds in sorted(mediums_monthly.items())
+            for m, count in meds.items()
+        ],
+        "campaigns_monthly": [
+            {"mes": mes, "campaign": c, "total": count}
+            for mes, camps in sorted(campaigns_monthly.items())
+            for c, count in camps.items()
         ],
     }
 

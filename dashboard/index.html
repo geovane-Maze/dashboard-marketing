@@ -1013,33 +1013,45 @@ function renderExecutivo() {
   const leadsData = filterMonthly(DATA.leads.monthly, pred);
   const totalLeadsPeriodo = leadsData.reduce((s, r) => s + r.total, 0);
 
-  // Pagos / Orgânicos (dados históricos do RD Station)
-  const totalLeadsAll = DATA.leads.total || 0;
-  const pagos = DATA.leads.pagos || 0;
-  const organicos = DATA.leads.organicos || (totalLeadsAll - pagos);
+  // ── Dados UTM filtrados por período ─────────────────────────────────────────
+  const filtSources = {};
+  (DATA.utm.sources_monthly || []).filter(r => !pred || pred(r.mes))
+    .forEach(r => { filtSources[r.source] = (filtSources[r.source] || 0) + r.total; });
+
+  const filtMediums = {};
+  (DATA.utm.mediums_monthly || []).filter(r => !pred || pred(r.mes))
+    .forEach(r => { filtMediums[r.medium] = (filtMediums[r.medium] || 0) + r.total; });
+
+  const filtCanal = {};
+  (DATA.leads.canal_monthly || []).filter(r => !pred || pred(r.mes))
+    .forEach(r => { filtCanal[r.canal] = (filtCanal[r.canal] || 0) + r.total; });
+
+  const filtCamps = {};
+  (DATA.utm.campaigns_monthly || []).filter(r => !pred || pred(r.mes))
+    .forEach(r => { filtCamps[r.campaign] = (filtCamps[r.campaign] || 0) + r.total; });
+
+  // Pagos/Orgânicos filtrados pelo período via UTM
+  const pagos = ['metaads', 'googlecpc'].reduce((s, src) => s + (filtSources[src] || 0), 0);
+  const organicos = totalLeadsPeriodo - pagos;
   const pct = (v, t) => t > 0 ? ' (' + (v / t * 100).toFixed(0) + '%)' : '';
 
-  // Google Ads no período — investimento da API, leads do UTM filtrados por período
+  // Google Ads no período — investimento da API, leads do UTM filtrados
   let googleGasto = 0;
   getGoogleMonthly(pred).forEach(r => { googleGasto += r.gasto; });
-  const googleLeads = (DATA.utm.sources_monthly || [])
-    .filter(r => r.source === 'googlecpc' && (!pred || pred(r.mes)))
-    .reduce((s, r) => s + r.total, 0);
+  const googleLeads = filtSources['googlecpc'] || 0;
   const googleCPL = googleLeads > 0 ? googleGasto / googleLeads : 0;
 
-  // Meta Ads no período — investimento da API, leads do UTM filtrados por período
+  // Meta Ads no período — investimento da API, leads do UTM filtrados
   let metaGasto = 0;
   getMetaMonthly(pred).forEach(r => { metaGasto += r.gasto; });
-  const metaLeads = (DATA.utm.sources_monthly || [])
-    .filter(r => r.source === 'metaads' && (!pred || pred(r.mes)))
-    .reduce((s, r) => s + r.total, 0);
+  const metaLeads = filtSources['metaads'] || 0;
   const metaCPL = metaLeads > 0 ? metaGasto / metaLeads : 0;
 
   // ── Bloco 1: KPI leads ───────────────────────────────────────────────────────
   document.getElementById('kpi-leads-exec').innerHTML = [
     { label: 'Total de Leads Gerados', value: fmt.num(totalLeadsPeriodo), sub: 'período selecionado', cls: '' },
-    { label: 'Leads Pagos', value: fmt.num(pagos), sub: pct(pagos, totalLeadsAll) + ' do total', cls: 'blue' },
-    { label: 'Leads Orgânicos', value: fmt.num(organicos), sub: pct(organicos, totalLeadsAll) + ' do total', cls: 'green' },
+    { label: 'Leads Pagos', value: fmt.num(pagos), sub: pct(pagos, totalLeadsPeriodo) + ' do total', cls: 'blue' },
+    { label: 'Leads Orgânicos', value: fmt.num(organicos), sub: pct(organicos, totalLeadsPeriodo) + ' do total', cls: 'green' },
     { label: 'Leads Abertos (Ativos)', value: fmt.num(crm.total_open), sub: pct(crm.total_open, crm.total_deals) + ' dos negócios', cls: 'orange' },
     { label: 'Leads Perdidos', value: fmt.num(crm.total_lost), sub: pct(crm.total_lost, crm.total_deals) + ' dos negócios', cls: 'red' },
   ].map(k => `<div class="kpi-card ${k.cls}">
@@ -1135,30 +1147,31 @@ function renderExecutivo() {
   });
 
   // ── Bloco 6: UTM / Atribuição ────────────────────────────────────────────────
-  const sources = DATA.utm.sources.slice(0, 10);
+  const srcEntries = Object.entries(filtSources).sort((a, b) => b[1] - a[1]).slice(0, 10);
   makeChart('chart-exec-utm-source', {
     type: 'doughnut',
-    data: { labels: sources.map(r => r.source), datasets: [{ data: sources.map(r => r.total), backgroundColor: PALETTE }] },
+    data: { labels: srcEntries.map(r => r[0]), datasets: [{ data: srcEntries.map(r => r[1]), backgroundColor: PALETTE }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
   });
 
-  const mediums = DATA.utm.mediums.slice(0, 8);
+  const medEntries = Object.entries(filtMediums).sort((a, b) => b[1] - a[1]).slice(0, 8);
   makeChart('chart-exec-utm-medium', {
     type: 'doughnut',
-    data: { labels: mediums.map(r => r.medium), datasets: [{ data: mediums.map(r => r.total), backgroundColor: PALETTE }] },
+    data: { labels: medEntries.map(r => r[0]), datasets: [{ data: medEntries.map(r => r[1]), backgroundColor: PALETTE }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
   });
 
-  const canal = DATA.leads.by_canal.slice(0, 8);
+  const canalEntries = Object.entries(filtCanal).sort((a, b) => b[1] - a[1]).slice(0, 8);
   makeChart('chart-exec-canal', {
     type: 'doughnut',
-    data: { labels: canal.map(r => r.canal), datasets: [{ data: canal.map(r => r.total), backgroundColor: PALETTE }] },
+    data: { labels: canalEntries.map(r => r[0]), datasets: [{ data: canalEntries.map(r => r[1]), backgroundColor: PALETTE }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
   });
 
-  const totalCamp = DATA.utm.campaigns.reduce((s, r) => s + r.total, 0) || 1;
-  document.getElementById('exec-table-utm').innerHTML = DATA.utm.campaigns.map((r, i) =>
-    `<tr><td>${i+1}</td><td>${r.campaign}</td><td><strong>${r.total}</strong></td><td>${(r.total/totalCamp*100).toFixed(1)}%</td></tr>`
+  const campEntries = Object.entries(filtCamps).sort((a, b) => b[1] - a[1]);
+  const totalCamp = campEntries.reduce((s, r) => s + r[1], 0) || 1;
+  document.getElementById('exec-table-utm').innerHTML = campEntries.map((r, i) =>
+    `<tr><td>${i+1}</td><td>${r[0]}</td><td><strong>${r[1]}</strong></td><td>${(r[1]/totalCamp*100).toFixed(1)}%</td></tr>`
   ).join('') || '<tr><td colspan="4" class="empty">Sem dados UTM</td></tr>';
 
   // Alertas
