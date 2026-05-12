@@ -195,7 +195,10 @@ def aggregate_crm(deals):
     by_loss_reason = defaultdict(int)
     by_responsavel = defaultdict(lambda: {"total": 0, "ganhos": 0, "valor": 0.0})
     monthly_won = defaultdict(lambda: {"total": 0, "valor": 0.0})
-    monthly_stages = defaultdict(lambda: {"reuniao_pdf": 0, "apresentacao_bp": 0, "perdidos": 0})
+    monthly_stages = defaultdict(lambda: {
+        "reuniao_pdf": 0, "apresentacao_bp": 0, "perdidos": 0,
+        "reuniao_agendada": 0, "reuniao_realizada": 0,
+    })
 
     total_won = 0
     total_lost = 0
@@ -232,6 +235,10 @@ def aggregate_crm(deals):
                 monthly_stages[mes_criado]["reuniao_pdf"] += 1
             if "apresentação do business plan" in etapa_lower or "apresentacao do business plan" in etapa_lower:
                 monthly_stages[mes_criado]["apresentacao_bp"] += 1
+            if "reunião agendada" in etapa_lower or "reuniao agendada" in etapa_lower:
+                monthly_stages[mes_criado]["reuniao_agendada"] += 1
+            if "reunião realizada" in etapa_lower or "reuniao realizada" in etapa_lower:
+                monthly_stages[mes_criado]["reuniao_realizada"] += 1
             if motivo:
                 monthly_stages[mes_criado]["perdidos"] += 1
 
@@ -269,7 +276,14 @@ def aggregate_crm(deals):
             for k, v in sorted(monthly_won.items())
         ],
         "monthly_stages": [
-            {"mes": k, "reuniao_pdf": v["reuniao_pdf"], "apresentacao_bp": v["apresentacao_bp"], "perdidos": v["perdidos"]}
+            {
+                "mes": k,
+                "reuniao_pdf": v["reuniao_pdf"],
+                "apresentacao_bp": v["apresentacao_bp"],
+                "perdidos": v["perdidos"],
+                "reuniao_agendada": v["reuniao_agendada"],
+                "reuniao_realizada": v["reuniao_realizada"],
+            }
             for k, v in sorted(monthly_stages.items())
         ],
     }

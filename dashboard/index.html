@@ -1130,14 +1130,26 @@ function renderExecutivo() {
           }),
           backgroundColor: COLORS.secondary + 'CC', borderRadius: 4, yAxisID: 'y',
         },
+        // Fev/Mar → etapas antigas
+        {
+          label: 'Reunião Agendada',
+          data: last4.map(r => r.mes <= '2026-03' ? (stageByMes[r.mes]?.reuniao_agendada ?? 0) : null),
+          backgroundColor: '#27ae60CC', borderRadius: 4, yAxisID: 'y',
+        },
+        {
+          label: 'Reunião Realizada',
+          data: last4.map(r => r.mes <= '2026-03' ? (stageByMes[r.mes]?.reuniao_realizada ?? 0) : null),
+          backgroundColor: '#16a085CC', borderRadius: 4, yAxisID: 'y',
+        },
+        // Abr/Mai → etapas novas
         {
           label: 'Reunião PDF',
-          data: last4.map(r => stageByMes[r.mes]?.reuniao_pdf || 0),
+          data: last4.map(r => r.mes > '2026-03' ? (stageByMes[r.mes]?.reuniao_pdf ?? 0) : null),
           backgroundColor: COLORS.green + 'CC', borderRadius: 4, yAxisID: 'y',
         },
         {
           label: 'Apresentação BP',
-          data: last4.map(r => stageByMes[r.mes]?.apresentacao_bp || 0),
+          data: last4.map(r => r.mes > '2026-03' ? (stageByMes[r.mes]?.apresentacao_bp ?? 0) : null),
           backgroundColor: COLORS.orange + 'CC', borderRadius: 4, yAxisID: 'y',
         },
         {
