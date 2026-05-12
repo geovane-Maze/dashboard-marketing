@@ -1121,7 +1121,13 @@ function renderExecutivo() {
       datasets: [
         {
           label: 'Total de Leads',
-          data: last4.map(r => leadsByMes[r.mes]?.total || 0),
+          data: last4.map(r => {
+            // CRM disponível → usa; senão usa conversões Google + leads Meta como proxy
+            if (leadsByMes[r.mes]?.total) return leadsByMes[r.mes].total;
+            const googleConv = (DATA.google_ads.monthly || []).find(g => g.mes === r.mes)?.conversoes || 0;
+            const metaLeads = (DATA.meta_ads.monthly || []).find(m => m.mes === r.mes)?.leads || 0;
+            return googleConv + metaLeads;
+          }),
           backgroundColor: COLORS.secondary + 'CC', borderRadius: 4, yAxisID: 'y',
         },
         {
