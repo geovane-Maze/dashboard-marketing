@@ -1095,26 +1095,85 @@ function renderExecutivo() {
       </div>
     </div>`;
 
-  // ── Bloco 3: Evolução Mensal ─────────────────────────────────────────────────
-  const last4 = leadsData.slice(-4);
+  // ── Bloco 3: Evolução Mensal — sempre últimos 4 meses (independe do filtro) ──
+  const last4 = DATA.leads.monthly.slice(-4);   // últimos 4 meses fixos
   const stageByMes = {};
   (crm.monthly_stages || []).forEach(r => { stageByMes[r.mes] = r; });
+
+  // Investimento mensal por plataforma
+  const metaByMes = {};
+  (DATA.meta_ads.monthly || []).forEach(r => { metaByMes[r.mes] = r.gasto || 0; });
+  const googleByMes = {};
+  (DATA.google_ads.monthly || []).forEach(r => { googleByMes[r.mes] = r.gasto || 0; });
 
   makeChart('chart-exec-evolucao', {
     type: 'bar',
     data: {
       labels: last4.map(r => mesLabel(r.mes)),
       datasets: [
-        { label: 'Total de Leads',        data: last4.map(r => r.total),                                  backgroundColor: COLORS.secondary + 'CC', borderRadius: 4 },
-        { label: 'Reunião PDF',            data: last4.map(r => (stageByMes[r.mes]?.reuniao_pdf     || 0)), backgroundColor: COLORS.green   + 'CC', borderRadius: 4 },
-        { label: 'Apresentação BP',        data: last4.map(r => (stageByMes[r.mes]?.apresentacao_bp || 0)), backgroundColor: COLORS.orange  + 'CC', borderRadius: 4 },
-        { label: 'Perdidos',               data: last4.map(r => (stageByMes[r.mes]?.perdidos        || 0)), backgroundColor: COLORS.red     + 'CC', borderRadius: 4 },
+        {
+          label: 'Total de Leads',
+          data: last4.map(r => r.total),
+          backgroundColor: COLORS.secondary + 'CC', borderRadius: 4, yAxisID: 'y',
+        },
+        {
+          label: 'Reunião PDF',
+          data: last4.map(r => stageByMes[r.mes]?.reuniao_pdf || 0),
+          backgroundColor: COLORS.green + 'CC', borderRadius: 4, yAxisID: 'y',
+        },
+        {
+          label: 'Apresentação BP',
+          data: last4.map(r => stageByMes[r.mes]?.apresentacao_bp || 0),
+          backgroundColor: COLORS.orange + 'CC', borderRadius: 4, yAxisID: 'y',
+        },
+        {
+          label: 'Perdidos',
+          data: last4.map(r => stageByMes[r.mes]?.perdidos || 0),
+          backgroundColor: COLORS.red + 'CC', borderRadius: 4, yAxisID: 'y',
+        },
+        {
+          label: 'Investimento Total (R$)',
+          data: last4.map(r => Math.round((metaByMes[r.mes] || 0) + (googleByMes[r.mes] || 0))),
+          type: 'line',
+          borderColor: '#8e44ad',
+          backgroundColor: '#8e44ad33',
+          borderWidth: 2,
+          pointRadius: 5,
+          pointBackgroundColor: '#8e44ad',
+          fill: false,
+          yAxisID: 'y2',
+        },
       ]
     },
     options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom' } },
-      scales: { y: { beginAtZero: true } }
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              if (ctx.dataset.yAxisID === 'y2')
+                return ' ' + ctx.dataset.label + ': R$ ' + ctx.parsed.y.toLocaleString('pt-BR');
+              return ' ' + ctx.dataset.label + ': ' + ctx.parsed.y;
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true, position: 'left',
+          title: { display: true, text: 'Leads / Negócios' },
+          grid: { color: '#e5e7eb' },
+        },
+        y2: {
+          beginAtZero: true, position: 'right',
+          grid: { drawOnChartArea: false },
+          title: { display: true, text: 'Investimento (R$)' },
+          ticks: { callback: v => 'R$' + (v / 1000).toFixed(0) + 'k' },
+        }
+      }
     }
   });
 
