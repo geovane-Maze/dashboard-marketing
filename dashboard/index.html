@@ -1203,17 +1203,20 @@ function renderExecutivo() {
     }
   });
 
-  // ── Bloco 4: Funil na ordem correta ─────────────────────────────────────────
-  const sortedFunnel = [...crm.funnel].sort((a, b) => funnelSortIndex(a.etapa) - funnelSortIndex(b.etapa));
-  const maxFunnel = Math.max(...sortedFunnel.map(s => s.total), 1);
-  document.getElementById('exec-funnel-bars').innerHTML = sortedFunnel.map(s => `
+  // ── Bloco 4: Funil — apenas negócios ATIVOS (sem ganhos e sem perdidos) ────────
+  const activeFunnel = crm.active_funnel || [];
+  const totalAtivos = crm.total_active || activeFunnel.reduce((s, r) => s + r.total, 0);
+  const maxFunnel = Math.max(...activeFunnel.map(s => s.total), 1);
+  document.getElementById('exec-funnel-bars').innerHTML = activeFunnel.length
+    ? activeFunnel.map(s => `
     <div class="funnel-bar-container">
       <div class="funnel-bar-label">
         <span class="stage-name">${s.etapa}</span>
-        <span class="stage-count">${fmt.num(s.total)} negócios — ${fmt.currency(s.valor)}</span>
+        <span class="stage-count">${fmt.num(s.total)} negócios</span>
       </div>
       <div class="funnel-bar-track"><div class="funnel-bar-fill" style="width:${(s.total/maxFunnel*100).toFixed(1)}%"></div></div>
-    </div>`).join('');
+    </div>`).join('')
+    : '<p style="color:#999;padding:1rem">Sem negócios ativos</p>';
 
   // Por Responsável
   const resp = crm.by_responsavel.slice(0, 8);

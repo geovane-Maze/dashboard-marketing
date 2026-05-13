@@ -92,6 +92,34 @@ def parse_date_to_day(date_str):
     return dt.strftime("%Y-%m-%d") if dt else None
 
 
+STAGE_NORMALIZE = {
+    'contato inicial':                     'Contato Inicial',
+    'nutrição 1':                          'Nutrição 1',
+    'nutricao 1':                          'Nutrição 1',
+    'nutrição 2':                          'Nutrição 2',
+    'nutricao 2':                          'Nutrição 2',
+    'pré-qualificado':                     'Pré-qualificado',
+    'pre-qualificado':                     'Pré-qualificado',
+    'pré qualificado':                     'Pré-qualificado',
+    'pre qualificado':                     'Pré-qualificado',
+    'reunião pdf':                         'Reunião PDF',
+    'reuniao pdf':                         'Reunião PDF',
+    'apresentação do business plan':       'Apresentação do Business Plan',
+    'apresentacao do business plan':       'Apresentação do Business Plan',
+    'envio de cof':                        'Envio de COF',
+    'aprovação final':                     'Aprovação Final',
+    'aprovacao final':                     'Aprovação Final',
+    'entrada de lead':                     'Entrada de Lead',
+    'etapa descarte':                      'Etapa Descarte',
+}
+
+
+def normalize_etapa(etapa):
+    if not etapa:
+        return 'sem etapa'
+    return STAGE_NORMALIZE.get(etapa.strip().lower(), etapa.strip())
+
+
 def is_repasse(campaign_name):
     if not campaign_name:
         return False
@@ -192,6 +220,7 @@ def aggregate_leads(leads):
 
 def aggregate_crm(deals):
     by_stage = defaultdict(lambda: {"total": 0, "valor": 0.0, "ganhos": 0})
+    active_stage = defaultdict(lambda: {"total": 0, "valor": 0.0})  # apenas ativos
     by_loss_reason = defaultdict(int)
     by_responsavel = defaultdict(lambda: {"total": 0, "ganhos": 0, "valor": 0.0})
     monthly_won = defaultdict(lambda: {"total": 0, "valor": 0.0})
@@ -205,15 +234,24 @@ def aggregate_crm(deals):
     total_value = 0.0
 
     for deal in deals:
-        etapa = deal.get("etapa") or "sem etapa"
+        etapa_raw = deal.get("etapa") or "sem etapa"
+        etapa = normalize_etapa(etapa_raw)          # nome normalizado
         ganho_raw = str(deal.get("ganho") or "").lower()
         ganho = ganho_raw in ("true", "1", "sim", "yes")
+        motivo = deal.get("motivo_perda")
+        perdido = bool(motivo)
         valor = parse_num(deal.get("valor_total"))
 
         by_stage[etapa]["total"] += 1
         by_stage[etapa]["valor"] += valor
         if ganho:
             by_stage[etapa]["ganhos"] += 1
+
+        # Funil de ativos: exclui ganhos, perdidos e etapas de descarte
+        EXCLUIR_ATIVO = {'etapa descarte', 'sem etapa'}
+        if not ganho and not perdido and etapa.lower() not in EXCLUIR_ATIVO:
+            active_stage[etapa]["total"] += 1
+            active_stage[etapa]["valor"] += valor
 
         if ganho:
             total_won += 1
@@ -252,16 +290,36 @@ def aggregate_crm(deals):
 
     funnel = sorted(by_stage.items(), key=lambda x: -x[1]["total"])
 
+    # Funil de ativos na ordem correta do pipeline
+    PIPELINE_ORDER = [
+        'entrada de lead', 'contato inicial', 'nutrição 1', 'nutrição 2',
+        'pré-qualificado', 'reunião pdf', 'apresentação do business plan',
+        'envio de cof', 'workshop', 'aprovação final',
+    ]
+    def stage_sort_key(name):
+        nl = name.lower()
+        for i, s in enumerate(PIPELINE_ORDER):
+            if nl == s or nl in s or s in nl:
+                return i
+        return 999
+
+    active_funnel_sorted = sorted(active_stage.items(), key=lambda x: stage_sort_key(x[0]))
+
     return {
         "total_deals": len(deals),
         "total_won": total_won,
         "total_lost": total_lost,
         "total_open": total_open,
+        "total_active": sum(v["total"] for v in active_stage.values()),
         "total_value_won": round(total_value, 2),
         "taxa_fechamento": round(total_won / len(deals) * 100, 1) if deals else 0,
         "funnel": [
             {"etapa": k, "total": v["total"], "valor": round(v["valor"], 2), "ganhos": v["ganhos"]}
             for k, v in funnel
+        ],
+        "active_funnel": [
+            {"etapa": k, "total": v["total"], "valor": round(v["valor"], 2)}
+            for k, v in active_funnel_sorted
         ],
         "losses": [
             {"motivo": k, "total": v}
