@@ -751,14 +751,6 @@
     <!-- META ADS -->
     <div id="sec-meta" class="section">
       <div class="section-title">Meta Ads</div>
-      <div class="filter-group" style="margin-bottom:20px;">
-        <label>Tipo de Campanha</label>
-        <select id="filter-tipo" onchange="renderMeta()">
-          <option value="all">Todos (Expansão + Repasse)</option>
-          <option value="Expansão">Expansão</option>
-          <option value="Repasse">Repasse</option>
-        </select>
-      </div>
       <div class="kpi-grid" id="kpi-meta"></div>
       <div class="charts-row">
         <div class="chart-card">
@@ -1784,36 +1776,23 @@ function renderPerdas() {
 // ─── SECTION: META ADS ────────────────────────────────────────────────────────
 function renderMeta() {
   const pred     = getFilteredMonths();
-  const datePred = getDateFilter();      // filtro dia a dia (igual Visão Executiva)
-  const tipo     = getTipo();
+  const datePred = getDateFilter();   // filtro dia a dia — mesma fonte da Visão Executiva
   const monthly  = getMetaMonthly(pred);
 
-  // ── KPI totals — usa dados diários (mesma fonte da Visão Executiva) ─────────
+  // ── KPI totals: dados diários Meta Ads ─────────────────────────────────────
   let totalGasto = 0, totalImpr = 0, totalCliques = 0;
   (DATA.meta_ads.daily || [])
     .filter(r => !datePred || datePred(r.data))
     .forEach(r => {
-      totalGasto   += r.gasto       || 0;
-      totalImpr    += r.impressoes  || 0;
-      totalCliques += r.cliques     || 0;
+      totalGasto   += r.gasto      || 0;
+      totalImpr    += r.impressoes || 0;
+      totalCliques += r.cliques    || 0;
     });
 
-  // Leads Meta = leads do RD Station atribuídos à fonte 'metaads' via UTM
-  // (mesma lógica da Visão Executiva — metaLeads = filtSources['metaads'])
-  let totalLeads = (DATA.utm.sources_daily || [])
-    .filter(r => r.source === 'metaads' && (!datePred || datePred(r.data)))
+  // Leads = total leads RD Station no período (mesma fonte que Visão Executiva)
+  const totalLeads = (DATA.leads.daily || [])
+    .filter(r => !datePred || datePred(r.data))
     .reduce((s, r) => s + r.total, 0);
-
-  // Quando filtro de tipo está ativo, usa split mensal para gasto/leads
-  if (tipo !== 'all') {
-    totalGasto = 0; totalLeads = 0;
-    monthly.forEach(r => {
-      if (tipo === 'Expansão') { totalGasto += r.expansao_gasto; totalLeads += r.expansao_leads; }
-      else                      { totalGasto += r.repasse_gasto;  totalLeads += r.repasse_leads;  }
-    });
-    totalImpr    = monthly.reduce((s, r) => s + r.impressoes, 0);
-    totalCliques = monthly.reduce((s, r) => s + r.cliques, 0);
-  }
 
   const cpl = totalLeads > 0 ? totalGasto / totalLeads : 0;
   const ctr = totalImpr  > 0 ? totalCliques / totalImpr * 100 : 0;
@@ -1851,9 +1830,7 @@ function renderMeta() {
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } }
   });
 
-  let campaigns = DATA.meta_ads.campaigns;
-  if (tipo !== 'all') campaigns = campaigns.filter(c => c.tipo === tipo);
-  if (pred) campaigns = campaigns; // campaigns not filtered by date (already total)
+  const campaigns = DATA.meta_ads.campaigns;
 
   document.getElementById('table-meta-campaigns').innerHTML = campaigns.slice(0, 30).map(c =>
     `<tr>
