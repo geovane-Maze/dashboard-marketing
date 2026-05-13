@@ -463,7 +463,7 @@
       <div class="table-card">
         <h3>Top Campanhas UTM</h3>
         <table>
-          <thead><tr><th>#</th><th>Campanha (utm_campaign)</th><th>Leads</th><th>%</th></tr></thead>
+          <thead><tr><th>#</th><th>Campanha (utm_campaign)</th><th>Fonte</th><th>Leads</th><th>%</th><th>Valor Investido</th></tr></thead>
           <tbody id="exec-table-utm"></tbody>
         </table>
       </div>
@@ -1041,8 +1041,12 @@ function renderExecutivo() {
     .forEach(r => { filtCanal[r.canal] = (filtCanal[r.canal] || 0) + r.total; });
 
   const filtCamps = {};
+  const filtCampsSource = {};
   (DATA.utm.campaigns_daily || []).filter(r => !datePred || datePred(r.data))
-    .forEach(r => { filtCamps[r.campaign] = (filtCamps[r.campaign] || 0) + r.total; });
+    .forEach(r => {
+      filtCamps[r.campaign] = (filtCamps[r.campaign] || 0) + r.total;
+      if (r.source) filtCampsSource[r.campaign] = r.source;
+    });
 
   // Pagos/Orgânicos filtrados por dia
   const pagos = ['metaads', 'googlecpc'].reduce((s, src) => s + (filtSources[src] || 0), 0);
@@ -1272,11 +1276,41 @@ function renderExecutivo() {
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
   });
 
+  // Índice de gasto por campanha (Meta + Google) para lookup na tabela
+  const metaCampSpend = {};
+  (DATA.meta_ads.campaigns || []).forEach(c => { metaCampSpend[c.campanha.toLowerCase()] = c.gasto; });
+  const googleCampSpend = {};
+  (DATA.google_ads.campaigns || []).forEach(c => { googleCampSpend[c.campanha.toLowerCase()] = c.gasto; });
+
+  function findCampSpend(campName, source) {
+    const key = campName.toLowerCase();
+    // Tentativa de match exato
+    if (source === 'metaads' && metaCampSpend[key]) return metaCampSpend[key];
+    if (source === 'googlecpc' && googleCampSpend[key]) return googleCampSpend[key];
+    // Tentativa de match parcial (UTM campaign contém parte do nome da campanha)
+    const pool = source === 'metaads' ? metaCampSpend : source === 'googlecpc' ? googleCampSpend : {};
+    for (const [k, v] of Object.entries(pool)) {
+      if (k.includes(key) || key.includes(k)) return v;
+    }
+    return null;
+  }
+
+  const FONTE_LABEL = { metaads: '📘 Meta', googlecpc: '🔍 Google', direto: '—' };
+
   const campEntries = Object.entries(filtCamps).sort((a, b) => b[1] - a[1]);
   const totalCamp = campEntries.reduce((s, r) => s + r[1], 0) || 1;
-  document.getElementById('exec-table-utm').innerHTML = campEntries.map((r, i) =>
-    `<tr><td>${i+1}</td><td>${r[0]}</td><td><strong>${r[1]}</strong></td><td>${(r[1]/totalCamp*100).toFixed(1)}%</td></tr>`
-  ).join('') || '<tr><td colspan="4" class="empty">Sem dados UTM</td></tr>';
+  document.getElementById('exec-table-utm').innerHTML = campEntries.map((r, i) => {
+    const src = filtCampsSource[r[0]] || 'direto';
+    const spend = findCampSpend(r[0], src);
+    return `<tr>
+      <td>${i+1}</td>
+      <td>${r[0]}</td>
+      <td><span style="font-size:12px">${FONTE_LABEL[src] || src}</span></td>
+      <td><strong>${r[1]}</strong></td>
+      <td>${(r[1]/totalCamp*100).toFixed(1)}%</td>
+      <td>${spend !== null ? fmt.currency(spend) : '<span style="color:#999">—</span>'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" class="empty">Sem dados UTM</td></tr>';
 
   // Alertas
   const alerts = [];

@@ -678,12 +678,14 @@ def aggregate_utm(leads):
     sources = defaultdict(int)
     mediums = defaultdict(int)
     campaigns_utm = defaultdict(int)
+    campaigns_src = defaultdict(lambda: defaultdict(int))   # campaign -> source -> count
     sources_monthly = defaultdict(lambda: defaultdict(int))
     mediums_monthly = defaultdict(lambda: defaultdict(int))
     campaigns_monthly = defaultdict(lambda: defaultdict(int))
     sources_daily = defaultdict(lambda: defaultdict(int))
     mediums_daily = defaultdict(lambda: defaultdict(int))
     campaigns_daily = defaultdict(lambda: defaultdict(int))
+    campaigns_src_daily = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
 
     for lead in leads:
         src = lead.get("utm_source") or "direto"
@@ -694,6 +696,7 @@ def aggregate_utm(leads):
         mediums[med] += 1
         if camp:
             campaigns_utm[camp] += 1
+            campaigns_src[camp][src] += 1
 
         mes = parse_date_to_month(lead.get("criado_em"))
         dia = parse_date_to_day(lead.get("criado_em"))
@@ -708,6 +711,10 @@ def aggregate_utm(leads):
             mediums_daily[dia][med] += 1
             if camp:
                 campaigns_daily[dia][camp] += 1
+                campaigns_src_daily[dia][camp][src] += 1
+
+    def dominant_source(src_dict):
+        return max(src_dict, key=src_dict.get) if src_dict else "direto"
 
     return {
         "sources": [
@@ -719,7 +726,7 @@ def aggregate_utm(leads):
             for k, v in sorted(mediums.items(), key=lambda x: -x[1])
         ],
         "campaigns": [
-            {"campaign": k, "total": v}
+            {"campaign": k, "total": v, "source": dominant_source(campaigns_src[k])}
             for k, v in sorted(campaigns_utm.items(), key=lambda x: -x[1])[:20]
         ],
         "sources_monthly": [
@@ -748,7 +755,10 @@ def aggregate_utm(leads):
             for m, count in meds.items()
         ],
         "campaigns_daily": [
-            {"data": dia, "campaign": c, "total": count}
+            {
+                "data": dia, "campaign": c, "total": count,
+                "source": dominant_source(campaigns_src_daily[dia][c]),
+            }
             for dia, camps in sorted(campaigns_daily.items())
             for c, count in camps.items()
         ],
