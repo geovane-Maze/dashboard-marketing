@@ -336,68 +336,94 @@
     #content { padding: 14px; }
   }
 
-  /* ── MOBILE (≤ 600px) — sidebar vira barra inferior ─────────────────── */
+  /* ── MOBILE DRAWER (sempre presente, oculto por padrão) ─────────────── */
+  #mob-menu-btn {
+    display: none;
+    background: none; border: none; cursor: pointer;
+    padding: 6px; border-radius: 8px;
+    color: var(--primary); flex-shrink: 0;
+  }
+  #mob-menu-btn:active { background: var(--bg2); }
+  #mob-menu-btn svg { display: block; }
+
+  #mob-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 400;
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+  #mob-overlay.open { display: block; opacity: 1; }
+
+  #mob-drawer {
+    position: fixed; top: 0; left: 0;
+    width: 270px; height: 100vh;
+    background: var(--primary);
+    z-index: 500;
+    transform: translateX(-100%);
+    transition: transform 0.27s cubic-bezier(.4,0,.2,1);
+    display: flex; flex-direction: column;
+    overflow-y: auto;
+  }
+  #mob-drawer.open { transform: translateX(0); }
+
+  #mob-drawer .mob-drawer-header {
+    padding: 20px 18px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  #mob-drawer .mob-drawer-header h2 {
+    font-size: 14px; font-weight: 700; color: #fff; line-height: 1.3;
+  }
+  #mob-drawer .mob-drawer-header p {
+    font-size: 11px; color: rgba(255,255,255,0.55); margin-top: 2px;
+  }
+  #mob-drawer-close {
+    background: rgba(255,255,255,0.12); border: none; border-radius: 50%;
+    width: 30px; height: 30px; cursor: pointer; color: #fff;
+    font-size: 16px; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  #mob-drawer nav { flex: 1; padding: 10px 0; }
+  #mob-drawer nav a {
+    display: flex; align-items: center; gap: 12px;
+    padding: 13px 18px; font-size: 14px; color: rgba(255,255,255,0.8);
+    text-decoration: none; cursor: pointer;
+    border-left: 3px solid transparent; transition: all 0.15s;
+  }
+  #mob-drawer nav a:hover  { background: rgba(255,255,255,0.08); color: #fff; }
+  #mob-drawer nav a.active { background: rgba(63,169,245,0.2); color: #fff; border-left-color: var(--secondary); }
+  #mob-drawer nav a .icon  { font-size: 18px; width: 22px; text-align: center; font-style: normal; }
+  #mob-drawer .mob-drawer-footer {
+    padding: 12px 18px; font-size: 10px; color: rgba(255,255,255,0.4);
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+
+  /* ── MOBILE (≤ 600px) ────────────────────────────────────────────────── */
   @media (max-width: 600px) {
     :root { --sidebar-w: 0px; }
 
-    /* Sidebar → bottom nav bar */
-    #sidebar {
-      width: 100% !important;
-      height: 56px;
-      top: auto;
-      bottom: 0;
-      flex-direction: row;
-      overflow-x: auto;
-      overflow-y: hidden;
-      z-index: 200;
-    }
-    #sidebar .logo,
-    #sidebar .update-info { display: none; }
-    #sidebar nav {
-      flex-direction: row;
-      padding: 0;
-      width: 100%;
-      flex: 1;
-    }
-    #sidebar nav a {
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 2px;
-      padding: 6px 4px;
-      border-left: none !important;
-      border-top: 3px solid transparent;
-      flex: 1;
-      min-width: 52px;
-      font-size: 9px;
-    }
-    #sidebar nav a.active {
-      border-top-color: var(--secondary);
-      border-left: none;
-    }
-    #sidebar nav a span.nav-label {
-      display: block !important;
-      font-size: 9px;
-      line-height: 1.1;
-      text-align: center;
-      white-space: nowrap;
-    }
-    #sidebar nav a .icon { font-size: 17px; }
+    /* Esconde sidebar desktop */
+    #sidebar { display: none !important; }
 
-    /* Main ocupa largura total + espaço para a nav */
-    #main { margin-left: 0 !important; padding-bottom: 64px; }
+    /* Mostra botão hamburguer */
+    #mob-menu-btn { display: flex; align-items: center; }
 
-    /* Topbar compacta */
+    /* Main ocupa largura total */
+    #main { margin-left: 0 !important; }
+
+    /* Topbar compacta — título + hamburguer na 1ª linha, filtros na 2ª */
     #topbar {
       padding: 8px 12px;
       gap: 6px;
     }
     #topbar h1 {
       font-size: 13px;
-      flex-basis: 100%;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      min-width: 0;
     }
     .filter-group label { display: none; }
     .filter-group select,
@@ -405,36 +431,36 @@
     .filter-group input[type="month"] {
       font-size: 11px;
       padding: 4px 6px;
-      max-width: 120px;
+      max-width: 110px;
     }
-    .camp-toggle { min-width: 130px; font-size: 11px; }
+    .camp-toggle { min-width: 120px; font-size: 11px; }
     .camp-menu { width: calc(100vw - 24px); right: -12px; }
 
     /* Conteúdo */
     #content { padding: 12px; }
 
     /* KPI grids */
-    .kpi-grid       { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .kpi-grid-crm   { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .kpi-grid-5     { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .kpi-card       { padding: 14px 10px 12px; }
+    .kpi-grid     { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .kpi-grid-crm { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .kpi-grid-5   { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .kpi-card     { padding: 14px 10px 12px; }
     .kpi-card .kpi-value { font-size: 24px; }
     .kpi-card .kpi-label { font-size: 10px; }
 
     /* Gráficos */
-    .chart-wrap  { height: 220px !important; }
+    .chart-wrap      { height: 220px !important; }
     .chart-wrap.tall { height: 260px !important; }
-    .chart-card  { padding: 14px 10px; }
-    .chart-card h3 { font-size: 13px; }
+    .chart-card      { padding: 14px 10px; }
+    .chart-card h3   { font-size: 13px; }
 
-    /* Tabelas — scroll horizontal */
-    .table-card  { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    table        { min-width: 480px; font-size: 12px; }
+    /* Tabelas */
+    .table-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table       { min-width: 480px; font-size: 12px; }
     table th, table td { padding: 8px 10px; }
 
     /* Ads comparison */
-    .ads-comparison  { grid-template-columns: 1fr; }
-    .ads-group-kpis  { grid-template-columns: repeat(3, 1fr); }
+    .ads-comparison { grid-template-columns: 1fr; }
+    .ads-group-kpis { grid-template-columns: repeat(3, 1fr); }
 
     /* Funil */
     .funnel-bar-label { font-size: 12px; }
@@ -450,6 +476,7 @@
     .kpi-card .kpi-value { font-size: 22px; }
     #topbar h1 { font-size: 12px; }
     table { min-width: 380px; font-size: 11px; }
+    #mob-drawer { width: 85vw; }
   }
 </style>
 </head>
@@ -503,6 +530,14 @@
 <div id="main">
   <!-- TOP BAR -->
   <div id="topbar">
+    <!-- Botão hamburguer — só aparece no mobile -->
+    <button id="mob-menu-btn" onclick="openMobDrawer()" aria-label="Menu">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="2" y1="5"  x2="20" y2="5"/>
+        <line x1="2" y1="11" x2="20" y2="11"/>
+        <line x1="2" y1="17" x2="20" y2="17"/>
+      </svg>
+    </button>
     <h1>Dashboard Marketing — Expansão CDC</h1>
     <div class="filter-group">
       <label>Atalho</label>
@@ -2011,6 +2046,104 @@ async function loadData() {
 }
 
 loadData();
+</script>
+
+<!-- ── MOBILE DRAWER ──────────────────────────────────────────────────────── -->
+<div id="mob-overlay" onclick="closeMobDrawer()"></div>
+
+<div id="mob-drawer">
+  <div class="mob-drawer-header">
+    <div>
+      <h2>Clínica da Cidade</h2>
+      <p>Dashboard Expansão CDC</p>
+    </div>
+    <button id="mob-drawer-close" onclick="closeMobDrawer()">✕</button>
+  </div>
+  <nav id="mob-drawer-nav">
+    <a href="#" data-section="executivo" class="active">
+      <i class="icon">📊</i><span>Visão Executiva</span>
+    </a>
+    <a href="#" data-section="evolucao">
+      <i class="icon">📈</i><span>Evolução Mensal</span>
+    </a>
+    <a href="#" data-section="crm">
+      <i class="icon">🔄</i><span>Funil CRM</span>
+    </a>
+    <a href="#" data-section="perdas">
+      <i class="icon">⚠️</i><span>Gargalos & Perdas</span>
+    </a>
+    <a href="#" data-section="meta">
+      <i class="icon">📘</i><span>Meta Ads</span>
+    </a>
+    <a href="#" data-section="google">
+      <i class="icon">🔍</i><span>Google Ads</span>
+    </a>
+    <a href="#" data-section="criativos">
+      <i class="icon">🎨</i><span>Criativos</span>
+    </a>
+    <a href="#" data-section="utm">
+      <i class="icon">🔗</i><span>UTM / Atribuição</span>
+    </a>
+    <a href="#" data-section="ga4">
+      <i class="icon">🌐</i><span>Google Analytics</span>
+    </a>
+  </nav>
+  <div class="mob-drawer-footer" id="mob-drawer-update">Carregando...</div>
+</div>
+
+<script>
+// ── Mobile Drawer ────────────────────────────────────────────────────────────
+function openMobDrawer() {
+  document.getElementById('mob-drawer').classList.add('open');
+  document.getElementById('mob-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeMobDrawer() {
+  document.getElementById('mob-drawer').classList.remove('open');
+  document.getElementById('mob-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// Navegação pelo drawer — sincroniza com a sidebar desktop
+document.querySelectorAll('#mob-drawer-nav a').forEach(link => {
+  link.addEventListener('click', function(e) {
+    e.preventDefault();
+    const sec = this.dataset.section;
+
+    // Atualiza active no drawer
+    document.querySelectorAll('#mob-drawer-nav a').forEach(a => a.classList.remove('active'));
+    this.classList.add('active');
+
+    // Atualiza active na sidebar desktop (mantém em sincronia)
+    document.querySelectorAll('#sidebar nav a').forEach(a => {
+      a.classList.toggle('active', a.dataset.section === sec);
+    });
+
+    // Navega para a seção
+    showSection(sec);
+    closeMobDrawer();
+  });
+});
+
+// Sincroniza drawer quando usuário navega pela sidebar desktop
+document.querySelectorAll('#sidebar nav a').forEach(link => {
+  link.addEventListener('click', function() {
+    const sec = this.dataset.section;
+    document.querySelectorAll('#mob-drawer-nav a').forEach(a => {
+      a.classList.toggle('active', a.dataset.section === sec);
+    });
+  });
+});
+
+// Atualiza info de última atualização no drawer
+const _origUpdateInfo = setInterval(() => {
+  const info = document.getElementById('sidebar-update');
+  const dest = document.getElementById('mob-drawer-update');
+  if (info && dest && info.textContent !== 'Carregando...') {
+    dest.textContent = info.textContent;
+    clearInterval(_origUpdateInfo);
+  }
+}, 500);
 </script>
 </body>
 </html>
