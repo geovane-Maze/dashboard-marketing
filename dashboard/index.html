@@ -1779,20 +1779,16 @@ function renderMeta() {
   const datePred = getDateFilter();   // filtro dia a dia — mesma fonte da Visão Executiva
   const monthly  = getMetaMonthly(pred);
 
-  // ── KPI totals: dados diários Meta Ads ─────────────────────────────────────
-  let totalGasto = 0, totalImpr = 0, totalCliques = 0;
+  // ── KPI totals: dados diários Meta Ads (planilha Meta — fonte única) ────────
+  let totalGasto = 0, totalLeads = 0, totalImpr = 0, totalCliques = 0;
   (DATA.meta_ads.daily || [])
     .filter(r => !datePred || datePred(r.data))
     .forEach(r => {
       totalGasto   += r.gasto      || 0;
+      totalLeads   += r.leads      || 0;   // leads conforme reportado pela Meta
       totalImpr    += r.impressoes || 0;
       totalCliques += r.cliques    || 0;
     });
-
-  // Leads = total leads RD Station no período (mesma fonte que Visão Executiva)
-  const totalLeads = (DATA.leads.daily || [])
-    .filter(r => !datePred || datePred(r.data))
-    .reduce((s, r) => s + r.total, 0);
 
   const cpl = totalLeads > 0 ? totalGasto / totalLeads : 0;
   const ctr = totalImpr  > 0 ? totalCliques / totalImpr * 100 : 0;
