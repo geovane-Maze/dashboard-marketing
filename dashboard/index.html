@@ -474,6 +474,14 @@
     <!-- EVOLUÇÃO MENSAL -->
     <div id="sec-evolucao" class="section">
       <div class="section-title">Evolução Mensal</div>
+      <!-- Filtro exclusivo desta página — não afeta nenhuma outra seção -->
+      <div class="filter-group" style="margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+        <label style="font-weight:600;color:var(--primary);">📅 Período desta página</label>
+        <input type="month" id="evo-filter-start" onchange="renderEvolucao()" style="border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;color:var(--text);background:var(--bg);" />
+        <span style="font-size:12px;color:#888;">até</span>
+        <input type="month" id="evo-filter-end" onchange="renderEvolucao()" style="border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;color:var(--text);background:var(--bg);" />
+        <button class="btn-filter" onclick="evoResetFilter()">↺ Últimos 4 meses</button>
+      </div>
       <div class="charts-row full">
         <div class="chart-card">
           <h3>Leads Captados por Mês</h3>
@@ -1324,8 +1332,40 @@ function renderExecutivo() {
 }
 
 // ─── SECTION: EVOLUÇÃO ────────────────────────────────────────────────────────
+// Calcula os últimos N meses disponíveis nos dados (união de todas as fontes mensais)
+function evoGetLast4Months() {
+  return [...new Set([
+    ...(DATA.google_ads.monthly || []).map(r => r.mes),
+    ...(DATA.meta_ads.monthly || []).map(r => r.mes),
+    ...(DATA.leads.monthly || []).map(r => r.mes),
+  ])].sort().slice(-4);
+}
+
+// Reseta o filtro da página Evolução Mensal para os últimos 4 meses
+function evoResetFilter() {
+  const last4 = evoGetLast4Months();
+  if (last4.length === 0) return;
+  document.getElementById('evo-filter-start').value = last4[0];
+  document.getElementById('evo-filter-end').value = last4[last4.length - 1];
+  renderEvolucao();
+}
+
 function renderEvolucao() {
-  const pred = getFilteredMonths();
+  // ── Filtro exclusivo desta página ──────────────────────────────────────────
+  const last4 = evoGetLast4Months();
+  const startEl = document.getElementById('evo-filter-start');
+  const endEl   = document.getElementById('evo-filter-end');
+
+  // Na primeira vez que a página carrega, inicializa automaticamente com os últimos 4 meses
+  if (!startEl.value && !endEl.value && last4.length > 0) {
+    startEl.value = last4[0];
+    endEl.value   = last4[last4.length - 1];
+  }
+
+  const startM = startEl.value || (last4[0] || '2000-01');
+  const endM   = endEl.value   || (last4[last4.length - 1] || '2099-12');
+  const pred   = m => m >= startM && m <= endM;  // predicado de mês (ex: "2026-02")
+  // ───────────────────────────────────────────────────────────────────────────
 
   const leadsData = filterMonthly(DATA.leads.monthly, pred);
   makeChart('chart-leads-monthly', {
