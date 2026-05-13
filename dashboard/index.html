@@ -545,7 +545,7 @@
           <div id="crm-funnel-bars" style="padding: 8px 0;"></div>
         </div>
         <div class="chart-card">
-          <h3>Negócios Ganhos por Mês</h3>
+          <h3>Reunião PDF por Mês</h3>
           <div class="chart-wrap"><canvas id="chart-crm-won"></canvas></div>
         </div>
       </div>
@@ -1530,14 +1530,14 @@ function renderCRM() {
     </div>`).join('');
 
   // Won by month
-  const wonData = filterMonthly(DATA.crm.monthly_won || [], pred);
+  const reuniaoMensal = filterMonthly(DATA.crm.monthly_stages || [], pred);
   makeChart('chart-crm-won', {
     type: 'bar',
     data: {
-      labels: wonData.map(r => mesLabel(r.mes)),
-      datasets: [{ label: 'Negócios Ganhos', data: wonData.map(r => r.total), backgroundColor: COLORS.green + 'CC', borderRadius: 4 }]
+      labels: reuniaoMensal.map(r => mesLabel(r.mes)),
+      datasets: [{ label: 'Reunião PDF', data: reuniaoMensal.map(r => r.reuniao_pdf || 0), backgroundColor: COLORS.orange + 'CC', borderRadius: 4 }]
     },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
   });
 
   // Responsável
