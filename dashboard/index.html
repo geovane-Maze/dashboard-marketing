@@ -1012,15 +1012,30 @@ function isRepasse(name) {
 }
 
 // ─── NAVIGATION ───────────────────────────────────────────────────────────────
+// Função global de navegação — usada pela sidebar desktop E pelo drawer mobile
+function showSection(sec) {
+  // Mostra a seção correta
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById('sec-' + sec);
+  if (el) el.classList.add('active');
+
+  // Atualiza active na sidebar desktop
+  document.querySelectorAll('#sidebar nav a').forEach(l => {
+    l.classList.toggle('active', l.dataset.section === sec);
+  });
+
+  // Atualiza active no drawer mobile
+  document.querySelectorAll('#mob-drawer-nav a').forEach(l => {
+    l.classList.toggle('active', l.dataset.section === sec);
+  });
+
+  renderSection(sec);
+}
+
 document.querySelectorAll('#sidebar nav a').forEach(link => {
   link.addEventListener('click', e => {
     e.preventDefault();
-    const sec = link.dataset.section;
-    document.querySelectorAll('#sidebar nav a').forEach(l => l.classList.remove('active'));
-    link.classList.add('active');
-    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-    document.getElementById('sec-' + sec).classList.add('active');
-    renderSection(sec);
+    showSection(link.dataset.section);
   });
 });
 
@@ -2104,34 +2119,12 @@ function closeMobDrawer() {
   document.body.style.overflow = '';
 }
 
-// Navegação pelo drawer — sincroniza com a sidebar desktop
+// Navegação pelo drawer — usa showSection() que já cuida de tudo
 document.querySelectorAll('#mob-drawer-nav a').forEach(link => {
   link.addEventListener('click', function(e) {
     e.preventDefault();
-    const sec = this.dataset.section;
-
-    // Atualiza active no drawer
-    document.querySelectorAll('#mob-drawer-nav a').forEach(a => a.classList.remove('active'));
-    this.classList.add('active');
-
-    // Atualiza active na sidebar desktop (mantém em sincronia)
-    document.querySelectorAll('#sidebar nav a').forEach(a => {
-      a.classList.toggle('active', a.dataset.section === sec);
-    });
-
-    // Navega para a seção
-    showSection(sec);
+    showSection(this.dataset.section);
     closeMobDrawer();
-  });
-});
-
-// Sincroniza drawer quando usuário navega pela sidebar desktop
-document.querySelectorAll('#sidebar nav a').forEach(link => {
-  link.addEventListener('click', function() {
-    const sec = this.dataset.section;
-    document.querySelectorAll('#mob-drawer-nav a').forEach(a => {
-      a.classList.toggle('active', a.dataset.section === sec);
-    });
   });
 });
 
