@@ -1516,18 +1516,27 @@ function renderCRM() {
     { label: 'Negócios Perdidos',             value: fmt.num(crm.total_lost),       sub: 'com motivo registrado',         cls: 'red'    },
   ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
 
-  // Funnel bars
-  const maxTotal = Math.max(...crm.funnel.map(s => s.total), 1);
-  document.getElementById('crm-funnel-bars').innerHTML = crm.funnel.slice(0, 10).map(s => `
+  // Funnel bars — usa active_funnel (ordem do pipeline, sem Etapa Descarte)
+  const crmFunnel  = crm.active_funnel || [];
+  const crmMax     = Math.max(...crmFunnel.map(s => s.total), 1);
+  const crmTotal   = crm.total_active || crmFunnel.reduce((a, s) => a + s.total, 0) || 1;
+
+  document.getElementById('crm-funnel-bars').innerHTML = crmFunnel.length
+    ? crmFunnel.map(s => {
+        const pctBar   = (s.total / crmMax * 100).toFixed(1);   // largura da barra
+        const pctLabel = (s.total / crmMax * 100).toFixed(1);   // % exibida (maior etapa = 100%)
+        return `
     <div class="funnel-bar-container">
       <div class="funnel-bar-label">
         <span class="stage-name">${s.etapa}</span>
-        <span class="stage-count">${fmt.num(s.total)} negócios — ${fmt.currency(s.valor)}</span>
+        <span class="stage-count">${fmt.num(s.total)} leads &nbsp;<strong style="color:var(--secondary)">${pctLabel}%</strong></span>
       </div>
       <div class="funnel-bar-track">
-        <div class="funnel-bar-fill" style="width:${(s.total/maxTotal*100).toFixed(1)}%"></div>
+        <div class="funnel-bar-fill" style="width:${pctBar}%"></div>
       </div>
-    </div>`).join('');
+    </div>`;
+      }).join('')
+    : '<p style="color:#999;padding:1rem">Sem negócios ativos</p>';
 
   // Won by month
   const reuniaoMensal = filterMonthly(DATA.crm.monthly_stages || [], pred);
