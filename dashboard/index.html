@@ -307,11 +307,22 @@
   .ads-kpi .ads-kpi-value { font-size: 20px; font-weight: 700; color: var(--primary); margin: 4px 0 2px; line-height: 1.1; }
   .ads-kpi .ads-kpi-sub { font-size: 10px; color: #aaa; }
 
-  /* RESPONSIVE */
-  @media (max-width: 900px) {
-    .charts-row { grid-template-columns: 1fr; }
-    .charts-row.triple { grid-template-columns: 1fr; }
+  /* ── RESPONSIVE ─────────────────────────────────────────────────────────── */
+
+  /* Tablet landscape */
+  @media (max-width: 1100px) {
+    .kpi-grid-crm { grid-template-columns: repeat(4, 1fr); }
   }
+
+  /* Tablet portrait — charts empilham */
+  @media (max-width: 900px) {
+    .charts-row, .charts-row.triple { grid-template-columns: 1fr; }
+    .ads-comparison { grid-template-columns: 1fr; }
+    .kpi-grid-5 { grid-template-columns: repeat(3, 1fr); }
+    .kpi-grid-crm { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* Sidebar colapsa a ícones */
   @media (max-width: 700px) {
     #sidebar { width: 60px; }
     #sidebar nav a span.nav-label { display: none; }
@@ -320,6 +331,125 @@
     #main { margin-left: 60px; }
     .kpi-grid { grid-template-columns: repeat(2, 1fr); }
     .kpi-grid-crm { grid-template-columns: repeat(2, 1fr); }
+    .kpi-grid-5 { grid-template-columns: repeat(2, 1fr); }
+    #topbar { padding: 8px 14px; gap: 8px; }
+    #content { padding: 14px; }
+  }
+
+  /* ── MOBILE (≤ 600px) — sidebar vira barra inferior ─────────────────── */
+  @media (max-width: 600px) {
+    :root { --sidebar-w: 0px; }
+
+    /* Sidebar → bottom nav bar */
+    #sidebar {
+      width: 100% !important;
+      height: 56px;
+      top: auto;
+      bottom: 0;
+      flex-direction: row;
+      overflow-x: auto;
+      overflow-y: hidden;
+      z-index: 200;
+    }
+    #sidebar .logo,
+    #sidebar .update-info { display: none; }
+    #sidebar nav {
+      flex-direction: row;
+      padding: 0;
+      width: 100%;
+      flex: 1;
+    }
+    #sidebar nav a {
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      padding: 6px 4px;
+      border-left: none !important;
+      border-top: 3px solid transparent;
+      flex: 1;
+      min-width: 52px;
+      font-size: 9px;
+    }
+    #sidebar nav a.active {
+      border-top-color: var(--secondary);
+      border-left: none;
+    }
+    #sidebar nav a span.nav-label {
+      display: block !important;
+      font-size: 9px;
+      line-height: 1.1;
+      text-align: center;
+      white-space: nowrap;
+    }
+    #sidebar nav a .icon { font-size: 17px; }
+
+    /* Main ocupa largura total + espaço para a nav */
+    #main { margin-left: 0 !important; padding-bottom: 64px; }
+
+    /* Topbar compacta */
+    #topbar {
+      padding: 8px 12px;
+      gap: 6px;
+    }
+    #topbar h1 {
+      font-size: 13px;
+      flex-basis: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .filter-group label { display: none; }
+    .filter-group select,
+    .filter-group input[type="date"],
+    .filter-group input[type="month"] {
+      font-size: 11px;
+      padding: 4px 6px;
+      max-width: 120px;
+    }
+    .camp-toggle { min-width: 130px; font-size: 11px; }
+    .camp-menu { width: calc(100vw - 24px); right: -12px; }
+
+    /* Conteúdo */
+    #content { padding: 12px; }
+
+    /* KPI grids */
+    .kpi-grid       { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .kpi-grid-crm   { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .kpi-grid-5     { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .kpi-card       { padding: 14px 10px 12px; }
+    .kpi-card .kpi-value { font-size: 24px; }
+    .kpi-card .kpi-label { font-size: 10px; }
+
+    /* Gráficos */
+    .chart-wrap  { height: 220px !important; }
+    .chart-wrap.tall { height: 260px !important; }
+    .chart-card  { padding: 14px 10px; }
+    .chart-card h3 { font-size: 13px; }
+
+    /* Tabelas — scroll horizontal */
+    .table-card  { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table        { min-width: 480px; font-size: 12px; }
+    table th, table td { padding: 8px 10px; }
+
+    /* Ads comparison */
+    .ads-comparison  { grid-template-columns: 1fr; }
+    .ads-group-kpis  { grid-template-columns: repeat(3, 1fr); }
+
+    /* Funil */
+    .funnel-bar-label { font-size: 12px; }
+
+    /* Filtro Evolução Mensal */
+    #sec-evolucao .filter-group { gap: 6px; }
+    #sec-evolucao .filter-group label { display: block; font-size: 11px; }
+  }
+
+  /* Telas muito pequenas (≤ 380px) */
+  @media (max-width: 380px) {
+    .kpi-grid, .kpi-grid-crm, .kpi-grid-5 { grid-template-columns: 1fr; }
+    .kpi-card .kpi-value { font-size: 22px; }
+    #topbar h1 { font-size: 12px; }
+    table { min-width: 380px; font-size: 11px; }
   }
 </style>
 </head>
