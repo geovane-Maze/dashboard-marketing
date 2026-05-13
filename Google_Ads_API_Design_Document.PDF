@@ -1,0 +1,136 @@
+GOOGLE ADS API DESIGN DOCUMENT
+Maze Mídia — Internal Marketing Dashboard
+Version 1.0 — May 2026
+
+================================================================
+1. COMPANY OVERVIEW
+================================================================
+
+Company Name: Maze Mídia
+Website: https://mazemidia.com.br
+Contact Email: geovane@mazemidia.com.br
+
+Maze Mídia is a Brazilian digital marketing agency that manages
+Google Ads campaigns on behalf of its clients. The agency
+operates as a certified Google Ads partner and manages multiple
+client accounts through a single MCC (Manager) account.
+
+================================================================
+2. TOOL OVERVIEW
+================================================================
+
+Tool Name: Maze Mídia Internal Marketing Dashboard
+Type: Internal reporting dashboard (not distributed externally)
+Users: Internal agency employees only
+
+The tool is a private web dashboard built to consolidate
+marketing performance data from multiple platforms (Google Ads,
+Meta Ads, Google Analytics 4, and CRM) into a single reporting
+interface for internal use by the Maze Mídia team.
+
+================================================================
+3. PURPOSE AND USE CASE
+================================================================
+
+The dashboard is used exclusively for:
+
+- Monitoring campaign performance metrics (spend, impressions,
+  clicks, conversions) across client accounts
+- Generating internal performance reports
+- Tracking ROI and key marketing KPIs for client accounts
+- Identifying trends and anomalies in campaign data
+
+The tool does NOT:
+- Create or modify campaigns
+- Manage bids or budgets
+- Access or store any end-user personal data
+- Distribute data to third parties
+
+================================================================
+4. DATA FLOW
+================================================================
+
+Step 1: Data Collection
+A Python script runs daily via GitHub Actions (automated CI/CD)
+and calls the Google Ads API to retrieve campaign-level
+performance metrics for the past 90 days.
+
+API Resource queried: campaign
+Metrics collected per campaign per day:
+  - campaign.name
+  - metrics.cost_micros (spend)
+  - metrics.clicks
+  - metrics.impressions
+  - metrics.conversions
+  - segments.date
+
+Step 2: Data Storage
+The collected data is aggregated and stored as a JSON file
+(summary.json) in a private GitHub repository. No raw API
+responses are stored.
+
+Step 3: Data Visualization
+The JSON file is read by a static HTML dashboard hosted on
+GitHub Pages (private access). The dashboard displays charts
+and KPI cards for internal review.
+
+================================================================
+5. API USAGE
+================================================================
+
+Endpoints used:
+- GoogleAdsService.Search (read-only)
+
+Query example:
+  SELECT campaign.name, metrics.cost_micros, metrics.clicks,
+         metrics.impressions, metrics.conversions, segments.date
+  FROM campaign
+  WHERE segments.date BETWEEN '2026-01-01' AND '2026-05-11'
+    AND campaign.status != 'REMOVED'
+    AND metrics.cost_micros > 0
+
+Access type: Read-only (no write operations)
+Authentication: OAuth 2.0 with offline refresh token
+Token storage: Stored securely as environment variables in
+               GitHub Actions Secrets (never exposed in code)
+
+================================================================
+6. CAMPAIGN TYPES SUPPORTED
+================================================================
+
+The tool collects and reports on all active campaign types:
+- Search
+- Performance Max
+- Display
+- Video
+- Demand Gen
+
+================================================================
+7. SECURITY AND DATA HANDLING
+================================================================
+
+- OAuth credentials stored as encrypted GitHub Secrets
+- No end-user personal data is collected or stored
+- API calls are read-only (no account modifications possible)
+- Dashboard access is restricted to internal team members
+- No third-party data sharing
+
+================================================================
+8. INFRASTRUCTURE
+================================================================
+
+- Language: Python 3.11
+- Automation: GitHub Actions (daily scheduled job)
+- Dashboard: Static HTML + JavaScript (Chart.js)
+- Hosting: GitHub Pages (private repository)
+- Authentication: Google OAuth 2.0
+
+================================================================
+9. CONTACT
+================================================================
+
+Developer: Geovane (Maze Mídia)
+Email: geovane@mazemidia.com.br
+MCC Account: 289-177-9593
+
+================================================================
