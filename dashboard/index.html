@@ -1844,13 +1844,20 @@ function renderMeta() {
 
 // ─── SECTION: GOOGLE ADS ──────────────────────────────────────────────────────
 function renderGoogle() {
-  const pred = getFilteredMonths();
-  const monthly = getGoogleMonthly(pred);
+  const pred     = getFilteredMonths();
+  const datePred = getDateFilter();
+  const monthly  = getGoogleMonthly(pred);
 
-  const totalGasto = monthly.reduce((s, r) => s + r.gasto, 0);
-  const totalConv = monthly.reduce((s, r) => s + r.conversoes, 0);
-  const totalImpr = monthly.reduce((s, r) => s + r.impressoes, 0);
-  const totalCliques = monthly.reduce((s, r) => s + r.cliques, 0);
+  // KPI totals — dados diários para respeitar filtro dia a dia
+  let totalGasto = 0, totalConv = 0, totalImpr = 0, totalCliques = 0;
+  (DATA.google_ads.daily || [])
+    .filter(r => !datePred || datePred(r.data))
+    .forEach(r => {
+      totalGasto   += r.gasto      || 0;
+      totalConv    += r.conversoes || 0;
+      totalImpr    += r.impressoes || 0;
+      totalCliques += r.cliques    || 0;
+    });
   const cpl = totalConv > 0 ? totalGasto / totalConv : 0;
   const ctr = totalImpr > 0 ? totalCliques / totalImpr * 100 : 0;
 
@@ -1943,36 +1950,62 @@ function renderCreatives() {
 
 // ─── SECTION: UTM ─────────────────────────────────────────────────────────────
 function renderUTM() {
-  const sources = DATA.utm.sources.slice(0, 10);
+  const datePred = getDateFilter();
+
+  // ── Sources filtradas por período ─────────────────────────────────────────
+  const filtSrc = {};
+  (DATA.utm.sources_daily || []).filter(r => !datePred || datePred(r.data))
+    .forEach(r => { filtSrc[r.source] = (filtSrc[r.source] || 0) + r.total; });
+  const sources = Object.entries(filtSrc).sort((a,b) => b[1]-a[1]).slice(0,10)
+    .map(([source, total]) => ({ source, total }));
+
   makeChart('chart-utm-source', {
     type: 'doughnut',
     data: { labels: sources.map(r => r.source), datasets: [{ data: sources.map(r => r.total), backgroundColor: PALETTE }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
   });
 
-  const mediums = DATA.utm.mediums.slice(0, 8);
+  // ── Mediums filtrados por período ─────────────────────────────────────────
+  const filtMed = {};
+  (DATA.utm.mediums_daily || []).filter(r => !datePred || datePred(r.data))
+    .forEach(r => { filtMed[r.medium] = (filtMed[r.medium] || 0) + r.total; });
+  const mediums = Object.entries(filtMed).sort((a,b) => b[1]-a[1]).slice(0,8)
+    .map(([medium, total]) => ({ medium, total }));
+
   makeChart('chart-utm-medium', {
     type: 'doughnut',
     data: { labels: mediums.map(r => r.medium), datasets: [{ data: mediums.map(r => r.total), backgroundColor: PALETTE }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
   });
 
-  const canal = DATA.leads.by_canal.slice(0, 8);
+  // ── Canal filtrado por período ─────────────────────────────────────────────
+  const filtCanal = {};
+  (DATA.leads.canal_daily || []).filter(r => !datePred || datePred(r.data))
+    .forEach(r => { filtCanal[r.canal] = (filtCanal[r.canal] || 0) + r.total; });
+  const canal = Object.entries(filtCanal).sort((a,b) => b[1]-a[1]).slice(0,8)
+    .map(([canal, total]) => ({ canal, total }));
+
   makeChart('chart-canal', {
     type: 'doughnut',
     data: { labels: canal.map(r => r.canal), datasets: [{ data: canal.map(r => r.total), backgroundColor: PALETTE }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
   });
 
-  const totalCamp = DATA.utm.campaigns.reduce((s, r) => s + r.total, 0) || 1;
-  document.getElementById('table-utm-campaigns').innerHTML = DATA.utm.campaigns.map((r, i) =>
-    `<tr><td>${i+1}</td><td>${r.campaign}</td><td><strong>${r.total}</strong></td><td>${(r.total/totalCamp*100).toFixed(1)}%</td></tr>`
+  // ── Campanhas UTM filtradas por período ───────────────────────────────────
+  const filtCamp = {};
+  (DATA.utm.campaigns_daily || []).filter(r => !datePred || datePred(r.data))
+    .forEach(r => { filtCamp[r.campaign] = (filtCamp[r.campaign] || 0) + r.total; });
+  const camps = Object.entries(filtCamp).sort((a,b) => b[1]-a[1]);
+  const totalCamp = camps.reduce((s,[,v]) => s + v, 0) || 1;
+
+  document.getElementById('table-utm-campaigns').innerHTML = camps.map(([campaign, total], i) =>
+    `<tr><td>${i+1}</td><td>${campaign}</td><td><strong>${total}</strong></td><td>${(total/totalCamp*100).toFixed(1)}%</td></tr>`
   ).join('') || '<tr><td colspan="4" class="empty">Sem dados UTM</td></tr>';
 }
 
 // ─── SECTION: GA4 ─────────────────────────────────────────────────────────────
 function renderGA4() {
-  const pred = getFilteredMonths();
+  const pred    = getFilteredMonths();
   const monthly = filterMonthly(DATA.ga4.monthly, pred);
 
   const totalSessions = monthly.reduce((s, r) => s + r.sessions, 0);
