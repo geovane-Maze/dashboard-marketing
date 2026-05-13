@@ -164,6 +164,8 @@
   .kpi-card.red .kpi-value { color: var(--red); }
   .kpi-card.blue .kpi-value { color: var(--secondary); }
   .kpi-card.orange .kpi-value { color: var(--orange); }
+  .kpi-card.teal .kpi-value { color: var(--teal); }
+  .kpi-card.purple .kpi-value { color: var(--purple); }
 
   /* CHARTS */
   .charts-row {
@@ -1461,14 +1463,40 @@ function renderEvolucao() {
 // ─── SECTION: CRM ─────────────────────────────────────────────────────────────
 function renderCRM() {
   const crm = DATA.crm;
+  const pred = getFilteredMonths();
+
+  // ── Busca etapas no funil ativo ────────────────────────────────────────────
+  const activeFunnel = crm.active_funnel || [];
+  function stageCount(name) {
+    const s = activeFunnel.find(r => r.etapa.toLowerCase() === name.toLowerCase());
+    return s ? s.total : 0;
+  }
+  const reuniaoPDFCount  = stageCount('Reunião PDF');
+  const apresentacaoBP   = stageCount('Apresentação do Business Plan');
+  const workshopCount    = stageCount('Workshop');
+
+  // ── Investimento total no período (Meta + Google) ──────────────────────────
+  const metaMonthly   = getMetaMonthly(pred);
+  const googleMonthly = getGoogleMonthly(pred);
+  const totalInvest   = metaMonthly.reduce((s, r) => s + r.gasto, 0)
+                      + googleMonthly.reduce((s, r) => s + r.gasto, 0);
+
+  // Custo por lead em Reunião PDF = investimento total / qtde Reunião PDF
+  const custoReuniaoPDF = reuniaoPDFCount > 0 ? totalInvest / reuniaoPDFCount : 0;
+
+  // Taxa de Reunião PDF = Reunião PDF / total de negócios ativos
+  const totalAtivos  = crm.total_active || crm.total_open || 1;
+  const taxaReuniao  = reuniaoPDFCount / totalAtivos * 100;
 
   document.getElementById('kpi-crm').innerHTML = [
-    { label: 'Total de Negócios', value: fmt.num(crm.total_deals), sub: 'no CRM', cls: '' },
-    { label: 'Negócios Abertos', value: fmt.num(crm.total_open), sub: 'em andamento', cls: 'blue' },
-    { label: 'Negócios Ganhos', value: fmt.num(crm.total_won), sub: fmt.currency(crm.total_value_won), cls: 'green' },
-    { label: 'Negócios Perdidos', value: fmt.num(crm.total_lost), sub: 'com motivo registrado', cls: 'red' },
-    { label: 'Taxa de Fechamento', value: fmt.pct(crm.taxa_fechamento), sub: 'ganhos / total', cls: 'orange' },
-    { label: 'Valor Total Ganho', value: fmt.currency(crm.total_value_won), sub: 'histórico', cls: '' },
+    { label: 'Total de Negócios',             value: fmt.num(crm.total_deals),      sub: 'no CRM',                       cls: ''       },
+    { label: 'Negócios Abertos',              value: fmt.num(crm.total_open),       sub: 'em andamento',                  cls: 'blue'   },
+    { label: 'Reunião PDF',                   value: fmt.num(reuniaoPDFCount),      sub: 'leads nesta etapa',             cls: 'blue'   },
+    { label: 'Apresentação do Business Plan', value: fmt.num(apresentacaoBP),       sub: 'leads nesta etapa',             cls: 'teal'   },
+    { label: 'Workshop',                      value: fmt.num(workshopCount),         sub: 'leads nesta etapa',             cls: 'purple' },
+    { label: 'Custo por Lead — Reunião PDF',  value: fmt.currency(custoReuniaoPDF), sub: 'investimento ÷ leads Reun. PDF', cls: 'orange' },
+    { label: 'Taxa de Reunião PDF',           value: fmt.pct(taxaReuniao),          sub: 'Reun. PDF ÷ total ativos',      cls: 'orange' },
+    { label: 'Negócios Perdidos',             value: fmt.num(crm.total_lost),       sub: 'com motivo registrado',         cls: 'red'    },
   ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
 
   // Funnel bars
@@ -1485,7 +1513,6 @@ function renderCRM() {
     </div>`).join('');
 
   // Won by month
-  const pred = getFilteredMonths();
   const wonData = filterMonthly(DATA.crm.monthly_won || [], pred);
   makeChart('chart-crm-won', {
     type: 'bar',
