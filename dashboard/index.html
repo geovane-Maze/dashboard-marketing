@@ -1367,14 +1367,40 @@ function renderEvolucao() {
   const pred   = m => m >= startM && m <= endM;  // predicado de mês (ex: "2026-02")
   // ───────────────────────────────────────────────────────────────────────────
 
-  const leadsData = filterMonthly(DATA.leads.monthly, pred);
+  // Monta lookup de leads mensais e de etapas CRM por mês
+  const leadsMonthMap  = {};
+  (DATA.leads.monthly || []).forEach(r => { leadsMonthMap[r.mes] = r; });
+  const stagesMonthMap = {};
+  (DATA.crm.monthly_stages || []).forEach(r => { stagesMonthMap[r.mes] = r; });
+
+  // Usa os meses cobertos pelo filtro atual (union de todas as fontes)
+  const allMesesEvo = [...new Set([
+    ...(DATA.google_ads.monthly || []).map(r => r.mes),
+    ...(DATA.meta_ads.monthly   || []).map(r => r.mes),
+    ...(DATA.leads.monthly      || []).map(r => r.mes),
+    ...Object.keys(stagesMonthMap),
+  ])].sort().filter(m => m >= startM && m <= endM);
+
   makeChart('chart-leads-monthly', {
     type: 'bar',
     data: {
-      labels: leadsData.map(r => mesLabel(r.mes)),
+      labels: allMesesEvo.map(mesLabel),
       datasets: [
-        { label: 'Total Leads', data: leadsData.map(r => r.total), backgroundColor: COLORS.secondary + 'CC', borderRadius: 4 },
-        { label: 'Qualificados', data: leadsData.map(r => r.qualificados), backgroundColor: COLORS.green + 'CC', borderRadius: 4 },
+        {
+          label: 'Total de Leads',
+          data: allMesesEvo.map(m => (leadsMonthMap[m] || {}).total || 0),
+          backgroundColor: COLORS.secondary + 'CC', borderRadius: 4
+        },
+        {
+          label: 'Reunião PDF',
+          data: allMesesEvo.map(m => (stagesMonthMap[m] || {}).reuniao_pdf || 0),
+          backgroundColor: COLORS.orange + 'CC', borderRadius: 4
+        },
+        {
+          label: 'Apresentação do Business Plan',
+          data: allMesesEvo.map(m => (stagesMonthMap[m] || {}).apresentacao_bp || 0),
+          backgroundColor: COLORS.green + 'CC', borderRadius: 4
+        },
       ]
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }
