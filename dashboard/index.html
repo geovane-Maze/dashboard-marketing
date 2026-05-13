@@ -754,11 +754,11 @@
       <div class="kpi-grid" id="kpi-meta"></div>
       <div class="charts-row">
         <div class="chart-card">
-          <h3>Gasto Mensal — Expansão vs Repasse</h3>
+          <h3>Investimento Mensal</h3>
           <div class="chart-wrap tall"><canvas id="chart-meta-expansao"></canvas></div>
         </div>
         <div class="chart-card">
-          <h3>Leads Mensais — Expansão vs Repasse</h3>
+          <h3>Leads Mensal</h3>
           <div class="chart-wrap tall"><canvas id="chart-meta-leads-tipo"></canvas></div>
         </div>
       </div>
@@ -1806,28 +1806,57 @@ function renderMeta() {
     { label: 'CTR Médio', value: fmt.pct(ctr), sub: 'cliques/impressões', cls: 'green' },
   ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
 
+  // Últimos 3 meses disponíveis (union meta + leads)
+  const allMesesMeta = [...new Set([
+    ...(DATA.meta_ads.monthly || []).map(r => r.mes),
+    ...(DATA.leads.monthly    || []).map(r => r.mes),
+    ...(DATA.utm.sources_monthly || []).map(r => r.mes),
+  ])].sort().slice(-3);
+
+  // Gasto mensal por mês (últimos 3)
+  const gastoByMes = {};
+  (DATA.meta_ads.monthly || []).forEach(r => { gastoByMes[r.mes] = r.gasto; });
+
   makeChart('chart-meta-expansao', {
     type: 'bar',
     data: {
-      labels: monthly.map(r => mesLabel(r.mes)),
-      datasets: [
-        { label: 'Expansão', data: monthly.map(r => r.expansao_gasto), backgroundColor: COLORS.secondary + 'CC', borderRadius: 4, stack: 's' },
-        { label: 'Repasse', data: monthly.map(r => r.repasse_gasto), backgroundColor: COLORS.orange + 'CC', borderRadius: 4, stack: 's' },
-      ]
+      labels: allMesesMeta.map(mesLabel),
+      datasets: [{
+        label: 'Investimento (R$)',
+        data: allMesesMeta.map(m => gastoByMes[m] || 0),
+        backgroundColor: COLORS.secondary + 'CC',
+        borderRadius: 6,
+      }]
     },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } }
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
+    }
   });
+
+  // Leads mensais por mês (últimos 3) — fonte: utm.sources_monthly utm_source='metaads'
+  const leadsByMesMeta = {};
+  (DATA.utm.sources_monthly || [])
+    .filter(r => r.source === 'metaads')
+    .forEach(r => { leadsByMesMeta[r.mes] = (leadsByMesMeta[r.mes] || 0) + r.total; });
 
   makeChart('chart-meta-leads-tipo', {
     type: 'bar',
     data: {
-      labels: monthly.map(r => mesLabel(r.mes)),
-      datasets: [
-        { label: 'Expansão', data: monthly.map(r => r.expansao_leads), backgroundColor: COLORS.secondary + 'CC', borderRadius: 4, stack: 's' },
-        { label: 'Repasse', data: monthly.map(r => r.repasse_leads), backgroundColor: COLORS.orange + 'CC', borderRadius: 4, stack: 's' },
-      ]
+      labels: allMesesMeta.map(mesLabel),
+      datasets: [{
+        label: 'Leads',
+        data: allMesesMeta.map(m => leadsByMesMeta[m] || 0),
+        backgroundColor: COLORS.green + 'CC',
+        borderRadius: 6,
+      }]
     },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } }
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
   });
 
   const campaigns = DATA.meta_ads.campaigns;
