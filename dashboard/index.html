@@ -225,7 +225,34 @@
   .badge.won { background: #DCFCE7; color: #15803D; }
   .badge.lost { background: #FEE2E2; color: #B91C1C; }
   .badge.status-ativa { background: #DCFCE7; color: #15803D; }
-  .badge.status-pausada { background: #F3F4F6; color: #6B7280; }
+  .badge.status-pausada { background: #FEE2E2; color: #B91C1C; }
+  /* Dropdown customizado Criativos */
+  .criat-camp-wrap { position: relative; display: inline-block; }
+  .criat-camp-trigger {
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px;
+    cursor: pointer; background: white; display: flex; align-items: center;
+    justify-content: space-between; font-size: 13px; min-width: 280px; max-width: 320px;
+    gap: 8px; user-select: none;
+  }
+  .criat-camp-trigger:hover { border-color: var(--primary); }
+  .criat-camp-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .criat-camp-list {
+    display: none; position: absolute; top: calc(100% + 4px); left: 0;
+    background: white; border: 1px solid var(--border); border-radius: 8px;
+    max-height: 320px; overflow-y: auto; z-index: 600;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.13); min-width: 340px;
+  }
+  .criat-camp-list.open { display: block; }
+  .criat-camp-item {
+    padding: 8px 12px; cursor: pointer; display: flex; align-items: center;
+    gap: 8px; font-size: 12px; border-bottom: 1px solid #f1f5f9;
+  }
+  .criat-camp-item:last-child { border-bottom: none; }
+  .criat-camp-item:hover { background: #f8fafc; }
+  .criat-camp-item.selected { background: #EFF6FF; }
+  .criat-camp-item .camp-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tag-ativo   { background: #DCFCE7; color: #15803D; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; }
+  .tag-pausado { background: #FEE2E2; color: #B91C1C; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; }
   .badge.open { background: #F1F5F9; color: #475569; }
 
   /* FUNNEL */
@@ -809,17 +836,36 @@
     <!-- CRIATIVOS -->
     <div id="sec-criativos" class="section">
       <div class="section-title">Criativos — Meta Ads</div>
-      <div class="filter-group" style="margin-bottom:20px;">
-        <label>Ordenar por</label>
+      <div class="filter-group" style="margin-bottom:20px;flex-wrap:wrap;gap:10px;align-items:center;">
+        <label>Período</label>
+        <input type="date" id="criat-from" onchange="renderCreatives()"
+          style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
+        <span style="font-size:13px;color:var(--text-secondary)">até</span>
+        <input type="date" id="criat-to" onchange="renderCreatives()"
+          style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
+
+        <label style="margin-left:8px;">Campanha</label>
+        <div class="criat-camp-wrap" id="criat-camp-wrap">
+          <div class="criat-camp-trigger" id="criat-camp-trigger" onclick="toggleCriatCamp(event)">
+            <span class="criat-camp-label" id="criat-camp-label">Todas as campanhas</span>
+            <span style="opacity:0.45;font-size:11px;">▾</span>
+          </div>
+          <div class="criat-camp-list" id="criat-camp-list" onclick="criatCampClick(event)"></div>
+        </div>
+
+        <label style="margin-left:8px;">Status</label>
+        <select id="criat-status" onchange="renderCreatives()">
+          <option value="all">Todos</option>
+          <option value="ativo">Ativo</option>
+          <option value="pausado">Pausado</option>
+        </select>
+
+        <label style="margin-left:8px;">Ordenar por</label>
         <select id="creative-sort" onchange="renderCreatives()">
           <option value="gasto">Maior Gasto</option>
           <option value="leads">Mais Leads</option>
           <option value="cpl_asc">Menor CPL</option>
           <option value="ctr">Maior CTR</option>
-        </select>
-        <label style="margin-left:16px;">Campanha</label>
-        <select id="creative-camp" onchange="renderCreatives()" style="max-width:280px;">
-          <option value="all">Todas as campanhas</option>
         </select>
       </div>
       <div class="table-card">
@@ -1991,40 +2037,113 @@ function renderGoogle() {
 
 // ─── SECTION: CRIATIVOS ───────────────────────────────────────────────────────
 
-// Determina campanhas ativas: aquelas com gasto no mês mais recente disponível
+// Array global de nomes de campanhas para o dropdown customizado
+let criatCampNames = [];
+let selectedCreativeCamp = 'all';
+
+// Fecha dropdown ao clicar fora
+document.addEventListener('click', function() {
+  const list = document.getElementById('criat-camp-list');
+  if (list) list.classList.remove('open');
+});
+
+function toggleCriatCamp(e) {
+  e.stopPropagation();
+  document.getElementById('criat-camp-list').classList.toggle('open');
+}
+
+function criatCampClick(e) {
+  e.stopPropagation();
+  const item = e.target.closest('.criat-camp-item');
+  if (!item) return;
+  const idx = parseInt(item.dataset.idx);
+  const name = criatCampNames[idx];
+  selectedCreativeCamp = (name === '__all__') ? 'all' : name;
+  const label = selectedCreativeCamp === 'all'
+    ? 'Todas as campanhas'
+    : (selectedCreativeCamp.length > 38 ? selectedCreativeCamp.slice(0, 38) + '…' : selectedCreativeCamp);
+  document.getElementById('criat-camp-label').textContent = label;
+  document.getElementById('criat-camp-list').classList.remove('open');
+  renderCreatives();
+}
+
+// Campanhas ativas: com gasto no mês mais recente dos dados
 function getActiveCampaigns() {
   const campMonthly = DATA.meta_ads.campaign_monthly || [];
-  if (campMonthly.length === 0) return new Set();
+  if (!campMonthly.length) return new Set();
   const lastMonth = campMonthly.map(r => r.mes).sort().at(-1);
-  return new Set(
-    campMonthly.filter(r => r.mes === lastMonth && r.gasto > 0).map(r => r.campanha)
-  );
+  return new Set(campMonthly.filter(r => r.mes === lastMonth && r.gasto > 0).map(r => r.campanha));
+}
+
+function populateCriatCampDropdown(activeCamps, periodCamps) {
+  const allNames = DATA.meta_ads.campaign_names || [];
+  const filtered = periodCamps ? allNames.filter(n => periodCamps.has(n)) : allNames;
+  criatCampNames = ['__all__', ...filtered];
+
+  // Valida selectedCreativeCamp
+  if (selectedCreativeCamp !== 'all' && !filtered.includes(selectedCreativeCamp)) {
+    selectedCreativeCamp = 'all';
+    document.getElementById('criat-camp-label').textContent = 'Todas as campanhas';
+  }
+
+  document.getElementById('criat-camp-list').innerHTML = criatCampNames.map((name, idx) => {
+    const isAll = name === '__all__';
+    const isSel = isAll ? selectedCreativeCamp === 'all' : selectedCreativeCamp === name;
+    if (isAll) {
+      return `<div class="criat-camp-item${isSel ? ' selected' : ''}" data-idx="0">
+        <span class="camp-name-text">Todas as campanhas</span>
+      </div>`;
+    }
+    const ativa = activeCamps.has(name);
+    const tag   = ativa
+      ? `<span class="tag-ativo">Ativo</span>`
+      : `<span class="tag-pausado">Pausado</span>`;
+    const label = name.length > 46 ? name.slice(0, 46) + '…' : name;
+    return `<div class="criat-camp-item${isSel ? ' selected' : ''}" data-idx="${idx}">
+      ${tag}<span class="camp-name-text" title="${name.replace(/"/g,'&quot;')}">${label}</span>
+    </div>`;
+  }).join('');
 }
 
 function renderCreatives() {
-  const sort     = document.getElementById('creative-sort').value;
-  const campFilt = document.getElementById('creative-camp').value;
+  const sort       = document.getElementById('creative-sort').value;
+  const statusFilt = document.getElementById('criat-status').value;
+  const fromVal    = document.getElementById('criat-from').value;  // 'YYYY-MM-DD'
+  const toVal      = document.getElementById('criat-to').value;
 
-  // Popula o select de campanhas (apenas na primeira vez ou se estiver vazio)
-  const campSelect = document.getElementById('creative-camp');
-  if (campSelect.options.length <= 1) {
-    const campNames = DATA.meta_ads.campaign_names || [];
-    campNames.forEach(name => {
-      const opt = document.createElement('option');
-      opt.value = name;
-      opt.textContent = name.length > 50 ? name.slice(0, 50) + '…' : name;
-      opt.title = name;
-      campSelect.appendChild(opt);
-    });
-  }
+  // Converte datas para meses para filtrar campaign_monthly
+  const fromMonth = fromVal ? fromVal.slice(0, 7) : null;
+  const toMonth   = toVal   ? toVal.slice(0, 7)   : null;
+  const hasPeriod = fromMonth || toMonth;
+
+  const periodCamps = hasPeriod ? new Set(
+    (DATA.meta_ads.campaign_monthly || [])
+      .filter(r => (!fromMonth || r.mes >= fromMonth) && (!toMonth || r.mes <= toMonth) && r.gasto > 0)
+      .map(r => r.campanha)
+  ) : null;
 
   const activeCamps = getActiveCampaigns();
 
+  // Popula dropdown com tags Ativo/Pausado
+  populateCriatCampDropdown(activeCamps, periodCamps);
+
   let creatives = [...DATA.meta_ads.creatives];
 
-  // Filtro por campanha
-  if (campFilt !== 'all') {
-    creatives = creatives.filter(c => c.campanha === campFilt);
+  // Filtro por período (mantém só criativos de campanhas ativas no período)
+  if (periodCamps) {
+    creatives = creatives.filter(c => periodCamps.has(c.campanha));
+  }
+
+  // Filtro por campanha selecionada
+  if (selectedCreativeCamp !== 'all') {
+    creatives = creatives.filter(c => c.campanha === selectedCreativeCamp);
+  }
+
+  // Filtro por status
+  if (statusFilt === 'ativo') {
+    creatives = creatives.filter(c => activeCamps.has(c.campanha));
+  } else if (statusFilt === 'pausado') {
+    creatives = creatives.filter(c => !activeCamps.has(c.campanha));
   }
 
   // Ordenação
@@ -2035,7 +2154,7 @@ function renderCreatives() {
 
   document.getElementById('table-creatives').innerHTML = creatives.slice(0, 30).map(c => {
     const ativa = activeCamps.has(c.campanha);
-    const statusLabel = ativa ? 'Ativa' : 'Pausada';
+    const statusLabel = ativa ? 'Ativo' : 'Pausado';
     const statusClass = ativa ? 'status-ativa' : 'status-pausada';
     const thumb = c.thumbnail
       ? `<img class="thumb-img" src="${c.thumbnail}" onerror="this.style.display='none'" loading="lazy">`
@@ -2053,7 +2172,7 @@ function renderCreatives() {
       <td>${fmt.k(c.impressoes)}</td>
       <td>${fmt.pct(c.ctr)}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="8" class="empty">Sem criativos</td></tr>';
+  }).join('') || '<tr><td colspan="8" class="empty">Sem criativos no período</td></tr>';
 }
 
 // ─── SECTION: UTM ─────────────────────────────────────────────────────────────
