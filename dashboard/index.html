@@ -855,7 +855,7 @@
 
         <label style="margin-left:8px;">Status</label>
         <select id="criat-status" onchange="renderCreatives()">
-          <option value="all">Todos</option>
+          <option value="all" selected>Todos</option>
           <option value="ativo">Ativo</option>
           <option value="pausado">Pausado</option>
         </select>
@@ -2067,15 +2067,27 @@ function criatCampClick(e) {
   renderCreatives();
 }
 
-// Campanhas ativas: com gasto no mês mais recente dos dados
+// Campanhas ativas: com gasto nos últimos 2 meses disponíveis nos dados
 function getActiveCampaigns() {
   const campMonthly = DATA.meta_ads.campaign_monthly || [];
   if (!campMonthly.length) return new Set();
-  const lastMonth = campMonthly.map(r => r.mes).sort().at(-1);
-  return new Set(campMonthly.filter(r => r.mes === lastMonth && r.gasto > 0).map(r => r.campanha));
+  const allMonths = [...new Set(campMonthly.map(r => r.mes))].sort();
+  const last2 = allMonths.slice(-2);  // últimos 2 meses
+  return new Set(campMonthly.filter(r => last2.includes(r.mes) && r.gasto > 0).map(r => r.campanha));
+}
+
+// Campanhas do período selecionado (para o dropdown)
+function getPeriodCampaigns(fromMonth, toMonth) {
+  if (!fromMonth && !toMonth) return null;
+  return new Set(
+    (DATA.meta_ads.campaign_monthly || [])
+      .filter(r => (!fromMonth || r.mes >= fromMonth) && (!toMonth || r.mes <= toMonth) && r.gasto > 0)
+      .map(r => r.campanha)
+  );
 }
 
 function populateCriatCampDropdown(activeCamps, periodCamps) {
+  // O dropdown mostra campanhas do período selecionado (ou todas se sem período)
   const allNames = DATA.meta_ads.campaign_names || [];
   const filtered = periodCamps ? allNames.filter(n => periodCamps.has(n)) : allNames;
   criatCampNames = ['__all__', ...filtered];
@@ -2108,38 +2120,28 @@ function populateCriatCampDropdown(activeCamps, periodCamps) {
 function renderCreatives() {
   const sort       = document.getElementById('creative-sort').value;
   const statusFilt = document.getElementById('criat-status').value;
-  const fromVal    = document.getElementById('criat-from').value;  // 'YYYY-MM-DD'
+  const fromVal    = document.getElementById('criat-from').value;
   const toVal      = document.getElementById('criat-to').value;
 
-  // Converte datas para meses para filtrar campaign_monthly
   const fromMonth = fromVal ? fromVal.slice(0, 7) : null;
   const toMonth   = toVal   ? toVal.slice(0, 7)   : null;
-  const hasPeriod = fromMonth || toMonth;
 
-  const periodCamps = hasPeriod ? new Set(
-    (DATA.meta_ads.campaign_monthly || [])
-      .filter(r => (!fromMonth || r.mes >= fromMonth) && (!toMonth || r.mes <= toMonth) && r.gasto > 0)
-      .map(r => r.campanha)
-  ) : null;
-
+  // Campanhas ativas (últimos 2 meses) para tags no dropdown e coluna Status
   const activeCamps = getActiveCampaigns();
 
-  // Popula dropdown com tags Ativo/Pausado
+  // Campanhas do período → controla APENAS o dropdown de Campanha
+  // (os criativos são dados acumulados all-time sem granularidade de data)
+  const periodCamps = getPeriodCampaigns(fromMonth, toMonth);
   populateCriatCampDropdown(activeCamps, periodCamps);
 
   let creatives = [...DATA.meta_ads.creatives];
 
-  // Filtro por período (mantém só criativos de campanhas ativas no período)
-  if (periodCamps) {
-    creatives = creatives.filter(c => periodCamps.has(c.campanha));
-  }
-
-  // Filtro por campanha selecionada
+  // Filtro por campanha selecionada no dropdown
   if (selectedCreativeCamp !== 'all') {
     creatives = creatives.filter(c => c.campanha === selectedCreativeCamp);
   }
 
-  // Filtro por status
+  // Filtro por status (Ativo = campanha rodou nos últimos 2 meses)
   if (statusFilt === 'ativo') {
     creatives = creatives.filter(c => activeCamps.has(c.campanha));
   } else if (statusFilt === 'pausado') {

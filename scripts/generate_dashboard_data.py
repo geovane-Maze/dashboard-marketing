@@ -416,7 +416,7 @@ def aggregate_meta_ads(rows):
             creatives[anuncio]["cliques"] += cliques
             if row.get("thumbnail"):
                 creatives[anuncio]["thumbnail"] = row.get("thumbnail")
-            if not creatives[anuncio]["campanha"]:
+            if campanha:  # sempre atualiza para o nome mais recente da campanha
                 creatives[anuncio]["campanha"] = campanha
 
     monthly_list = []
