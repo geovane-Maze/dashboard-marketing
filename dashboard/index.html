@@ -838,10 +838,10 @@
       <div class="section-title">Criativos — Meta Ads</div>
       <div class="filter-group" style="margin-bottom:20px;flex-wrap:wrap;gap:10px;align-items:center;">
         <label>Período</label>
-        <input type="date" id="criat-from" onchange="renderCreatives()"
+        <input type="date" id="criat-from"
           style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
         <span style="font-size:13px;color:var(--text-secondary)">até</span>
-        <input type="date" id="criat-to" onchange="renderCreatives()"
+        <input type="date" id="criat-to"
           style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
 
         <label style="margin-left:8px;">Campanha</label>
@@ -854,19 +854,26 @@
         </div>
 
         <label style="margin-left:8px;">Status</label>
-        <select id="criat-status" onchange="renderCreatives()">
+        <select id="criat-status">
           <option value="all" selected>Todos</option>
           <option value="ativo">Ativo</option>
           <option value="pausado">Pausado</option>
         </select>
 
         <label style="margin-left:8px;">Ordenar por</label>
-        <select id="creative-sort" onchange="renderCreatives()">
+        <select id="creative-sort">
           <option value="gasto">Maior Gasto</option>
           <option value="leads">Mais Leads</option>
           <option value="cpl_asc">Menor CPL</option>
           <option value="ctr">Maior CTR</option>
         </select>
+
+        <button onclick="renderCreatives()" style="
+          margin-left:8px; padding:7px 20px; background:var(--primary); color:#fff;
+          border:none; border-radius:6px; font-size:13px; font-weight:600;
+          cursor:pointer; white-space:nowrap;">
+          Aplicar
+        </button>
       </div>
       <div class="table-card">
         <h3>Top Criativos por Performance</h3>
