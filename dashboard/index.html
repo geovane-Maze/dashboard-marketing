@@ -224,6 +224,8 @@
   .badge.repasse { background: #FEF3C7; color: #92400E; }
   .badge.won { background: #DCFCE7; color: #15803D; }
   .badge.lost { background: #FEE2E2; color: #B91C1C; }
+  .badge.status-ativa { background: #DCFCE7; color: #15803D; }
+  .badge.status-pausada { background: #F3F4F6; color: #6B7280; }
   .badge.open { background: #F1F5F9; color: #475569; }
 
   /* FUNNEL */
@@ -815,11 +817,9 @@
           <option value="cpl_asc">Menor CPL</option>
           <option value="ctr">Maior CTR</option>
         </select>
-        <label style="margin-left:16px;">Tipo</label>
-        <select id="creative-tipo" onchange="renderCreatives()">
-          <option value="all">Todos</option>
-          <option value="Expansão">Expansão</option>
-          <option value="Repasse">Repasse</option>
+        <label style="margin-left:16px;">Campanha</label>
+        <select id="creative-camp" onchange="renderCreatives()" style="max-width:280px;">
+          <option value="all">Todas as campanhas</option>
         </select>
       </div>
       <div class="table-card">
@@ -827,7 +827,7 @@
         <table>
           <thead>
             <tr>
-              <th>Criativo</th><th>Campanha</th><th>Tipo</th><th>Gasto</th>
+              <th>Criativo</th><th>Campanha</th><th>Status</th><th>Gasto</th>
               <th>Leads</th><th>CPL</th><th>Impressões</th><th>CTR</th>
             </tr>
           </thead>
@@ -1859,20 +1859,60 @@ function renderMeta() {
     }
   });
 
-  const campaigns = DATA.meta_ads.campaigns;
+  // ── Tabela de campanhas filtrada por período ─────────────────────────────
+  // Gasto/impressões/cliques: campaign_monthly filtrado pelo mês selecionado
+  const campSpendMap = {};
+  (DATA.meta_ads.campaign_monthly || [])
+    .filter(r => !pred || pred(r.mes))
+    .forEach(r => {
+      if (!campSpendMap[r.campanha]) {
+        campSpendMap[r.campanha] = { gasto: 0, impressoes: 0, cliques: 0, tipo: r.tipo };
+      }
+      campSpendMap[r.campanha].gasto      += r.gasto      || 0;
+      campSpendMap[r.campanha].impressoes += r.impressoes || 0;
+      campSpendMap[r.campanha].cliques    += r.cliques    || 0;
+    });
 
-  document.getElementById('table-meta-campaigns').innerHTML = campaigns.slice(0, 30).map(c =>
-    `<tr>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.campanha}">${c.campanha}</td>
-      <td><span class="badge ${c.tipo === 'Repasse' ? 'repasse' : 'expansao'}">${c.tipo}</span></td>
-      <td>${fmt.currency(c.gasto)}</td>
-      <td>${fmt.num(c.leads)}</td>
-      <td>${fmt.currency(c.cpl)}</td>
-      <td>${fmt.k(c.impressoes)}</td>
-      <td>${fmt.k(c.cliques)}</td>
-      <td>${fmt.pct(c.ctr)}</td>
-    </tr>`
-  ).join('') || '<tr><td colspan="8" class="empty">Sem dados</td></tr>';
+  // Leads: utm.campaigns_daily filtrado por data + source='metaads'
+  const utmLeadsMap = {};
+  (DATA.utm.campaigns_daily || [])
+    .filter(r => r.source === 'metaads' && (!datePred || datePred(r.data)))
+    .forEach(r => {
+      const key = (r.campaign || '').toLowerCase().trim();
+      utmLeadsMap[key] = (utmLeadsMap[key] || 0) + r.total;
+    });
+
+  function findUtmLeads(campName) {
+    const key = (campName || '').toLowerCase().trim();
+    if (utmLeadsMap[key] !== undefined) return utmLeadsMap[key];
+    // partial match fallback: find utm campaign that contains or is contained in camp name
+    for (const [k, v] of Object.entries(utmLeadsMap)) {
+      if (key.includes(k) || k.includes(key)) return v;
+    }
+    return 0;
+  }
+
+  const activeCampaigns = Object.entries(campSpendMap)
+    .filter(([, d]) => d.gasto > 0)
+    .sort((a, b) => b[1].gasto - a[1].gasto)
+    .slice(0, 30);
+
+  document.getElementById('table-meta-campaigns').innerHTML = activeCampaigns.map(([campName, d]) => {
+    const leads = findUtmLeads(campName);
+    const cpl   = leads > 0 ? d.gasto / leads : 0;
+    const ctr   = d.impressoes > 0 ? d.cliques / d.impressoes : 0;
+    const tipo  = d.tipo || (isRepasse(campName) ? 'Repasse' : 'Expansão');
+    return `<tr>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${campName}">${campName}</td>
+      <td><span class="badge ${tipo === 'Repasse' ? 'repasse' : 'expansao'}">${tipo}</span></td>
+      <td>${fmt.currency(d.gasto)}</td>
+      <td>${fmt.num(leads)}</td>
+      <td>${fmt.currency(cpl)}</td>
+      <td>${fmt.k(d.impressoes)}</td>
+      <td>${fmt.k(d.cliques)}</td>
+      <td>${fmt.pct(ctr)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="8" class="empty">Sem dados no período selecionado</td></tr>';
 }
 
 // ─── SECTION: GOOGLE ADS ──────────────────────────────────────────────────────
@@ -1950,23 +1990,53 @@ function renderGoogle() {
 }
 
 // ─── SECTION: CRIATIVOS ───────────────────────────────────────────────────────
+
+// Determina campanhas ativas: aquelas com gasto no mês mais recente disponível
+function getActiveCampaigns() {
+  const campMonthly = DATA.meta_ads.campaign_monthly || [];
+  if (campMonthly.length === 0) return new Set();
+  const lastMonth = campMonthly.map(r => r.mes).sort().at(-1);
+  return new Set(
+    campMonthly.filter(r => r.mes === lastMonth && r.gasto > 0).map(r => r.campanha)
+  );
+}
+
 function renderCreatives() {
-  const sort = document.getElementById('creative-sort').value;
-  const tipoFilt = document.getElementById('creative-tipo').value;
+  const sort     = document.getElementById('creative-sort').value;
+  const campFilt = document.getElementById('creative-camp').value;
+
+  // Popula o select de campanhas (apenas na primeira vez ou se estiver vazio)
+  const campSelect = document.getElementById('creative-camp');
+  if (campSelect.options.length <= 1) {
+    const campNames = DATA.meta_ads.campaign_names || [];
+    campNames.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name.length > 50 ? name.slice(0, 50) + '…' : name;
+      opt.title = name;
+      campSelect.appendChild(opt);
+    });
+  }
+
+  const activeCamps = getActiveCampaigns();
 
   let creatives = [...DATA.meta_ads.creatives];
 
-  if (tipoFilt !== 'all') {
-    creatives = creatives.filter(c => isRepasse(c.campanha) ? tipoFilt === 'Repasse' : tipoFilt === 'Expansão');
+  // Filtro por campanha
+  if (campFilt !== 'all') {
+    creatives = creatives.filter(c => c.campanha === campFilt);
   }
 
+  // Ordenação
   if (sort === 'leads') creatives.sort((a, b) => b.leads - a.leads);
   else if (sort === 'cpl_asc') creatives.sort((a, b) => (a.cpl || 99999) - (b.cpl || 99999));
   else if (sort === 'ctr') creatives.sort((a, b) => b.ctr - a.ctr);
   else creatives.sort((a, b) => b.gasto - a.gasto);
 
   document.getElementById('table-creatives').innerHTML = creatives.slice(0, 30).map(c => {
-    const tipo = isRepasse(c.campanha) ? 'Repasse' : 'Expansão';
+    const ativa = activeCamps.has(c.campanha);
+    const statusLabel = ativa ? 'Ativa' : 'Pausada';
+    const statusClass = ativa ? 'status-ativa' : 'status-pausada';
     const thumb = c.thumbnail
       ? `<img class="thumb-img" src="${c.thumbnail}" onerror="this.style.display='none'" loading="lazy">`
       : `<div class="no-thumb">🖼️</div>`;
@@ -1976,7 +2046,7 @@ function renderCreatives() {
         <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px" title="${c.anuncio}">${c.anuncio}</span>
       </td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px" title="${c.campanha}">${c.campanha}</td>
-      <td><span class="badge ${tipo === 'Repasse' ? 'repasse' : 'expansao'}">${tipo}</span></td>
+      <td><span class="badge ${statusClass}">${statusLabel}</span></td>
       <td>${fmt.currency(c.gasto)}</td>
       <td>${fmt.num(c.leads)}</td>
       <td>${c.cpl > 0 ? fmt.currency(c.cpl) : '—'}</td>
