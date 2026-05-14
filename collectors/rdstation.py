@@ -66,14 +66,52 @@ def _get_segmentation_id(headers):
     raise Exception("Nenhuma segmentacao encontrada na conta do RD Station.")
 
 
-def _get_contact_details(uuid, headers):
-    response = requests.get(
-        f"{BASE_URL}/platform/contacts/{uuid}",
-        headers=headers,
+class _ApiContext:
+    """Encapsula token + headers para permitir refresh durante run longo."""
+    def __init__(self):
+        self.token = get_access_token()
+        self.headers = {"Authorization": f"Bearer {self.token}"}
+        self.failures = {"details": 0, "events": 0}
+
+    def refresh(self):
+        self.token = get_access_token()
+        self.headers = {"Authorization": f"Bearer {self.token}"}
+
+
+def _request_with_retry(url, ctx, params=None, max_retries=4, kind="details"):
+    """GET com retry exponencial. Refaz token em 401. Backoff em 429/5xx."""
+    backoff = 1.0
+    for attempt in range(max_retries):
+        try:
+            resp = requests.get(url, headers=ctx.headers, params=params, timeout=20)
+        except requests.RequestException as e:
+            print(f"  [Retry {attempt+1}/{max_retries}] rede falhou: {e}")
+            time.sleep(backoff); backoff *= 2; continue
+
+        if resp.status_code == 200:
+            return resp
+        if resp.status_code == 401:
+            # Token expirou — refaz e tenta de novo
+            ctx.refresh()
+            continue
+        if resp.status_code in (429, 500, 502, 503, 504):
+            # Rate limit ou erro temporário — backoff
+            retry_after = float(resp.headers.get("Retry-After", backoff))
+            time.sleep(retry_after); backoff *= 2; continue
+        # Outros erros (404 etc): não retenta
+        return resp
+
+    ctx.failures[kind] += 1
+    return None
+
+
+def _get_contact_details(uuid, ctx):
+    resp = _request_with_retry(
+        f"{BASE_URL}/platform/contacts/{uuid}", ctx, kind="details"
     )
-    if response.status_code != 200:
+    if resp is None or resp.status_code != 200:
         return {}
-    data = response.json()
+    data = resp.json()
     return data.get("contact", data)
 
 
@@ -114,56 +152,55 @@ def _decode_traffic_source(traffic_source_raw):
         return {}
 
 
-def _get_conversion_utms(uuid, headers):
+def _get_conversion_utms(uuid, ctx):
     """Busca eventos de conversao do contato e extrai UTMs."""
+    resp = _request_with_retry(
+        f"{BASE_URL}/platform/contacts/{uuid}/events", ctx,
+        params={"event_type": "CONVERSION"}, kind="events"
+    )
+    if resp is None or resp.status_code != 200:
+        return {}
     try:
-        response = requests.get(
-            f"{BASE_URL}/platform/contacts/{uuid}/events",
-            headers=headers,
-            params={"event_type": "CONVERSION"},
-        )
-        if response.status_code != 200:
-            return {}
-        events = response.json()
+        events = resp.json()
         if not events:
             return {}
-
-        # Pega o evento de conversao mais recente com traffic_source
         for event in events:
             payload = event.get("payload", {})
             traffic_source = payload.get("traffic_source", "")
             if traffic_source and traffic_source.startswith("encoded_"):
                 return _decode_traffic_source(traffic_source)
-        return {}
     except Exception:
         return {}
+    return {}
 
 
 def get_all_leads():
-    access_token = get_access_token()
-    headers = {"Authorization": f"Bearer {access_token}"}
+    ctx = _ApiContext()
     leads = []
     seen_uuids = set()  # Dedup: evita coletar o mesmo contato em múltiplas páginas
     page = 1
     duplicate_count = 0
+    contacts_processed = 0
 
     print("Buscando segmentacao de contatos...")
-    seg_id, seg_name = _get_segmentation_id(headers)
+    seg_id, seg_name = _get_segmentation_id(ctx.headers)
     print(f"  Usando segmentacao: {seg_name} (ID: {seg_id})")
     print("Coletando leads do RD Station...")
 
     while True:
-        response = requests.get(
+        # Lista contatos da segmentação (com retry)
+        resp = _request_with_retry(
             f"{BASE_URL}/platform/segmentations/{seg_id}/contacts",
-            headers=headers,
-            params={"page": page, "page_size": 20},
+            ctx, params={"page": page, "page_size": 20}, kind="details"
         )
 
-        if response.status_code == 404:
+        if resp is None or resp.status_code == 404:
+            break
+        if resp.status_code != 200:
+            print(f"  ERRO segmentação página {page}: HTTP {resp.status_code}")
             break
 
-        response.raise_for_status()
-        data = response.json()
+        data = resp.json()
         contacts = data.get("contacts", [])
 
         if not contacts:
@@ -178,9 +215,15 @@ def get_all_leads():
                 duplicate_count += 1
                 continue
             seen_uuids.add(uuid)
-            details = _get_contact_details(uuid, headers)
-            utms = _get_conversion_utms(uuid, headers)
-            time.sleep(0.15)
+
+            # Refresh proativo do token a cada 100 contatos (evita expiração mid-run)
+            contacts_processed += 1
+            if contacts_processed % 100 == 0:
+                ctx.refresh()
+
+            details = _get_contact_details(uuid, ctx)
+            utms = _get_conversion_utms(uuid, ctx)
+            time.sleep(0.25)  # Sleep maior para evitar rate limit (era 0.15)
 
             origem_raw = details.get("cf_plug_opportunity_origin") or ""
             partes = [p.strip() for p in origem_raw.split("|")] if "|" in origem_raw else [origem_raw.strip(), ""]
@@ -224,5 +267,7 @@ def get_all_leads():
 
     if duplicate_count > 0:
         print(f"  Avisos: {duplicate_count} contatos duplicados (paginação RD) foram ignorados.")
+    if ctx.failures["details"] > 0 or ctx.failures["events"] > 0:
+        print(f"  ATENÇÃO: {ctx.failures['details']} falhas em /contacts, {ctx.failures['events']} em /events.")
     print(f"Total de leads coletados: {len(leads)}")
     return leads
