@@ -46,6 +46,28 @@ def read_sheet(gc, sheet_name):
     return [dict(zip(headers, row)) for row in rows[1:] if any(cell.strip() for cell in row)]
 
 
+def dedupe_by_id(records, source_name=""):
+    """Defensive dedup: remove registros com mesmo 'id' (mantém primeira ocorrência)."""
+    if not records:
+        return records
+    seen = set()
+    result = []
+    dup_count = 0
+    for r in records:
+        rid = (r.get("id") or "").strip()
+        if not rid:
+            result.append(r)  # sem id: mantém (não é duplicação detectável)
+            continue
+        if rid in seen:
+            dup_count += 1
+            continue
+        seen.add(rid)
+        result.append(r)
+    if dup_count > 0:
+        print(f"  [Dedupe] {source_name}: {dup_count} duplicatas removidas ({len(result)} únicos).")
+    return result
+
+
 def parse_num(v):
     if v is None or v == "":
         return 0.0
@@ -773,9 +795,11 @@ def main():
 
     print("  Lendo leads...")
     leads = read_sheet(gc, "leads")
+    leads = dedupe_by_id(leads, "leads")
 
     print("  Lendo CRM deals...")
     crm_deals = read_sheet(gc, "crm_deals")
+    crm_deals = dedupe_by_id(crm_deals, "crm_deals")
 
     print("  Lendo Meta Ads...")
     meta_ads = read_sheet(gc, "meta_ads")

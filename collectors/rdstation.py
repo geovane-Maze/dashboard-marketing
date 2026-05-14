@@ -143,7 +143,9 @@ def get_all_leads():
     access_token = get_access_token()
     headers = {"Authorization": f"Bearer {access_token}"}
     leads = []
+    seen_uuids = set()  # Dedup: evita coletar o mesmo contato em múltiplas páginas
     page = 1
+    duplicate_count = 0
 
     print("Buscando segmentacao de contatos...")
     seg_id, seg_name = _get_segmentation_id(headers)
@@ -169,6 +171,13 @@ def get_all_leads():
 
         for contact in contacts:
             uuid = contact.get("uuid")
+            if not uuid:
+                continue
+            # Dedup: pula contatos já coletados (paginação RD pode repetir)
+            if uuid in seen_uuids:
+                duplicate_count += 1
+                continue
+            seen_uuids.add(uuid)
             details = _get_contact_details(uuid, headers)
             utms = _get_conversion_utms(uuid, headers)
             time.sleep(0.15)
@@ -213,5 +222,7 @@ def get_all_leads():
         print(f"  Pagina {page}: {len(contacts)} leads coletados")
         page += 1
 
+    if duplicate_count > 0:
+        print(f"  Avisos: {duplicate_count} contatos duplicados (paginação RD) foram ignorados.")
     print(f"Total de leads coletados: {len(leads)}")
     return leads
