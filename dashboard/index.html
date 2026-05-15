@@ -271,12 +271,29 @@
   .thumb-img {
     width: 48px; height: 48px; object-fit: cover; border-radius: 6px;
     border: 1px solid var(--border); background: var(--bg2);
+    transition: transform 0.15s, box-shadow 0.15s;
   }
   .no-thumb {
     width: 48px; height: 48px; border-radius: 6px; border: 1px solid var(--border);
     background: var(--bg2); display: flex; align-items: center; justify-content: center;
     font-size: 18px;
   }
+  a.thumb-link {
+    display: inline-block; line-height: 0; position: relative;
+  }
+  a.thumb-link:hover .thumb-img {
+    transform: scale(1.06);
+    box-shadow: 0 4px 14px rgba(13,59,102,0.25);
+    border-color: var(--primary);
+  }
+  a.thumb-link::after {
+    content: "↗"; position: absolute; top: -6px; right: -6px;
+    background: var(--primary); color: white; font-size: 10px; font-weight: 700;
+    width: 16px; height: 16px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.15s; line-height: 1;
+  }
+  a.thumb-link:hover::after { opacity: 1; }
 
   /* LOADING */
   #loading {
@@ -2166,9 +2183,12 @@ function renderCreatives() {
     const ativa = activeCamps.has(c.campanha);
     const statusLabel = ativa ? 'Ativo' : 'Pausado';
     const statusClass = ativa ? 'status-ativa' : 'status-pausada';
-    const thumb = c.thumbnail
+    const thumbInner = c.thumbnail
       ? `<img class="thumb-img" src="${c.thumbnail}" onerror="this.style.display='none'" loading="lazy">`
       : `<div class="no-thumb">🖼️</div>`;
+    const thumb = c.permalink
+      ? `<a class="thumb-link" href="${c.permalink}" target="_blank" rel="noopener noreferrer" title="Ver criativo no Instagram/Facebook">${thumbInner}</a>`
+      : thumbInner;
     return `<tr>
       <td style="display:flex;align-items:center;gap:8px;max-width:240px;">
         ${thumb}
