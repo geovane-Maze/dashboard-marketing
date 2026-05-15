@@ -384,7 +384,7 @@ def aggregate_meta_ads(rows):
     }))
     creatives = defaultdict(lambda: {
         "gasto": 0.0, "leads": 0.0, "impressoes": 0.0, "cliques": 0.0,
-        "thumbnail": "", "campanha": "", "permalink": "",
+        "thumbnail": "", "campanha": "", "conjunto": "", "permalink": "",
     })
 
     for row in rows:
@@ -440,6 +440,8 @@ def aggregate_meta_ads(rows):
                 creatives[anuncio]["thumbnail"] = row.get("thumbnail")
             if row.get("permalink"):
                 creatives[anuncio]["permalink"] = row.get("permalink")
+            if row.get("conjunto"):
+                creatives[anuncio]["conjunto"] = row.get("conjunto")
             if campanha:  # sempre atualiza para o nome mais recente da campanha
                 creatives[anuncio]["campanha"] = campanha
 
@@ -478,6 +480,7 @@ def aggregate_meta_ads(rows):
         ctr = round(d["cliques"] / d["impressoes"] * 100, 2) if d["impressoes"] > 0 else 0
         creatives_list.append({
             "anuncio": nome, "campanha": d["campanha"],
+            "conjunto": d.get("conjunto", ""),
             "thumbnail": d["thumbnail"],
             "permalink": d.get("permalink", ""),
             "gasto": round(d["gasto"], 2), "leads": int(round(d["leads"])),

@@ -898,7 +898,8 @@
         <table>
           <thead>
             <tr>
-              <th>Criativo</th><th>Campanha</th><th>Status</th><th>Gasto</th>
+              <th>Criativo</th><th>Campanha</th><th>Ad Set Name</th><th>Ad Name</th>
+              <th>Status</th><th>Gasto</th>
               <th>Leads</th><th>CPL</th><th>Impressões</th><th>CTR</th>
             </tr>
           </thead>
@@ -2189,12 +2190,15 @@ function renderCreatives() {
     const thumb = c.permalink
       ? `<a class="thumb-link" href="${c.permalink}" target="_blank" rel="noopener noreferrer" title="Ver criativo no Instagram/Facebook">${thumbInner}</a>`
       : thumbInner;
+    const conjunto = c.conjunto || '—';
     return `<tr>
       <td style="display:flex;align-items:center;gap:8px;max-width:240px;">
         ${thumb}
         <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px" title="${c.anuncio}">${c.anuncio}</span>
       </td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px" title="${c.campanha}">${c.campanha}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px" title="${conjunto}">${conjunto}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px" title="${c.anuncio}">${c.anuncio}</td>
       <td><span class="badge ${statusClass}">${statusLabel}</span></td>
       <td>${fmt.currency(c.gasto)}</td>
       <td>${fmt.num(c.leads)}</td>
@@ -2202,7 +2206,7 @@ function renderCreatives() {
       <td>${fmt.k(c.impressoes)}</td>
       <td>${fmt.pct(c.ctr)}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="8" class="empty">Sem criativos no período</td></tr>';
+  }).join('') || '<tr><td colspan="10" class="empty">Sem criativos no período</td></tr>';
 }
 
 // ─── SECTION: UTM ─────────────────────────────────────────────────────────────
