@@ -295,6 +295,50 @@
   }
   a.thumb-link:hover::after { opacity: 1; }
 
+  /* LOGIN */
+  #login-screen {
+    position: fixed; inset: 0; background: linear-gradient(135deg, #0D3B66 0%, #1B4F8A 100%);
+    display: flex; align-items: center; justify-content: center; z-index: 9999;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  #login-screen.hidden { display: none; }
+  .login-box {
+    background: white; border-radius: 14px; padding: 38px 36px;
+    width: 90%; max-width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    text-align: center;
+  }
+  .login-box .login-logo {
+    font-size: 42px; margin-bottom: 12px;
+  }
+  .login-box h2 {
+    color: #0D3B66; margin: 0 0 6px; font-size: 20px; font-weight: 700;
+  }
+  .login-box .login-sub {
+    color: #6B7280; font-size: 13px; margin-bottom: 22px;
+  }
+  .login-box input {
+    width: 100%; padding: 13px 14px; border: 1.5px solid #E5E7EB;
+    border-radius: 8px; font-size: 14px; outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s; box-sizing: border-box;
+  }
+  .login-box input:focus {
+    border-color: #0D3B66; box-shadow: 0 0 0 3px rgba(13,59,102,0.12);
+  }
+  .login-box button {
+    width: 100%; margin-top: 12px; padding: 13px;
+    background: #0D3B66; color: white; border: none; border-radius: 8px;
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .login-box button:hover:not(:disabled) { background: #062847; }
+  .login-box button:disabled { background: #94A3B8; cursor: not-allowed; }
+  .login-error {
+    color: #B91C1C; font-size: 12px; margin-top: 10px; min-height: 16px;
+  }
+  .login-footer {
+    margin-top: 18px; font-size: 11px; color: #94A3B8;
+  }
+
   /* LOADING */
   #loading {
     position: fixed; inset: 0; background: var(--primary);
@@ -528,6 +572,21 @@
 </style>
 </head>
 <body>
+
+<!-- TELA DE LOGIN (oculta por padrão; mostrada apenas se dados estiverem criptografados) -->
+<div id="login-screen" class="hidden">
+  <div class="login-box">
+    <div class="login-logo">🔒</div>
+    <h2>Dashboard Marketing</h2>
+    <div class="login-sub">Clínica da Cidade — Expansão CDC</div>
+    <form id="login-form" autocomplete="off">
+      <input type="password" id="login-pwd" placeholder="Digite a senha" autofocus required>
+      <button type="submit" id="login-btn">Entrar</button>
+      <div class="login-error" id="login-error"></div>
+    </form>
+    <div class="login-footer">Acesso restrito · dados criptografados (AES-256)</div>
+  </div>
+</div>
 
 <div id="loading">
   <div class="spinner"></div>
@@ -2313,26 +2372,98 @@ function renderGA4() {
   ).join('') || '<tr><td colspan="4" class="empty">Sem dados</td></tr>';
 }
 
+// ─── CRIPTOGRAFIA: descriptografia AES-256-GCM via Web Crypto API ─────────────
+function base64ToBytes(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+async function deriveAesKey(password, salt, iterations) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['decrypt']
+  );
+}
+
+async function decryptPayload(password, payload) {
+  const salt       = base64ToBytes(payload.salt);
+  const nonce      = base64ToBytes(payload.nonce);
+  const ciphertext = base64ToBytes(payload.ciphertext);
+  const key = await deriveAesKey(password, salt, payload.iterations);
+  const decrypted = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: nonce }, key, ciphertext
+  );
+  return JSON.parse(new TextDecoder().decode(decrypted));
+}
+
+let ENCRYPTED_PAYLOAD = null;  // Guarda o payload se for criptografado
+
 // ─── BOOT ─────────────────────────────────────────────────────────────────────
+async function startDashboard() {
+  document.getElementById('sidebar-update').textContent = 'Atualizado: ' + (DATA.last_update || '—');
+
+  const today = new Date();
+  const threeMonthsAgo = new Date(today);
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+  threeMonthsAgo.setDate(1);
+  document.getElementById('filter-date-start').value = threeMonthsAgo.toISOString().slice(0, 10);
+  document.getElementById('filter-date-end').value = today.toISOString().slice(0, 10);
+
+  renderCampList();
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('login-screen').classList.add('hidden');
+  renderExecutivo();
+}
+
+async function tryDecryptAndStart(password) {
+  try {
+    DATA = await decryptPayload(password, ENCRYPTED_PAYLOAD);
+    // Sucesso: salva na sessão (some quando o usuário fecha o navegador)
+    sessionStorage.setItem('dash_pwd', password);
+    await startDashboard();
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
 async function loadData() {
   try {
     const res = await fetch('data/summary.json?v=' + Date.now());
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    DATA = await res.json();
+    const payload = await res.json();
 
-    document.getElementById('sidebar-update').textContent = 'Atualizado: ' + (DATA.last_update || '—');
+    // Dados criptografados? Mostrar login
+    if (payload && payload.encrypted === true) {
+      ENCRYPTED_PAYLOAD = payload;
+      document.getElementById('loading').style.display = 'none';
 
-    // Inicializa datas: padrão = últimos 3 meses até hoje
-    const today = new Date();
-    const threeMonthsAgo = new Date(today);
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-    threeMonthsAgo.setDate(1);
-    document.getElementById('filter-date-start').value = threeMonthsAgo.toISOString().slice(0, 10);
-    document.getElementById('filter-date-end').value = today.toISOString().slice(0, 10);
+      // Tenta senha cacheada na sessão
+      const cached = sessionStorage.getItem('dash_pwd');
+      if (cached) {
+        const ok = await tryDecryptAndStart(cached);
+        if (ok) return;
+        sessionStorage.removeItem('dash_pwd');  // senha inválida (mudou)
+      }
 
-    renderCampList();
-    document.getElementById('loading').style.display = 'none';
-    renderExecutivo();
+      // Mostra tela de login
+      document.getElementById('login-screen').classList.remove('hidden');
+      document.getElementById('login-pwd').focus();
+      return;
+    }
+
+    // Dados em texto puro (sem senha configurada)
+    DATA = payload;
+    await startDashboard();
   } catch (err) {
     document.getElementById('loading').innerHTML =
       `<div style="text-align:center;padding:24px;">
@@ -2345,6 +2476,28 @@ async function loadData() {
       </div>`;
   }
 }
+
+// Handler do form de login
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('login-form');
+  const btn  = document.getElementById('login-btn');
+  const err  = document.getElementById('login-error');
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const pwd = document.getElementById('login-pwd').value;
+      if (!pwd) return;
+      btn.disabled = true; btn.textContent = 'Verificando...';
+      err.textContent = '';
+      const ok = await tryDecryptAndStart(pwd);
+      if (!ok) {
+        err.textContent = 'Senha incorreta. Tente novamente.';
+        btn.disabled = false; btn.textContent = 'Entrar';
+        document.getElementById('login-pwd').select();
+      }
+    });
+  }
+});
 
 loadData();
 </script>

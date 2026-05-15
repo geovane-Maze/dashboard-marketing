@@ -7,3 +7,4 @@ google-ads
 facebook-business
 python-dotenv
 pandas
+cryptography

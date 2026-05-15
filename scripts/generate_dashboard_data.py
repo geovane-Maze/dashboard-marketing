@@ -4,6 +4,7 @@ Generate aggregated JSON data for the marketing dashboard.
 Run after main.py. Reads from Google Sheets and writes to dashboard/data/summary.json.
 """
 
+import base64
 import json
 import os
 import re
@@ -123,6 +124,47 @@ def attach_rd_leads_to_creatives(creatives_list, meta_rows, leads, threshold=0.4
     total_matched = sum(leads_per_anuncio.values())
     print(f"  [Match RD/Meta] leads matched: {total_matched}, sem match: {unmatched}")
     return creatives_list
+
+
+# ════════════════════════════════════════════════════════════════════
+# CRIPTOGRAFIA AES-256-GCM (proteção por senha)
+# ════════════════════════════════════════════════════════════════════
+def encrypt_payload(plaintext_bytes, password, iterations=250_000):
+    """
+    Criptografa bytes com AES-256-GCM + PBKDF2-SHA256.
+    Retorna um dict com salt, nonce, iterations e ciphertext (base64).
+    O resultado pode ser serializado como JSON e descriptografado no browser
+    via Web Crypto API.
+    """
+    try:
+        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    except ImportError:
+        raise RuntimeError(
+            "Pacote 'cryptography' não instalado. Rode: pip install cryptography"
+        )
+
+    salt = os.urandom(16)
+    nonce = os.urandom(12)
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,  # AES-256
+        salt=salt,
+        iterations=iterations,
+    )
+    key = kdf.derive(password.encode("utf-8"))
+    aesgcm = AESGCM(key)
+    ciphertext = aesgcm.encrypt(nonce, plaintext_bytes, associated_data=None)
+    return {
+        "encrypted": True,
+        "version": 1,
+        "kdf": "PBKDF2-SHA256",
+        "iterations": iterations,
+        "salt": base64.b64encode(salt).decode("ascii"),
+        "nonce": base64.b64encode(nonce).decode("ascii"),
+        "ciphertext": base64.b64encode(ciphertext).decode("ascii"),
+    }
 
 
 def dedupe_by_id(records, source_name=""):
@@ -918,8 +960,22 @@ def main():
     }
 
     output_file = os.path.join(OUTPUT_DIR, "summary.json")
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(summary, f, ensure_ascii=False, indent=2)
+
+    # Serializa o summary em bytes UTF-8
+    plaintext = json.dumps(summary, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+    # Se DASHBOARD_PASSWORD definido no .env, criptografa
+    password = config.DASHBOARD_PASSWORD if hasattr(config, "DASHBOARD_PASSWORD") else None
+    if password:
+        print(f"  Criptografando com AES-256-GCM (PBKDF2 250k iter)...")
+        encrypted = encrypt_payload(plaintext, password)
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(encrypted, f, ensure_ascii=False, indent=2)
+        print(f"  >>> Dashboard PROTEGIDO POR SENHA <<<")
+    else:
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write(plaintext.decode("utf-8"))
+        print(f"  AVISO: DASHBOARD_PASSWORD não definido. Dados gravados sem criptografia.")
 
     size_kb = os.path.getsize(output_file) / 1024
     print(f"  Arquivo gerado: {output_file} ({size_kb:.1f} KB)")
