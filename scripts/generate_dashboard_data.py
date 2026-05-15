@@ -6,7 +6,9 @@ Run after main.py. Reads from Google Sheets and writes to dashboard/data/summary
 
 import json
 import os
+import re
 import sys
+import unicodedata
 from collections import defaultdict
 from datetime import datetime
 
@@ -44,6 +46,83 @@ def read_sheet(gc, sheet_name):
         return []
     headers = rows[0]
     return [dict(zip(headers, row)) for row in rows[1:] if any(cell.strip() for cell in row)]
+
+
+# ════════════════════════════════════════════════════════════════════
+# MATCHING utm_content (CRM) ↔ anuncio (Meta Ads)
+# ════════════════════════════════════════════════════════════════════
+_TOKEN_STOP = {
+    'anuncio', 'ad', 'ads', 'v1', 'v2', 'v3', 'v4', 'v5',
+    'de', 'da', 'do', 'a', 'o', 'e', 'com', 'para', 'no', 'na', 'os', 'as',
+    'estatico', 'animado', 'video', 'vídeo',
+}
+
+def _tokens(s):
+    """Normaliza string em conjunto de tokens significativos (sem acento, lowercase, sem stop words)."""
+    if not s:
+        return set()
+    s = unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('ascii').lower()
+    parts = re.split(r'[^a-z0-9]+', s)
+    return {p for p in parts if p and p not in _TOKEN_STOP and len(p) >= 3}
+
+def _jaccard(a, b):
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+def attach_rd_leads_to_creatives(creatives_list, meta_rows, leads, threshold=0.4):
+    """Conta leads do CRM por criativo via matching token-based de utm_content ↔ anuncio.
+
+    Estratégia:
+      1. Constrói pool com TODOS os anúncios da aba meta_ads (não só os top 50)
+      2. Para cada lead com utm_source=metaads e utm_content, encontra anuncio
+         com maior Jaccard >= threshold
+      3. Acumula contagem por anuncio
+      4. Anexa leads_rd e cpl_rd em cada item de creatives_list
+    """
+    # 1. Pool de TODOS os anúncios (do meta_ads raw)
+    all_anuncios = set()
+    for r in meta_rows:
+        a = (r.get("anuncio") or "").strip()
+        if a:
+            all_anuncios.add(a)
+    # Garante que os top creatives também estão no pool
+    for c in creatives_list:
+        all_anuncios.add(c["anuncio"])
+    anuncio_tokens = [(a, _tokens(a)) for a in all_anuncios]
+
+    # 2. Para cada lead metaads, achar melhor anuncio
+    leads_per_anuncio = defaultdict(int)
+    unmatched = 0
+    for lead in leads:
+        if (lead.get("utm_source") or "").strip() != "metaads":
+            continue
+        utm_c = lead.get("utm_content") or ""
+        if not utm_c:
+            continue
+        tc = _tokens(utm_c)
+        if not tc:
+            unmatched += 1
+            continue
+        best, best_score = None, 0.0
+        for anuncio, ta in anuncio_tokens:
+            s = _jaccard(tc, ta)
+            if s > best_score:
+                best_score, best = s, anuncio
+        if best_score >= threshold and best:
+            leads_per_anuncio[best] += 1
+        else:
+            unmatched += 1
+
+    # 3. Anexa em creatives_list
+    for c in creatives_list:
+        leads_rd = leads_per_anuncio.get(c["anuncio"], 0)
+        c["leads_rd"] = leads_rd
+        c["cpl_rd"] = round(c["gasto"] / leads_rd, 2) if leads_rd > 0 else 0
+
+    total_matched = sum(leads_per_anuncio.values())
+    print(f"  [Match RD/Meta] leads matched: {total_matched}, sem match: {unmatched}")
+    return creatives_list
 
 
 def dedupe_by_id(records, source_name=""):
@@ -817,6 +896,10 @@ def main():
     ga4 = read_sheet(gc, "ga4_sessions")
 
     print("  Agregando dados...")
+    meta_aggregated = aggregate_meta_ads(meta_ads)
+    # Enriquece criativos com leads do CRM via matching utm_content ↔ anuncio
+    attach_rd_leads_to_creatives(meta_aggregated["creatives"], meta_ads, leads)
+
     summary = {
         "last_update": datetime.now().strftime("%d/%m/%Y %H:%M"),
         "totals": {
@@ -828,7 +911,7 @@ def main():
         },
         "leads": aggregate_leads(leads),
         "crm": aggregate_crm(crm_deals),
-        "meta_ads": aggregate_meta_ads(meta_ads),
+        "meta_ads": meta_aggregated,
         "google_ads": aggregate_google_ads(google_ads),
         "ga4": aggregate_ga4(ga4),
         "utm": aggregate_utm(leads),

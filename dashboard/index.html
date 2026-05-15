@@ -2175,8 +2175,8 @@ function renderCreatives() {
   }
 
   // Ordenação
-  if (sort === 'leads') creatives.sort((a, b) => b.leads - a.leads);
-  else if (sort === 'cpl_asc') creatives.sort((a, b) => (a.cpl || 99999) - (b.cpl || 99999));
+  if (sort === 'leads') creatives.sort((a, b) => (b.leads_rd ?? 0) - (a.leads_rd ?? 0));
+  else if (sort === 'cpl_asc') creatives.sort((a, b) => ((a.cpl_rd ?? 99999) || 99999) - ((b.cpl_rd ?? 99999) || 99999));
   else if (sort === 'ctr') creatives.sort((a, b) => b.ctr - a.ctr);
   else creatives.sort((a, b) => b.gasto - a.gasto);
 
@@ -2201,8 +2201,8 @@ function renderCreatives() {
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px" title="${c.anuncio}">${c.anuncio}</td>
       <td><span class="badge ${statusClass}">${statusLabel}</span></td>
       <td>${fmt.currency(c.gasto)}</td>
-      <td>${fmt.num(c.leads)}</td>
-      <td>${c.cpl > 0 ? fmt.currency(c.cpl) : '—'}</td>
+      <td title="Leads do CRM (RD Station) por utm_content">${fmt.num(c.leads_rd ?? 0)}</td>
+      <td>${(c.cpl_rd ?? 0) > 0 ? fmt.currency(c.cpl_rd) : '—'}</td>
       <td>${fmt.k(c.impressoes)}</td>
       <td>${fmt.pct(c.ctr)}</td>
     </tr>`;
