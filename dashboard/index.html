@@ -1603,6 +1603,9 @@ function renderRelatorio() {
     <!-- 📅 COMPARATIVO MÊS ANTERIOR -->
     <div class="rel-section">
       <h3>📅 Comparativo — ${R.mes_label} vs ${comp.mes_ant_label || 'Mês Anterior'}</h3>
+      <p style="font-size:11px;color:#999;margin:-8px 0 12px;">
+        ⚠️ ${R.mes_label} é um mês em andamento — comparações com mês completo podem ser proporcionalmente menores.
+      </p>
       <div class="comparativo-grid">${compHtml}</div>
     </div>
 
@@ -1702,7 +1705,7 @@ function renderRelatorio() {
                 <td class="pct">${crm.total_deals ? pct(crm.total_active/crm.total_deals*100) : '—'}</td>
               </tr>
               <tr>
-                <td>Chegaram em Reunião PDF</td>
+                <td>Atualmente em Reunião PDF</td>
                 <td class="num">${num(crm.reuniao_pdf_total)}</td>
                 <td class="pct">${pct(crm.reuniao_pdf_pct)}</td>
               </tr>
@@ -1710,6 +1713,11 @@ function renderRelatorio() {
                 <td>Ativos em Reunião PDF (hoje)</td>
                 <td class="num">${num(crm.reuniao_pdf_ativo)}</td>
                 <td class="pct">${pct(crm.reuniao_pdf_ativo_pct)}</td>
+              </tr>
+              <tr>
+                <td>Chegaram em Reunião PDF — ${R.mes_label}</td>
+                <td class="num">${num(crm.reuniao_pdf_mes)}</td>
+                <td class="pct">${crm.reuniao_pdf_mes_pct != null ? pct(crm.reuniao_pdf_mes_pct) : '—'}</td>
               </tr>
               <tr>
                 <td>Ganhos (fechados)</td>

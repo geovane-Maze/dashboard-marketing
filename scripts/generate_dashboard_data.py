@@ -972,8 +972,15 @@ def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
     Pré-calcula as métricas do Relatório Resumido para o mês atual.
     Retorna um dict pronto para ser renderizado no dashboard sem lógica extra no front.
     """
-    mes_atual = datetime.now().strftime("%Y-%m")
-    mes_label = datetime.now().strftime("%B/%Y").capitalize()
+    # Tradução manual dos meses para evitar dependência do locale pt_BR do sistema
+    MESES_PT = ["", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+                "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+    def _label_mes(dt):
+        return f"{MESES_PT[dt.month]}/{dt.year}"
+
+    agora = datetime.now()
+    mes_atual = agora.strftime("%Y-%m")
+    mes_label = _label_mes(agora)
 
     # ── Leads do mês por source ───────────────────────────────────────────────
     mes_src = {}
@@ -1013,6 +1020,12 @@ def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
     taxa_reuniao_total = round(reuniao_pdf_total / total_deals * 100, 1) if total_deals else 0
     taxa_reuniao_ativo = round(reuniao_pdf_ativo / total_active * 100, 1) if total_active else 0
 
+    # Reunião PDF do MÊS ATUAL (deals criados no mês cuja etapa atual é Reunião PDF)
+    reuniao_pdf_mes = next((r.get("reuniao_pdf", 0) for r in crm.get("monthly_stages", [])
+                            if r["mes"] == mes_atual), 0)
+    # Taxa do mês: % de leads do mês que chegaram em Reunião PDF
+    taxa_reuniao_mes = round(reuniao_pdf_mes / total_leads_mes * 100, 1) if total_leads_mes else None
+
     # ── Perdas do mês ─────────────────────────────────────────────────────────
     perdas_mes = next((r["perdidos"] for r in crm.get("monthly_stages", [])
                        if r["mes"] == mes_atual), 0)
@@ -1036,7 +1049,7 @@ def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
     primeiro_dia_mes = _dt.now().replace(day=1)
     mes_ant_dt  = primeiro_dia_mes - timedelta(days=1)
     mes_anterior = mes_ant_dt.strftime("%Y-%m")
-    mes_ant_label = mes_ant_dt.strftime("%B/%Y").capitalize()
+    mes_ant_label = _label_mes(mes_ant_dt)
 
     ant_src = {}
     for r in utm_agg.get("sources_monthly", []):
@@ -1059,21 +1072,23 @@ def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
                         if r["mes"] == mes_anterior), 0)
 
     def variacao(atual, anterior):
-        if not anterior:
+        # Se qualquer um dos lados for None ou 0, não há base de comparação confiável
+        if atual is None or anterior is None or not anterior:
             return None
         return round((atual - anterior) / anterior * 100, 1)
 
     comparativo = {
         "mes_anterior": mes_anterior,
         "mes_ant_label": mes_ant_label,
-        "leads_total":  {"atual": total_leads_mes,   "anterior": ant_total,  "delta": variacao(total_leads_mes,   ant_total)},
-        "leads_pago":   {"atual": pago_leads_mes,    "anterior": ant_pago,   "delta": variacao(pago_leads_mes,    ant_pago)},
-        "leads_google": {"atual": google_leads_mes,  "anterior": ant_google, "delta": variacao(google_leads_mes,  ant_google)},
-        "leads_meta":   {"atual": meta_leads_mes,    "anterior": ant_meta,   "delta": variacao(meta_leads_mes,    ant_meta)},
-        "cpl_meta":     {"atual": cpl_meta,          "anterior": ant_cpl_meta,   "delta": variacao(cpl_meta or 0,   ant_cpl_meta or 0)},
-        "cpl_google":   {"atual": cpl_google,        "anterior": ant_cpl_google, "delta": variacao(cpl_google or 0, ant_cpl_google or 0)},
-        "cpl_pago":     {"atual": cpl_pago,          "anterior": ant_cpl_pago,   "delta": variacao(cpl_pago or 0,   ant_cpl_pago or 0)},
-        "reuniao_pdf":  {"atual": reuniao_pdf_total, "anterior": ant_reuniao,    "delta": variacao(reuniao_pdf_total, ant_reuniao)},
+        "leads_total":  {"atual": total_leads_mes,   "anterior": ant_total,   "delta": variacao(total_leads_mes,   ant_total)},
+        "leads_pago":   {"atual": pago_leads_mes,    "anterior": ant_pago,    "delta": variacao(pago_leads_mes,    ant_pago)},
+        "leads_google": {"atual": google_leads_mes,  "anterior": ant_google,  "delta": variacao(google_leads_mes,  ant_google)},
+        "leads_meta":   {"atual": meta_leads_mes,    "anterior": ant_meta,    "delta": variacao(meta_leads_mes,    ant_meta)},
+        "cpl_meta":     {"atual": cpl_meta,          "anterior": ant_cpl_meta,   "delta": variacao(cpl_meta,   ant_cpl_meta)},
+        "cpl_google":   {"atual": cpl_google,        "anterior": ant_cpl_google, "delta": variacao(cpl_google, ant_cpl_google)},
+        "cpl_pago":     {"atual": cpl_pago,          "anterior": ant_cpl_pago,   "delta": variacao(cpl_pago,   ant_cpl_pago)},
+        # Reunião PDF: comparação MENSAL (deals criados no mês cuja etapa virou Reunião PDF)
+        "reuniao_pdf":  {"atual": reuniao_pdf_mes,   "anterior": ant_reuniao,    "delta": variacao(reuniao_pdf_mes, ant_reuniao)},
     }
 
     # ── Semáforo de saúde ─────────────────────────────────────────────────────
@@ -1087,6 +1102,7 @@ def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
         if v is None: return "gray"
         return "green" if v < 200 else ("yellow" if v <= 300 else "red")
     def semaforo_taxa_reuniao(v):
+        if v is None: return "gray"
         return "green" if v >= 12 else ("yellow" if v >= 8 else "red")
 
     semaforo = [
@@ -1096,7 +1112,8 @@ def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
          "ref": "< R$150 🟢  R$150-250 🟡  > R$250 🔴"},
         {"label": "CPL Médio Pago",  "valor": cpl_pago,    "status": semaforo_cpl_pago(cpl_pago),
          "ref": "< R$200 🟢  R$200-300 🟡  > R$300 🔴"},
-        {"label": "Taxa Reunião PDF","valor": taxa_reuniao_total, "status": semaforo_taxa_reuniao(taxa_reuniao_total),
+        # Taxa do mês: % de leads do mês atual que chegaram em Reunião PDF
+        {"label": "Taxa Reunião PDF (mês)","valor": taxa_reuniao_mes, "status": semaforo_taxa_reuniao(taxa_reuniao_mes),
          "ref": "> 12% 🟢  8-12% 🟡  < 8% 🔴", "tipo": "pct"},
     ]
 
@@ -1107,7 +1124,9 @@ def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
             "gasto": 0.0, "leads": 0.0, "thumbnail": "", "permalink": "", "campanha": "", "conjunto": ""
         })
         for row in meta_rows:
-            if not (row.get("data") or "").startswith(mes_atual):
+            # Usa parse_date_to_month (mesma lógica do resto do script) para
+            # tolerar formatos de data diferentes na planilha (ex.: dd/mm/yyyy)
+            if parse_date_to_month(row.get("data")) != mes_atual:
                 continue
             nome = (row.get("anuncio") or "").strip()
             if not nome:
@@ -1163,10 +1182,12 @@ def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
             "total_won":            total_won,
             "total_lost":           total_lost,
             "total_active":         total_active,
-            "reuniao_pdf_total":    reuniao_pdf_total,
-            "reuniao_pdf_pct":      taxa_reuniao_total,
-            "reuniao_pdf_ativo":    reuniao_pdf_ativo,
+            "reuniao_pdf_total":    reuniao_pdf_total,        # snapshot histórico: deals atualmente na etapa
+            "reuniao_pdf_pct":      taxa_reuniao_total,        # snapshot / total_deals
+            "reuniao_pdf_ativo":    reuniao_pdf_ativo,         # ativos atualmente na etapa
             "reuniao_pdf_ativo_pct": taxa_reuniao_ativo,
+            "reuniao_pdf_mes":      reuniao_pdf_mes,           # deals criados NESTE mês com etapa = Reunião PDF
+            "reuniao_pdf_mes_pct":  taxa_reuniao_mes,          # % do mês: reuniao_pdf_mes / total_leads_mes
             "perdas_mes":           perdas_mes,
         },
         # Top motivos de perda
