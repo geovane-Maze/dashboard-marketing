@@ -496,6 +496,16 @@
     gap: 16px; margin-bottom: 24px;
   }
 
+  /* KPI GRID 7 COLUNAS — leads com breakdown de perdas */
+  .kpi-grid-7 {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 12px; margin-bottom: 24px;
+  }
+  @media (max-width: 1500px) { .kpi-grid-7 { grid-template-columns: repeat(4, 1fr); } }
+  @media (max-width: 900px)  { .kpi-grid-7 { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 400px)  { .kpi-grid-7 { grid-template-columns: 1fr; } }
+
   /* ADS COMPARISON */
   .ads-comparison {
     display: grid; grid-template-columns: 1fr 1fr;
@@ -826,7 +836,7 @@
       <div class="section-title">Visão Executiva</div>
 
       <!-- Bloco 1: KPIs de Leads -->
-      <div class="kpi-grid-5" id="kpi-leads-exec"></div>
+      <div class="kpi-grid-7" id="kpi-leads-exec"></div>
 
       <!-- Bloco 2: Google + Meta Ads -->
       <div class="ads-comparison" id="ads-comparison"></div>
@@ -1895,12 +1905,16 @@ function renderExecutivo() {
   const metaCPL = metaLeads > 0 ? metaGasto / metaLeads : 0;
 
   // ── Bloco 1: KPI leads ───────────────────────────────────────────────────────
+  const lostPago = crm.total_lost_pago || 0;
+  const lostOrg  = crm.total_lost_organico || 0;
   document.getElementById('kpi-leads-exec').innerHTML = [
     { label: 'Total de Leads Gerados', value: fmt.num(totalLeadsPeriodo), sub: 'período selecionado', cls: '' },
     { label: 'Leads Pagos', value: fmt.num(pagos), sub: pct(pagos, totalLeadsPeriodo) + ' do total', cls: 'blue' },
     { label: 'Leads Orgânicos', value: fmt.num(organicos), sub: pct(organicos, totalLeadsPeriodo) + ' do total', cls: 'green' },
     { label: 'Leads Abertos (Ativos)', value: fmt.num(crm.total_open), sub: pct(crm.total_open, crm.total_deals) + ' dos negócios', cls: 'orange' },
-    { label: 'Leads Perdidos', value: fmt.num(crm.total_lost), sub: pct(crm.total_lost, crm.total_deals) + ' dos negócios', cls: 'red' },
+    { label: 'Leads Perdidos (Total)', value: fmt.num(crm.total_lost), sub: pct(crm.total_lost, crm.total_deals) + ' dos negócios', cls: 'red' },
+    { label: 'Leads Perdidos Pagos', value: fmt.num(lostPago), sub: pct(lostPago, crm.total_lost) + ' das perdas', cls: 'red' },
+    { label: 'Leads Perdidos Orgânicos', value: fmt.num(lostOrg), sub: pct(lostOrg, crm.total_lost) + ' das perdas', cls: 'red' },
   ].map(k => `<div class="kpi-card ${k.cls}">
     <div class="kpi-label">${k.label}</div>
     <div class="kpi-value">${k.value}</div>

@@ -477,10 +477,20 @@ def aggregate_crm(deals, leads=None):
 
     active_funnel_sorted = sorted(active_stage.items(), key=lambda x: stage_sort_key(x[0]))
 
+    # ── Perdas: separação pago vs orgânico ───────────────────────────────────
+    # Considera-se "pago" qualquer lead cuja utm_source seja googlecpc ou metaads.
+    # Os demais (direto, organico, e-mail, "não identificado", etc.) entram em
+    # orgânico para que a soma feche com total_lost.
+    PAID_SRCS = {"googlecpc", "metaads"}
+    total_lost_pago     = sum(v for k, v in by_loss_utm_source.items() if k in PAID_SRCS)
+    total_lost_organico = total_lost - total_lost_pago
+
     return {
         "total_deals": len(deals),
         "total_won": total_won,
         "total_lost": total_lost,
+        "total_lost_pago": total_lost_pago,
+        "total_lost_organico": total_lost_organico,
         "total_open": total_open,
         "total_active": sum(v["total"] for v in active_stage.values()),
         "total_value_won": round(total_value, 2),
