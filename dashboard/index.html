@@ -751,6 +751,23 @@
           <div class="chart-wrap"><canvas id="chart-exec-canal"></canvas></div>
         </div>
       </div>
+
+      <!-- Bloco 7: Taxa de Perda por UTM -->
+      <div class="charts-row triple">
+        <div class="chart-card">
+          <h3>Perdas por UTM Source <span style="font-size:10px;color:#999;font-weight:400;">% = perdas ÷ leads</span></h3>
+          <div class="chart-wrap"><canvas id="chart-exec-loss-source"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Perdas por Campanha <span style="font-size:10px;color:#999;font-weight:400;">% = perdas ÷ leads</span></h3>
+          <div class="chart-wrap"><canvas id="chart-exec-loss-campaign"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Perdas por Anúncio <span style="font-size:10px;color:#999;font-weight:400;">utm_content</span></h3>
+          <div class="chart-wrap"><canvas id="chart-exec-loss-content"></canvas></div>
+        </div>
+      </div>
+
       <div class="table-card">
         <h3>Top Campanhas UTM</h3>
         <table>
@@ -1679,6 +1696,61 @@ function renderExecutivo() {
   document.getElementById('exec-alerts').innerHTML = alerts.map(a =>
     `<div class="alert-card ${a.type}"><strong>${a.type === 'ok' ? '✅' : a.type === 'danger' ? '🚨' : '⚠️'}</strong> ${a.msg}</div>`
   ).join('');
+
+  // ── Bloco 7: Taxa de Perda por UTM ────────────────────────────────────────────
+  // Lookups: total de leads por source / campaign / content
+  const leadsBySource   = {};
+  (DATA.utm.sources   || []).forEach(r => { leadsBySource[r.source]     = r.total; });
+  const leadsByCampaign = {};
+  (DATA.utm.campaigns || []).forEach(r => { leadsByCampaign[r.campaign] = r.total; });
+  const leadsByContent  = {};
+  (DATA.utm.contents  || []).forEach(r => { leadsByContent[r.content]   = r.total; });
+
+  // Paleta vermelha para gráficos de perda
+  const RED_PALETTE = [
+    '#EF4444','#DC2626','#B91C1C','#F97316','#EA580C',
+    '#C2410C','#FBBF24','#D97706','#B45309','#7C2D12',
+  ];
+
+  function makeLossDoughnut(canvasId, lossData, leadsLookup, keyField) {
+    const items = (lossData || []).slice(0, 8);
+    if (!items.length) {
+      const el = document.getElementById(canvasId);
+      if (el) el.parentElement.innerHTML = '<p style="font-size:12px;color:#999;text-align:center;padding:24px;">Sem dados de UTM identificadas.</p>';
+      return;
+    }
+    makeChart(canvasId, {
+      type: 'doughnut',
+      data: {
+        labels: items.map(r => {
+          const totalLeads = leadsLookup[r[keyField]] || 0;
+          const taxa = totalLeads ? (r.total / totalLeads * 100).toFixed(1) : '—';
+          return `${r[keyField]} (${taxa}%)`;
+        }),
+        datasets: [{ data: items.map(r => r.total), backgroundColor: RED_PALETTE }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right', labels: { font: { size: 10 }, boxWidth: 12 } },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const r = items[ctx.dataIndex];
+                const totalLeads = leadsLookup[r[keyField]] || 0;
+                const taxa = totalLeads ? (r.total / totalLeads * 100).toFixed(1) + '%' : 'n/a';
+                return ` ${r.total} perdas de ${totalLeads || '?'} leads (${taxa})`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  makeLossDoughnut('chart-exec-loss-source',   DATA.crm.losses_by_utm_source,   leadsBySource,   'utm');
+  makeLossDoughnut('chart-exec-loss-campaign', DATA.crm.losses_by_utm_campaign, leadsByCampaign, 'utm');
+  makeLossDoughnut('chart-exec-loss-content',  DATA.crm.losses_by_utm_content,  leadsByContent,  'utm');
 }
 
 // ─── SECTION: EVOLUÇÃO ────────────────────────────────────────────────────────
