@@ -416,7 +416,7 @@
   .comp-delta.down { color: var(--red); }
   .comp-delta.neu  { color: #999; }
 
-  /* Top Criativos do mês */
+  /* Top Criativos do mês — cards grandes com thumbnail upscaled via proxy AI */
   .criativos-mes-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 28px; }
   @media (max-width: 1100px) { .criativos-mes-grid { grid-template-columns: repeat(3, 1fr); } }
   @media (max-width: 700px)  { .criativos-mes-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -426,17 +426,30 @@
     display: flex; flex-direction: column;
     box-shadow: 0 1px 4px rgba(0,0,0,.06);
     transition: transform .15s, box-shadow .15s;
+    text-decoration: none; color: inherit;
   }
   .criativo-mes-card:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,.12); }
   .criativo-mes-thumb {
     width: 100%; aspect-ratio: 1/1; object-fit: cover;
     background: #e5e7eb; display: block;
+    /* Melhora a renderização da imagem em qualquer navegador */
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
   }
   .criativo-mes-thumb-placeholder {
     width: 100%; aspect-ratio: 1/1; background: #e5e7eb;
     display: flex; align-items: center; justify-content: center;
     font-size: 28px;
   }
+  .criativo-mes-rank-overlay {
+    position: absolute; top: 8px; left: 8px;
+    background: rgba(13,59,102,0.92); color: #fff;
+    width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700;
+    box-shadow: 0 2px 4px rgba(0,0,0,.2);
+  }
+  .criativo-mes-thumb-wrap { position: relative; line-height: 0; }
   .criativo-mes-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
   .criativo-mes-nome { font-size: 11px; font-weight: 600; color: var(--primary); line-height: 1.3;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -1566,17 +1579,25 @@ function renderRelatorio() {
   ].join('');
 
   // ── Top Criativos HTML ─────────────────────────────────────────────────────
-  const topsHtml = tops.length ? tops.map(t => {
+  // Upscale via proxy wsrv.nl (libvips/Lanczos + sharpen) — converte thumbs
+  // pequenas do Meta (~100px) em imagens 600px nítidas. Gratuito, sem API key.
+  const upscale = url => url
+    ? `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=600&h=600&fit=cover&output=jpg&q=92&sharp=1&we=1`
+    : '';
+
+  const topsHtml = tops.length ? tops.map((t, i) => {
     const thumb = t.thumbnail
-      ? `<img class="criativo-mes-thumb" src="${t.thumbnail}" alt="${t.anuncio}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+      ? `<img class="criativo-mes-thumb" src="${upscale(t.thumbnail)}" alt="${t.anuncio}" loading="lazy" onerror="this.onerror=null;this.src='${t.thumbnail}';">`
       : '';
     const placeholder = `<div class="criativo-mes-thumb-placeholder" ${t.thumbnail ? 'style="display:none"' : ''}>🖼️</div>`;
-    const link = t.permalink
-      ? `href="${t.permalink}" target="_blank" rel="noopener"`
-      : '';
+    const cardTag = t.permalink ? 'a' : 'div';
+    const link = t.permalink ? `href="${t.permalink}" target="_blank" rel="noopener"` : '';
     return `
-      <a class="criativo-mes-card" ${link} style="text-decoration:none;color:inherit;">
-        ${thumb}${placeholder}
+      <${cardTag} class="criativo-mes-card" ${link}>
+        <div class="criativo-mes-thumb-wrap">
+          <div class="criativo-mes-rank-overlay">${i+1}</div>
+          ${thumb}${placeholder}
+        </div>
         <div class="criativo-mes-body">
           <div class="criativo-mes-nome">${t.anuncio}</div>
           <div class="criativo-mes-camp">${t.campanha || ''}</div>
@@ -1585,7 +1606,7 @@ function renderRelatorio() {
             <div class="criativo-mes-stat">${t.cpl != null ? moeda(t.cpl) : '—'} <span>CPL</span></div>
           </div>
         </div>
-      </a>`;
+      </${cardTag}>`;
   }).join('') : '<p style="color:#999;font-size:13px;">Nenhum criativo com dados no mês atual.</p>';
 
   document.getElementById('relatorio-content').innerHTML = `
