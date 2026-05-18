@@ -967,6 +967,118 @@ def aggregate_utm(leads):
     }
 
 
+def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg):
+    """
+    Pré-calcula as métricas do Relatório Resumido para o mês atual.
+    Retorna um dict pronto para ser renderizado no dashboard sem lógica extra no front.
+    """
+    mes_atual = datetime.now().strftime("%Y-%m")
+    mes_label = datetime.now().strftime("%B/%Y").capitalize()
+
+    # ── Leads do mês por source ───────────────────────────────────────────────
+    mes_src = {}
+    for r in utm_agg.get("sources_monthly", []):
+        if r["mes"] == mes_atual:
+            mes_src[r["source"]] = r["total"]
+
+    google_leads_mes  = mes_src.get("googlecpc", 0)
+    meta_leads_mes    = mes_src.get("metaads", 0)
+    direto_leads_mes  = mes_src.get("direto", 0)
+    pago_leads_mes    = google_leads_mes + meta_leads_mes
+    total_leads_mes   = sum(mes_src.values())
+    organico_leads_mes = total_leads_mes - pago_leads_mes
+
+    # ── Gasto e CPL do mês ───────────────────────────────────────────────────
+    meta_gasto_mes   = sum(r.get("gasto", 0) for r in meta_agg.get("daily", [])
+                           if (r.get("data") or "").startswith(mes_atual))
+    google_gasto_mes = sum(r.get("gasto", 0) for r in google_agg.get("daily", [])
+                           if (r.get("data") or "").startswith(mes_atual))
+    total_gasto_mes  = meta_gasto_mes + google_gasto_mes
+
+    cpl_meta   = round(meta_gasto_mes / meta_leads_mes, 2)   if meta_leads_mes   else None
+    cpl_google = round(google_gasto_mes / google_leads_mes, 2) if google_leads_mes else None
+    cpl_pago   = round(total_gasto_mes / pago_leads_mes, 2)   if pago_leads_mes   else None
+
+    # ── Funil CRM ─────────────────────────────────────────────────────────────
+    total_deals    = crm.get("total_deals", 0)
+    total_won      = crm.get("total_won", 0)
+    total_lost     = crm.get("total_lost", 0)
+    total_active   = crm.get("total_active", 0)
+
+    reuniao_pdf_total  = next((e["total"] for e in crm.get("funnel", [])
+                               if "reuni" in e["etapa"].lower() and "pdf" in e["etapa"].lower()), 0)
+    reuniao_pdf_ativo  = next((e["total"] for e in crm.get("active_funnel", [])
+                               if "reuni" in e["etapa"].lower() and "pdf" in e["etapa"].lower()), 0)
+
+    taxa_reuniao_total = round(reuniao_pdf_total / total_deals * 100, 1) if total_deals else 0
+    taxa_reuniao_ativo = round(reuniao_pdf_ativo / total_active * 100, 1) if total_active else 0
+
+    # ── Perdas do mês ─────────────────────────────────────────────────────────
+    perdas_mes = next((r["perdidos"] for r in crm.get("monthly_stages", [])
+                       if r["mes"] == mes_atual), 0)
+
+    top_motivos = [
+        {"motivo": r["motivo"], "total": r["total"]}
+        for r in crm.get("losses", [])[:5]
+    ]
+
+    # ── Leads históricos por canal ─────────────────────────────────────────────
+    src_map = {r["source"]: r["total"] for r in utm_agg.get("sources", [])}
+
+    # ── Funil ativo detalhado ──────────────────────────────────────────────────
+    funil_ativo = [
+        {"etapa": e["etapa"], "total": e["total"]}
+        for e in crm.get("active_funnel", [])
+    ]
+
+    return {
+        "mes":             mes_atual,
+        "mes_label":       mes_label,
+        # Leads do mês
+        "leads_mes": {
+            "total":    total_leads_mes,
+            "pago":     pago_leads_mes,
+            "organico": organico_leads_mes,
+            "googlecpc": google_leads_mes,
+            "metaads":   meta_leads_mes,
+            "direto":    direto_leads_mes,
+        },
+        # Custos e CPL
+        "custos_mes": {
+            "meta_gasto":   round(meta_gasto_mes, 2),
+            "google_gasto": round(google_gasto_mes, 2),
+            "total_gasto":  round(total_gasto_mes, 2),
+            "cpl_meta":     cpl_meta,
+            "cpl_google":   cpl_google,
+            "cpl_pago":     cpl_pago,
+        },
+        # CRM geral
+        "crm_resumo": {
+            "total_deals":          total_deals,
+            "total_won":            total_won,
+            "total_lost":           total_lost,
+            "total_active":         total_active,
+            "reuniao_pdf_total":    reuniao_pdf_total,
+            "reuniao_pdf_pct":      taxa_reuniao_total,
+            "reuniao_pdf_ativo":    reuniao_pdf_ativo,
+            "reuniao_pdf_ativo_pct": taxa_reuniao_ativo,
+            "perdas_mes":           perdas_mes,
+        },
+        # Top motivos de perda
+        "top_motivos_perda": top_motivos,
+        # Funil ativo por etapa
+        "funil_ativo": funil_ativo,
+        # Leads históricos por canal
+        "leads_historico": {
+            "googlecpc": src_map.get("googlecpc", 0),
+            "metaads":   src_map.get("metaads", 0),
+            "direto":    src_map.get("direto", 0),
+        },
+        # Perdas por canal (histórico)
+        "perdas_por_canal": crm.get("losses_by_utm_source", []),
+    }
+
+
 def main():
     print("Gerando dados do dashboard...")
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -995,6 +1107,12 @@ def main():
     # Enriquece criativos com leads do CRM via matching utm_content ↔ anuncio
     attach_rd_leads_to_creatives(meta_aggregated["creatives"], meta_ads, leads)
 
+    crm_agg     = aggregate_crm(crm_deals, leads)
+    meta_agg    = meta_aggregated
+    google_agg  = aggregate_google_ads(google_ads)
+    utm_agg     = aggregate_utm(leads)
+    leads_agg   = aggregate_leads(leads)
+
     summary = {
         "last_update": datetime.now().strftime("%d/%m/%Y %H:%M"),
         "totals": {
@@ -1004,12 +1122,13 @@ def main():
             "google_rows": len(google_ads),
             "ga4_rows": len(ga4),
         },
-        "leads": aggregate_leads(leads),
-        "crm": aggregate_crm(crm_deals, leads),
-        "meta_ads": meta_aggregated,
-        "google_ads": aggregate_google_ads(google_ads),
+        "leads": leads_agg,
+        "crm": crm_agg,
+        "meta_ads": meta_agg,
+        "google_ads": google_agg,
         "ga4": aggregate_ga4(ga4),
-        "utm": aggregate_utm(leads),
+        "utm": utm_agg,
+        "relatorio": build_relatorio(leads, crm_agg, meta_agg, google_agg, utm_agg),
     }
 
     output_file = os.path.join(OUTPUT_DIR, "summary.json")

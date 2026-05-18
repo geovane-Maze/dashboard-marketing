@@ -340,6 +340,41 @@
     margin-top: 18px; font-size: 11px; color: #94A3B8;
   }
 
+  /* RELATÓRIO RESUMIDO */
+  .rel-section { margin-bottom: 28px; }
+  .rel-section h3 {
+    font-size: 13px; font-weight: 700; color: var(--primary);
+    text-transform: uppercase; letter-spacing: .5px;
+    border-bottom: 2px solid var(--secondary); padding-bottom: 6px; margin-bottom: 14px;
+  }
+  .rel-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .rel-table th {
+    background: var(--bg2); color: #666; font-weight: 600;
+    padding: 8px 12px; text-align: left; font-size: 11px;
+    text-transform: uppercase; letter-spacing: .4px;
+  }
+  .rel-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); color: var(--text); }
+  .rel-table tr:last-child td { border-bottom: none; }
+  .rel-table td strong { color: var(--primary); }
+  .rel-table td.num { text-align: right; font-weight: 600; }
+  .rel-table td.pct { text-align: right; color: var(--secondary); font-weight: 600; }
+  .rel-table td.red { text-align: right; color: var(--red); font-weight: 600; }
+  .rel-table td.green { text-align: right; color: var(--green); font-weight: 600; }
+  .rel-tag {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600;
+  }
+  .rel-tag.google { background: #EBF5FF; color: #1A73E8; }
+  .rel-tag.meta   { background: #EEF2FF; color: #3B5998; }
+  .rel-tag.direto { background: #F0FDF4; color: #166534; }
+  .rel-aviso {
+    background: #FFF7ED; border-left: 3px solid var(--orange);
+    padding: 10px 14px; border-radius: 6px; font-size: 12px; color: #92400E;
+    margin-bottom: 16px;
+  }
+  .rel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 700px) { .rel-grid { grid-template-columns: 1fr; } }
+
   /* LOADING */
   #loading {
     position: fixed; inset: 0; background: var(--primary);
@@ -605,6 +640,9 @@
     <a href="#" class="active" data-section="executivo">
       <i class="icon">📊</i><span class="nav-label">Visão Executiva</span>
     </a>
+    <a href="#" data-section="relatorio">
+      <i class="icon">📝</i><span class="nav-label">Relatório Resumido</span>
+    </a>
     <a href="#" data-section="evolucao">
       <i class="icon">📈</i><span class="nav-label">Evolução Mensal</span>
     </a>
@@ -777,6 +815,14 @@
       </div>
 
       <div id="exec-alerts"></div>
+    </div>
+
+    <!-- RELATÓRIO RESUMIDO -->
+    <div id="sec-relatorio" class="section">
+      <div class="section-title">📝 Relatório Resumido</div>
+      <div id="relatorio-content">
+        <p style="color:#999;font-size:13px;">Carregando relatório...</p>
+      </div>
     </div>
 
     <!-- EVOLUÇÃO MENSAL -->
@@ -1361,6 +1407,7 @@ function renderSection(sec) {
   rendered[sec] = false; // always re-render on filter change
   switch (sec) {
     case 'executivo': renderExecutivo(); break;
+    case 'relatorio': renderRelatorio(); break;
     case 'evolucao':  renderEvolucao(); break;
     case 'crm':       renderCRM(); break;
     case 'perdas':    renderPerdas(); break;
@@ -1370,6 +1417,217 @@ function renderSection(sec) {
     case 'utm':       renderUTM(); break;
     case 'ga4':       renderGA4(); break;
   }
+}
+
+// ─── SECTION: RELATÓRIO RESUMIDO ─────────────────────────────────────────────
+function renderRelatorio() {
+  const R = DATA.relatorio;
+  if (!R) {
+    document.getElementById('relatorio-content').innerHTML =
+      '<p style="color:#999;font-size:13px;">Dados do relatório não disponíveis. Rode o pipeline para atualizar.</p>';
+    return;
+  }
+
+  const c = R.custos_mes;
+  const l = R.leads_mes;
+  const crm = R.crm_resumo;
+  const hist = R.leads_historico;
+
+  const moeda = v => v != null ? 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—';
+  const num   = v => v != null ? Number(v).toLocaleString('pt-BR') : '—';
+  const pct   = v => v != null ? v.toFixed(1) + '%' : '—';
+
+  // Taxa de perda por canal (histórico)
+  const perdasCanal = {};
+  (R.perdas_por_canal || []).forEach(r => { perdasCanal[r.utm] = r.total; });
+  const taxaGoog = hist.googlecpc ? ((perdasCanal['googlecpc']||0) / hist.googlecpc * 100).toFixed(1) + '%' : '—';
+  const taxaMeta = hist.metaads   ? ((perdasCanal['metaads']  ||0) / hist.metaads   * 100).toFixed(1) + '%' : '—';
+
+  document.getElementById('relatorio-content').innerHTML = `
+
+    <div class="rel-aviso">
+      📅 Dados atualizados automaticamente todo dia às 07:30. Última atualização: <strong>${DATA.last_update || '—'}</strong>
+    </div>
+
+    <div class="rel-grid">
+
+      <!-- Coluna 1 -->
+      <div>
+
+        <!-- LEADS DO MÊS -->
+        <div class="rel-section">
+          <h3>📥 Leads — ${R.mes_label}</h3>
+          <table class="rel-table">
+            <thead><tr><th>Canal</th><th style="text-align:right">Leads</th><th style="text-align:right">% do Total</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span class="rel-tag google">Google CPC</span></td>
+                <td class="num">${num(l.googlecpc)}</td>
+                <td class="pct">${l.total ? pct(l.googlecpc/l.total*100) : '—'}</td>
+              </tr>
+              <tr>
+                <td><span class="rel-tag meta">Meta Ads</span></td>
+                <td class="num">${num(l.metaads)}</td>
+                <td class="pct">${l.total ? pct(l.metaads/l.total*100) : '—'}</td>
+              </tr>
+              <tr style="background:var(--bg2)">
+                <td><strong>Total Pago</strong></td>
+                <td class="num"><strong>${num(l.pago)}</strong></td>
+                <td class="pct"><strong>${l.total ? pct(l.pago/l.total*100) : '—'}</strong></td>
+              </tr>
+              <tr>
+                <td><span class="rel-tag direto">Orgânico / Direto</span></td>
+                <td class="num">${num(l.organico)}</td>
+                <td class="pct">${l.total ? pct(l.organico/l.total*100) : '—'}</td>
+              </tr>
+              <tr style="background:var(--bg2)">
+                <td><strong>Total Geral</strong></td>
+                <td class="num"><strong>${num(l.total)}</strong></td>
+                <td class="pct"><strong>100%</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- CUSTO POR LEAD -->
+        <div class="rel-section">
+          <h3>💰 Custo por Lead — ${R.mes_label}</h3>
+          <table class="rel-table">
+            <thead><tr><th>Canal</th><th style="text-align:right">Investimento</th><th style="text-align:right">Leads</th><th style="text-align:right">CPL</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span class="rel-tag meta">Meta Ads</span></td>
+                <td class="num">${moeda(c.meta_gasto)}</td>
+                <td class="num">${num(l.metaads)}</td>
+                <td class="num">${moeda(c.cpl_meta)}</td>
+              </tr>
+              <tr>
+                <td><span class="rel-tag google">Google CPC</span></td>
+                <td class="num">${moeda(c.google_gasto)}</td>
+                <td class="num">${num(l.googlecpc)}</td>
+                <td class="num">${moeda(c.cpl_google)}</td>
+              </tr>
+              <tr style="background:var(--bg2)">
+                <td><strong>Total Pago</strong></td>
+                <td class="num"><strong>${moeda(c.total_gasto)}</strong></td>
+                <td class="num"><strong>${num(l.pago)}</strong></td>
+                <td class="num"><strong>${moeda(c.cpl_pago)}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+      <!-- Coluna 2 -->
+      <div>
+
+        <!-- FUNIL CRM -->
+        <div class="rel-section">
+          <h3>🔄 Funil CRM — Visão Geral</h3>
+          <table class="rel-table">
+            <thead><tr><th>Indicador</th><th style="text-align:right">Qtd</th><th style="text-align:right">%</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>Total de negócios (histórico)</td>
+                <td class="num">${num(crm.total_deals)}</td>
+                <td class="pct">100%</td>
+              </tr>
+              <tr>
+                <td>Negócios ativos</td>
+                <td class="num">${num(crm.total_active)}</td>
+                <td class="pct">${crm.total_deals ? pct(crm.total_active/crm.total_deals*100) : '—'}</td>
+              </tr>
+              <tr>
+                <td>Chegaram em Reunião PDF</td>
+                <td class="num">${num(crm.reuniao_pdf_total)}</td>
+                <td class="pct">${pct(crm.reuniao_pdf_pct)}</td>
+              </tr>
+              <tr>
+                <td>Ativos em Reunião PDF (hoje)</td>
+                <td class="num">${num(crm.reuniao_pdf_ativo)}</td>
+                <td class="pct">${pct(crm.reuniao_pdf_ativo_pct)}</td>
+              </tr>
+              <tr>
+                <td>Ganhos (fechados)</td>
+                <td class="green">${num(crm.total_won)}</td>
+                <td class="pct">${crm.total_deals ? pct(crm.total_won/crm.total_deals*100) : '—'}</td>
+              </tr>
+              <tr>
+                <td>Perdidos</td>
+                <td class="red">${num(crm.total_lost)}</td>
+                <td class="pct">${crm.total_deals ? pct(crm.total_lost/crm.total_deals*100) : '—'}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- LEADS x REUNIÃO PDF POR CANAL -->
+        <div class="rel-section">
+          <h3>📊 Leads Totais por Canal (histórico)</h3>
+          <table class="rel-table">
+            <thead><tr><th>Canal</th><th style="text-align:right">Leads</th><th style="text-align:right">Perdas CRM</th><th style="text-align:right">Taxa perda</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span class="rel-tag google">Google CPC</span></td>
+                <td class="num">${num(hist.googlecpc)}</td>
+                <td class="red">${num(perdasCanal['googlecpc']||0)}</td>
+                <td class="red">${taxaGoog}</td>
+              </tr>
+              <tr>
+                <td><span class="rel-tag meta">Meta Ads</span></td>
+                <td class="num">${num(hist.metaads)}</td>
+                <td class="red">${num(perdasCanal['metaads']||0)}</td>
+                <td class="red">${taxaMeta}</td>
+              </tr>
+              <tr>
+                <td><span class="rel-tag direto">Orgânico / Direto</span></td>
+                <td class="num">${num(hist.direto)}</td>
+                <td class="red">—</td>
+                <td class="red">—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- FUNIL ATIVO DETALHADO -->
+    <div class="rel-section">
+      <h3>📋 Funil CRM — Etapas Ativas Agora</h3>
+      <table class="rel-table">
+        <thead><tr><th>#</th><th>Etapa</th><th style="text-align:right">Negócios</th><th style="text-align:right">% do total ativo</th></tr></thead>
+        <tbody>
+          ${(R.funil_ativo || []).map((e, i) => `
+            <tr>
+              <td style="color:#999;font-size:11px;">${i+1}</td>
+              <td>${e.etapa}</td>
+              <td class="num"><strong>${e.total}</strong></td>
+              <td class="pct">${crm.total_active ? pct(e.total/crm.total_active*100) : '—'}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- TOP MOTIVOS DE PERDA -->
+    ${R.top_motivos_perda && R.top_motivos_perda.length ? `
+    <div class="rel-section">
+      <h3>⚠️ Top Motivos de Perda</h3>
+      <table class="rel-table">
+        <thead><tr><th>#</th><th>Motivo</th><th style="text-align:right">Perdas</th></tr></thead>
+        <tbody>
+          ${R.top_motivos_perda.map((r, i) => `
+            <tr>
+              <td style="color:#999;font-size:11px;">${i+1}</td>
+              <td>${r.motivo}</td>
+              <td class="red">${r.total}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : ''}
+
+  `;
 }
 
 // ─── SECTION: EXECUTIVO ───────────────────────────────────────────────────────
@@ -2655,6 +2913,9 @@ loadData();
   <nav id="mob-drawer-nav">
     <a href="#" data-section="executivo" class="active">
       <i class="icon">📊</i><span>Visão Executiva</span>
+    </a>
+    <a href="#" data-section="relatorio">
+      <i class="icon">📝</i><span>Relatório Resumido</span>
     </a>
     <a href="#" data-section="evolucao">
       <i class="icon">📈</i><span>Evolução Mensal</span>
