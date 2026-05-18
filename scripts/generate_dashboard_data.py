@@ -231,11 +231,11 @@ def parse_date_to_day(date_str):
 
 
 STAGE_NORMALIZE = {
-    'contato inicial':                     'Contato Inicial',
-    'nutrição 1':                          'Nutrição 1',
-    'nutricao 1':                          'Nutrição 1',
-    'nutrição 2':                          'Nutrição 2',
-    'nutricao 2':                          'Nutrição 2',
+    # ── Funil atual ──────────────────────────────────────────────────────────
+    'entrada de lead':                     'Entrada de Lead',
+    'tentativa de conexão':                'Tentativa de Conexão',
+    'tentativa de conexao':                'Tentativa de Conexão',
+    'lead respondente':                    'Lead Respondente',
     'pré-qualificado':                     'Pré-qualificado',
     'pre-qualificado':                     'Pré-qualificado',
     'pré qualificado':                     'Pré-qualificado',
@@ -245,9 +245,16 @@ STAGE_NORMALIZE = {
     'apresentação do business plan':       'Apresentação do Business Plan',
     'apresentacao do business plan':       'Apresentação do Business Plan',
     'envio de cof':                        'Envio de COF',
+    'workshop':                            'Workshop',
     'aprovação final':                     'Aprovação Final',
     'aprovacao final':                     'Aprovação Final',
-    'entrada de lead':                     'Entrada de Lead',
+    # ── Etapas legadas (dados históricos) ────────────────────────────────────
+    'contato inicial':                     'Contato Inicial',
+    'nutrição 1':                          'Nutrição 1',
+    'nutricao 1':                          'Nutrição 1',
+    'nutrição 2':                          'Nutrição 2',
+    'nutricao 2':                          'Nutrição 2',
+    # ── Sistema ──────────────────────────────────────────────────────────────
     'etapa descarte':                      'Etapa Descarte',
 }
 
@@ -454,9 +461,12 @@ def aggregate_crm(deals, leads=None):
 
     # Funil de ativos na ordem correta do pipeline
     PIPELINE_ORDER = [
-        'entrada de lead', 'contato inicial', 'nutrição 1', 'nutrição 2',
+        # Funil atual
+        'entrada de lead', 'tentativa de conexão', 'lead respondente',
         'pré-qualificado', 'reunião pdf', 'apresentação do business plan',
         'envio de cof', 'workshop', 'aprovação final',
+        # Etapas legadas (dados históricos — ficam ao final)
+        'contato inicial', 'nutrição 1', 'nutrição 2',
     ]
     def stage_sort_key(name):
         nl = name.lower()

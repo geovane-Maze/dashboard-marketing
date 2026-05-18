@@ -1374,11 +1374,18 @@ function renderSection(sec) {
 
 // ─── SECTION: EXECUTIVO ───────────────────────────────────────────────────────
 const FUNNEL_ORDER = [
-  'entrada de lead', 'contato inicial', 'nutrição 1', 'nutricao 1',
-  'nutrição 2', 'nutricao 2', 'pré-qualificado', 'pre-qualificado',
+  // Funil atual
+  'entrada de lead',
+  'tentativa de conexão', 'tentativa de conexao',
+  'lead respondente',
+  'pré-qualificado', 'pre-qualificado',
   'reunião pdf', 'reuniao pdf', 'reunião de pdf',
   'apresentação do business plan', 'apresentacao do business plan',
-  'envio de cof', 'workshop', 'aprovação final', 'aprovacao final',
+  'envio de cof',
+  'workshop',
+  'aprovação final', 'aprovacao final',
+  // Etapas legadas (dados históricos — aparecem ao final)
+  'contato inicial', 'nutrição 1', 'nutricao 1', 'nutrição 2', 'nutricao 2',
 ];
 
 function funnelSortIndex(etapa) {
