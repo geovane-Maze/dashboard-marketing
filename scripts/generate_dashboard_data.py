@@ -967,7 +967,7 @@ def aggregate_utm(leads):
     }
 
 
-def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg):
+def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
     """
     Pré-calcula as métricas do Relatório Resumido para o mês atual.
     Retorna um dict pronto para ser renderizado no dashboard sem lógica extra no front.
@@ -1031,6 +1031,111 @@ def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg):
         for e in crm.get("active_funnel", [])
     ]
 
+    # ── Comparativo mês anterior ──────────────────────────────────────────────
+    from datetime import datetime as _dt, timedelta
+    primeiro_dia_mes = _dt.now().replace(day=1)
+    mes_ant_dt  = primeiro_dia_mes - timedelta(days=1)
+    mes_anterior = mes_ant_dt.strftime("%Y-%m")
+    mes_ant_label = mes_ant_dt.strftime("%B/%Y").capitalize()
+
+    ant_src = {}
+    for r in utm_agg.get("sources_monthly", []):
+        if r["mes"] == mes_anterior:
+            ant_src[r["source"]] = r["total"]
+    ant_google = ant_src.get("googlecpc", 0)
+    ant_meta   = ant_src.get("metaads", 0)
+    ant_pago   = ant_google + ant_meta
+    ant_total  = sum(ant_src.values())
+
+    ant_meta_gasto   = sum(r.get("gasto", 0) for r in meta_agg.get("daily", [])
+                           if (r.get("data") or "").startswith(mes_anterior))
+    ant_google_gasto = sum(r.get("gasto", 0) for r in google_agg.get("daily", [])
+                           if (r.get("data") or "").startswith(mes_anterior))
+    ant_cpl_meta   = round(ant_meta_gasto / ant_meta, 2)     if ant_meta   else None
+    ant_cpl_google = round(ant_google_gasto / ant_google, 2) if ant_google else None
+    ant_cpl_pago   = round((ant_meta_gasto + ant_google_gasto) / ant_pago, 2) if ant_pago else None
+
+    ant_reuniao = next((r.get("reuniao_pdf", 0) for r in crm.get("monthly_stages", [])
+                        if r["mes"] == mes_anterior), 0)
+
+    def variacao(atual, anterior):
+        if not anterior:
+            return None
+        return round((atual - anterior) / anterior * 100, 1)
+
+    comparativo = {
+        "mes_anterior": mes_anterior,
+        "mes_ant_label": mes_ant_label,
+        "leads_total":  {"atual": total_leads_mes,   "anterior": ant_total,  "delta": variacao(total_leads_mes,   ant_total)},
+        "leads_pago":   {"atual": pago_leads_mes,    "anterior": ant_pago,   "delta": variacao(pago_leads_mes,    ant_pago)},
+        "leads_google": {"atual": google_leads_mes,  "anterior": ant_google, "delta": variacao(google_leads_mes,  ant_google)},
+        "leads_meta":   {"atual": meta_leads_mes,    "anterior": ant_meta,   "delta": variacao(meta_leads_mes,    ant_meta)},
+        "cpl_meta":     {"atual": cpl_meta,          "anterior": ant_cpl_meta,   "delta": variacao(cpl_meta or 0,   ant_cpl_meta or 0)},
+        "cpl_google":   {"atual": cpl_google,        "anterior": ant_cpl_google, "delta": variacao(cpl_google or 0, ant_cpl_google or 0)},
+        "cpl_pago":     {"atual": cpl_pago,          "anterior": ant_cpl_pago,   "delta": variacao(cpl_pago or 0,   ant_cpl_pago or 0)},
+        "reuniao_pdf":  {"atual": reuniao_pdf_total, "anterior": ant_reuniao,    "delta": variacao(reuniao_pdf_total, ant_reuniao)},
+    }
+
+    # ── Semáforo de saúde ─────────────────────────────────────────────────────
+    def semaforo_cpl_meta(v):
+        if v is None: return "gray"
+        return "green" if v < 200 else ("yellow" if v <= 350 else "red")
+    def semaforo_cpl_google(v):
+        if v is None: return "gray"
+        return "green" if v < 150 else ("yellow" if v <= 250 else "red")
+    def semaforo_cpl_pago(v):
+        if v is None: return "gray"
+        return "green" if v < 200 else ("yellow" if v <= 300 else "red")
+    def semaforo_taxa_reuniao(v):
+        return "green" if v >= 12 else ("yellow" if v >= 8 else "red")
+
+    semaforo = [
+        {"label": "CPL Meta Ads",    "valor": cpl_meta,    "status": semaforo_cpl_meta(cpl_meta),
+         "ref": "< R$200 🟢  R$200-350 🟡  > R$350 🔴"},
+        {"label": "CPL Google Ads",  "valor": cpl_google,  "status": semaforo_cpl_google(cpl_google),
+         "ref": "< R$150 🟢  R$150-250 🟡  > R$250 🔴"},
+        {"label": "CPL Médio Pago",  "valor": cpl_pago,    "status": semaforo_cpl_pago(cpl_pago),
+         "ref": "< R$200 🟢  R$200-300 🟡  > R$300 🔴"},
+        {"label": "Taxa Reunião PDF","valor": taxa_reuniao_total, "status": semaforo_taxa_reuniao(taxa_reuniao_total),
+         "ref": "> 12% 🟢  8-12% 🟡  < 8% 🔴", "tipo": "pct"},
+    ]
+
+    # ── Top criativos do mês ──────────────────────────────────────────────────
+    top_criativos = []
+    if meta_rows:
+        criat_mes = defaultdict(lambda: {
+            "gasto": 0.0, "leads": 0.0, "thumbnail": "", "permalink": "", "campanha": "", "conjunto": ""
+        })
+        for row in meta_rows:
+            if not (row.get("data") or "").startswith(mes_atual):
+                continue
+            nome = (row.get("anuncio") or "").strip()
+            if not nome:
+                continue
+            criat_mes[nome]["gasto"]  += parse_num(row.get("gasto"))
+            criat_mes[nome]["leads"]  += parse_num(row.get("leads"))
+            if row.get("thumbnail") and not criat_mes[nome]["thumbnail"]:
+                criat_mes[nome]["thumbnail"] = row.get("thumbnail")
+            if row.get("permalink") and not criat_mes[nome]["permalink"]:
+                criat_mes[nome]["permalink"] = row.get("permalink")
+            if row.get("campanha") and not criat_mes[nome]["campanha"]:
+                criat_mes[nome]["campanha"] = row.get("campanha")
+            if row.get("conjunto") and not criat_mes[nome]["conjunto"]:
+                criat_mes[nome]["conjunto"] = row.get("conjunto")
+
+        for nome, d in sorted(criat_mes.items(), key=lambda x: -x[1]["leads"])[:5]:
+            cpl_c = round(d["gasto"] / d["leads"], 2) if d["leads"] > 0 else None
+            top_criativos.append({
+                "anuncio":   nome,
+                "campanha":  d["campanha"],
+                "conjunto":  d["conjunto"],
+                "thumbnail": d["thumbnail"],
+                "permalink": d["permalink"],
+                "gasto":     round(d["gasto"], 2),
+                "leads":     int(round(d["leads"])),
+                "cpl":       cpl_c,
+            })
+
     return {
         "mes":             mes_atual,
         "mes_label":       mes_label,
@@ -1076,6 +1181,12 @@ def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg):
         },
         # Perdas por canal (histórico)
         "perdas_por_canal": crm.get("losses_by_utm_source", []),
+        # Comparativo mês anterior
+        "comparativo": comparativo,
+        # Semáforo de saúde
+        "semaforo": semaforo,
+        # Top 5 criativos do mês (Meta Ads)
+        "top_criativos_mes": top_criativos,
     }
 
 
@@ -1128,7 +1239,7 @@ def main():
         "google_ads": google_agg,
         "ga4": aggregate_ga4(ga4),
         "utm": utm_agg,
-        "relatorio": build_relatorio(leads, crm_agg, meta_agg, google_agg, utm_agg),
+        "relatorio": build_relatorio(leads, crm_agg, meta_agg, google_agg, utm_agg, meta_rows=meta_ads),
     }
 
     output_file = os.path.join(OUTPUT_DIR, "summary.json")

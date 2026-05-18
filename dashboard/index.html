@@ -375,6 +375,77 @@
   .rel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
   @media (max-width: 700px) { .rel-grid { grid-template-columns: 1fr; } }
 
+  /* Semáforo de saúde */
+  .semaforo-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
+  @media (max-width: 900px) { .semaforo-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 500px)  { .semaforo-grid { grid-template-columns: 1fr; } }
+  .semaforo-card {
+    background: var(--bg2); border-radius: 10px; padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 4px;
+    border-left: 5px solid #ccc;
+  }
+  .semaforo-card.green { border-left-color: var(--green); }
+  .semaforo-card.yellow { border-left-color: var(--orange); }
+  .semaforo-card.red    { border-left-color: var(--red); }
+  .semaforo-card.gray   { border-left-color: #aaa; }
+  .semaforo-label { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; }
+  .semaforo-valor { font-size: 22px; font-weight: 700; color: var(--primary); }
+  .semaforo-ref   { font-size: 10px; color: #999; margin-top: 2px; }
+  .semaforo-badge {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    padding: 2px 7px; border-radius: 20px; width: fit-content;
+  }
+  .semaforo-badge.green  { background: #DCFCE7; color: #166534; }
+  .semaforo-badge.yellow { background: #FEF9C3; color: #854D0E; }
+  .semaforo-badge.red    { background: #FEE2E2; color: #991B1B; }
+  .semaforo-badge.gray   { background: #F3F4F6; color: #6B7280; }
+
+  /* Comparativo mês anterior */
+  .comparativo-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
+  @media (max-width: 900px) { .comparativo-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 500px)  { .comparativo-grid { grid-template-columns: 1fr; } }
+  .comp-card {
+    background: var(--bg2); border-radius: 10px; padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .comp-label { font-size: 11px; color: #888; font-weight: 600; text-transform: uppercase; }
+  .comp-atual { font-size: 20px; font-weight: 700; color: var(--primary); }
+  .comp-sub   { font-size: 11px; color: #999; }
+  .comp-delta { font-size: 12px; font-weight: 700; margin-top: 4px; }
+  .comp-delta.up   { color: var(--green); }
+  .comp-delta.down { color: var(--red); }
+  .comp-delta.neu  { color: #999; }
+
+  /* Top Criativos do mês */
+  .criativos-mes-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 28px; }
+  @media (max-width: 1100px) { .criativos-mes-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 700px)  { .criativos-mes-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 400px)  { .criativos-mes-grid { grid-template-columns: 1fr; } }
+  .criativo-mes-card {
+    background: var(--bg2); border-radius: 10px; overflow: hidden;
+    display: flex; flex-direction: column;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    transition: transform .15s, box-shadow .15s;
+  }
+  .criativo-mes-card:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+  .criativo-mes-thumb {
+    width: 100%; aspect-ratio: 1/1; object-fit: cover;
+    background: #e5e7eb; display: block;
+  }
+  .criativo-mes-thumb-placeholder {
+    width: 100%; aspect-ratio: 1/1; background: #e5e7eb;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+  }
+  .criativo-mes-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
+  .criativo-mes-nome { font-size: 11px; font-weight: 600; color: var(--primary); line-height: 1.3;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .criativo-mes-camp { font-size: 10px; color: #888; line-height: 1.3;
+    display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .criativo-mes-stats { display: flex; gap: 8px; margin-top: 4px; }
+  .criativo-mes-stat { font-size: 11px; font-weight: 700; color: var(--secondary); }
+  .criativo-mes-stat span { font-size: 10px; color: #999; font-weight: 400; }
+
   /* LOADING */
   #loading {
     position: fixed; inset: 0; background: var(--primary);
@@ -1243,6 +1314,10 @@ function showSection(sec) {
     l.classList.toggle('active', l.dataset.section === sec);
   });
 
+  // Oculta filtros do topbar na página Relatório Resumido
+  const filterEls = document.querySelectorAll('#topbar .filter-group, #topbar .btn-filter');
+  filterEls.forEach(el => { el.style.display = sec === 'relatorio' ? 'none' : ''; });
+
   renderSection(sec);
 }
 
@@ -1428,10 +1503,13 @@ function renderRelatorio() {
     return;
   }
 
-  const c = R.custos_mes;
-  const l = R.leads_mes;
-  const crm = R.crm_resumo;
+  const c    = R.custos_mes;
+  const l    = R.leads_mes;
+  const crm  = R.crm_resumo;
   const hist = R.leads_historico;
+  const comp = R.comparativo || {};
+  const sem  = R.semaforo    || [];
+  const tops = R.top_criativos_mes || [];
 
   const moeda = v => v != null ? 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—';
   const num   = v => v != null ? Number(v).toLocaleString('pt-BR') : '—';
@@ -1443,10 +1521,95 @@ function renderRelatorio() {
   const taxaGoog = hist.googlecpc ? ((perdasCanal['googlecpc']||0) / hist.googlecpc * 100).toFixed(1) + '%' : '—';
   const taxaMeta = hist.metaads   ? ((perdasCanal['metaads']  ||0) / hist.metaads   * 100).toFixed(1) + '%' : '—';
 
+  // ── Semáforo HTML ──────────────────────────────────────────────────────────
+  const statusLabel = { green: '🟢 OK', yellow: '🟡 Atenção', red: '🔴 Alerta', gray: '⚫ Sem dados' };
+  const semHtml = sem.map(s => `
+    <div class="semaforo-card ${s.status}">
+      <div class="semaforo-label">${s.label}</div>
+      <div class="semaforo-valor">${s.tipo === 'pct' ? pct(s.valor) : moeda(s.valor)}</div>
+      <div class="semaforo-badge ${s.status}">${statusLabel[s.status] || s.status}</div>
+      <div class="semaforo-ref">${s.ref}</div>
+    </div>`).join('');
+
+  // ── Comparativo HTML ───────────────────────────────────────────────────────
+  function compCard(label, key, isMoeda) {
+    const d = comp[key] || {};
+    const atualFmt  = isMoeda ? moeda(d.atual)    : num(d.atual);
+    const antFmt    = isMoeda ? moeda(d.anterior)  : num(d.anterior);
+    const delta     = d.delta;
+    let deltaHtml = '';
+    if (delta != null) {
+      const isInverse = isMoeda; // para CPL, queda é bom
+      const upIsGood  = !isInverse;
+      const isUp      = delta > 0;
+      const cls       = delta === 0 ? 'neu' : (isUp === upIsGood ? 'up' : 'down');
+      const arrow     = delta > 0 ? '▲' : (delta < 0 ? '▼' : '');
+      deltaHtml = `<div class="comp-delta ${cls}">${arrow} ${Math.abs(delta).toFixed(1)}% vs ${comp.mes_ant_label || 'mês ant.'}</div>`;
+    }
+    return `
+      <div class="comp-card">
+        <div class="comp-label">${label}</div>
+        <div class="comp-atual">${atualFmt}</div>
+        <div class="comp-sub">Mês ant.: ${antFmt}</div>
+        ${deltaHtml}
+      </div>`;
+  }
+  const compHtml = [
+    compCard('Leads Total',   'leads_total',  false),
+    compCard('Leads Pagos',   'leads_pago',   false),
+    compCard('CPL Meta Ads',  'cpl_meta',     true),
+    compCard('CPL Google',    'cpl_google',   true),
+    compCard('CPL Médio Pago','cpl_pago',     true),
+    compCard('Reunião PDF',   'reuniao_pdf',  false),
+    compCard('Leads Google',  'leads_google', false),
+    compCard('Leads Meta',    'leads_meta',   false),
+  ].join('');
+
+  // ── Top Criativos HTML ─────────────────────────────────────────────────────
+  const topsHtml = tops.length ? tops.map(t => {
+    const thumb = t.thumbnail
+      ? `<img class="criativo-mes-thumb" src="${t.thumbnail}" alt="${t.anuncio}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+      : '';
+    const placeholder = `<div class="criativo-mes-thumb-placeholder" ${t.thumbnail ? 'style="display:none"' : ''}>🖼️</div>`;
+    const link = t.permalink
+      ? `href="${t.permalink}" target="_blank" rel="noopener"`
+      : '';
+    return `
+      <a class="criativo-mes-card" ${link} style="text-decoration:none;color:inherit;">
+        ${thumb}${placeholder}
+        <div class="criativo-mes-body">
+          <div class="criativo-mes-nome">${t.anuncio}</div>
+          <div class="criativo-mes-camp">${t.campanha || ''}</div>
+          <div class="criativo-mes-stats">
+            <div class="criativo-mes-stat">${t.leads} <span>leads</span></div>
+            <div class="criativo-mes-stat">${t.cpl != null ? moeda(t.cpl) : '—'} <span>CPL</span></div>
+          </div>
+        </div>
+      </a>`;
+  }).join('') : '<p style="color:#999;font-size:13px;">Nenhum criativo com dados no mês atual.</p>';
+
   document.getElementById('relatorio-content').innerHTML = `
 
     <div class="rel-aviso">
       📅 Dados atualizados automaticamente todo dia às 07:30. Última atualização: <strong>${DATA.last_update || '—'}</strong>
+    </div>
+
+    <!-- 🚦 SEMÁFORO DE SAÚDE -->
+    <div class="rel-section">
+      <h3>🚦 Semáforo de Saúde — ${R.mes_label}</h3>
+      <div class="semaforo-grid">${semHtml}</div>
+    </div>
+
+    <!-- 📅 COMPARATIVO MÊS ANTERIOR -->
+    <div class="rel-section">
+      <h3>📅 Comparativo — ${R.mes_label} vs ${comp.mes_ant_label || 'Mês Anterior'}</h3>
+      <div class="comparativo-grid">${compHtml}</div>
+    </div>
+
+    <!-- 🎨 TOP CRIATIVOS DO MÊS -->
+    <div class="rel-section">
+      <h3>🎨 Top Criativos do Mês — ${R.mes_label}</h3>
+      <div class="criativos-mes-grid">${topsHtml}</div>
     </div>
 
     <div class="rel-grid">
@@ -1562,7 +1725,7 @@ function renderRelatorio() {
           </table>
         </div>
 
-        <!-- LEADS x REUNIÃO PDF POR CANAL -->
+        <!-- LEADS x PERDAS POR CANAL -->
         <div class="rel-section">
           <h3>📊 Leads Totais por Canal (histórico)</h3>
           <table class="rel-table">
