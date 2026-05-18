@@ -4,7 +4,6 @@ Generate aggregated JSON data for the marketing dashboard.
 Run after main.py. Reads from Google Sheets and writes to dashboard/data/summary.json.
 """
 
-import base64
 import json
 import os
 import re
@@ -129,42 +128,38 @@ def attach_rd_leads_to_creatives(creatives_list, meta_rows, leads, threshold=0.4
 # ════════════════════════════════════════════════════════════════════
 # CRIPTOGRAFIA AES-256-GCM (proteção por senha)
 # ════════════════════════════════════════════════════════════════════
-def encrypt_payload(plaintext_bytes, password, iterations=250_000):
+def upload_to_supabase(file_path: str) -> bool:
     """
-    Criptografa bytes com AES-256-GCM + PBKDF2-SHA256.
-    Retorna um dict com salt, nonce, iterations e ciphertext (base64).
-    O resultado pode ser serializado como JSON e descriptografado no browser
-    via Web Crypto API.
+    Faz upload do summary.json para o bucket privado 'dashboard-data' no Supabase Storage.
+    Usa a service_role key (nunca exposta no front-end).
+    Retorna True em caso de sucesso.
     """
-    try:
-        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-        from cryptography.hazmat.primitives import hashes
-        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-    except ImportError:
-        raise RuntimeError(
-            "Pacote 'cryptography' não instalado. Rode: pip install cryptography"
-        )
+    supabase_url = config.SUPABASE_URL
+    service_key  = config.SUPABASE_SERVICE_KEY
 
-    salt = os.urandom(16)
-    nonce = os.urandom(12)
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,  # AES-256
-        salt=salt,
-        iterations=iterations,
-    )
-    key = kdf.derive(password.encode("utf-8"))
-    aesgcm = AESGCM(key)
-    ciphertext = aesgcm.encrypt(nonce, plaintext_bytes, associated_data=None)
-    return {
-        "encrypted": True,
-        "version": 1,
-        "kdf": "PBKDF2-SHA256",
-        "iterations": iterations,
-        "salt": base64.b64encode(salt).decode("ascii"),
-        "nonce": base64.b64encode(nonce).decode("ascii"),
-        "ciphertext": base64.b64encode(ciphertext).decode("ascii"),
-    }
+    if not supabase_url or not service_key:
+        print("  AVISO: SUPABASE_URL ou SUPABASE_SERVICE_KEY não definidos — upload ignorado.")
+        return False
+
+    try:
+        from supabase import create_client, Client
+        sb: Client = create_client(supabase_url, service_key)
+
+        with open(file_path, "rb") as f:
+            content = f.read()
+
+        # upsert=True substitui o arquivo existente
+        sb.storage.from_("dashboard-data").upload(
+            path="summary.json",
+            file=content,
+            file_options={"content-type": "application/json", "upsert": "true"},
+        )
+        print(f"  >>> summary.json enviado ao Supabase Storage com sucesso!")
+        return True
+
+    except Exception as exc:
+        print(f"  ERRO ao fazer upload para o Supabase: {exc}")
+        return False
 
 
 def dedupe_by_id(records, source_name=""):
@@ -961,24 +956,17 @@ def main():
 
     output_file = os.path.join(OUTPUT_DIR, "summary.json")
 
-    # Serializa o summary em bytes UTF-8
-    plaintext = json.dumps(summary, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-
-    # Se DASHBOARD_PASSWORD definido no .env, criptografa
-    password = config.DASHBOARD_PASSWORD if hasattr(config, "DASHBOARD_PASSWORD") else None
-    if password:
-        print(f"  Criptografando com AES-256-GCM (PBKDF2 250k iter)...")
-        encrypted = encrypt_payload(plaintext, password)
-        with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(encrypted, f, ensure_ascii=False, indent=2)
-        print(f"  >>> Dashboard PROTEGIDO POR SENHA <<<")
-    else:
-        with open(output_file, "w", encoding="utf-8") as f:
-            f.write(plaintext.decode("utf-8"))
-        print(f"  AVISO: DASHBOARD_PASSWORD não definido. Dados gravados sem criptografia.")
+    # Grava o arquivo local (usado apenas como artefato temporário no CI;
+    # o arquivo NÃO é commitado no git — os dados vão para o Supabase Storage)
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(summary, f, ensure_ascii=False, separators=(",", ":"))
 
     size_kb = os.path.getsize(output_file) / 1024
-    print(f"  Arquivo gerado: {output_file} ({size_kb:.1f} KB)")
+    print(f"  Arquivo local gerado: {output_file} ({size_kb:.1f} KB)")
+
+    # Envia para o Supabase Storage (bucket privado 'dashboard-data')
+    upload_to_supabase(output_file)
+
     print("Dashboard data gerado com sucesso!")
 
 

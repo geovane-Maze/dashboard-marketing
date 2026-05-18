@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard Expansão CDC — Clínica da Cidade</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect x='6' y='4' width='52' height='56' rx='5' fill='%23B3D4F0' stroke='%23000' stroke-width='3'/><rect x='38' y='10' width='14' height='5' rx='1.5' fill='%23FFFFFF' stroke='%23000' stroke-width='2'/><circle cx='22' cy='22' r='9' fill='%23E74C3C' stroke='%23000' stroke-width='2'/><path d='M22 22 L22 13 A9 9 0 0 1 31 22 Z' fill='%2327AE60'/><line x1='34' y1='30' x2='52' y2='30' stroke='%23000' stroke-width='2'/><line x1='34' y1='36' x2='46' y2='36' stroke='%23000' stroke-width='2'/><rect x='12' y='42' width='8' height='12' fill='%23F4D35E' stroke='%23000' stroke-width='2'/><rect x='22' y='38' width='8' height='16' fill='%23F4A24A' stroke='%23000' stroke-width='2'/><rect x='32' y='34' width='8' height='20' fill='%23E67E22' stroke='%23000' stroke-width='2'/><rect x='42' y='40' width='8' height='14' fill='%23D35400' stroke='%23000' stroke-width='2'/></svg>">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   :root {
@@ -584,7 +585,7 @@
       <button type="submit" id="login-btn">Entrar</button>
       <div class="login-error" id="login-error"></div>
     </form>
-    <div class="login-footer">Acesso restrito · dados criptografados (AES-256)</div>
+    <div class="login-footer">Acesso restrito · dados protegidos via Supabase</div>
   </div>
 </div>
 
@@ -2372,40 +2373,14 @@ function renderGA4() {
   ).join('') || '<tr><td colspan="4" class="empty">Sem dados</td></tr>';
 }
 
-// ─── CRIPTOGRAFIA: descriptografia AES-256-GCM via Web Crypto API ─────────────
-function base64ToBytes(b64) {
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
-}
+// ─── SUPABASE: configuração ───────────────────────────────────────────────────
+// PREENCHA com os valores do seu projeto em: supabase.com → Project Settings → API
+const SUPABASE_URL  = 'https://saoigiuykmubnqlkjvpx.supabase.co';
+const SUPABASE_KEY  = 'sb_publishable_lKMUJKoVsFkrm9WDxrsT0g_i-h7AJ6H';
+const DASH_EMAIL    = 'dashboard@clinicadacidade.com.br'; // e-mail do usuário criado no Supabase Auth
 
-async function deriveAesKey(password, salt, iterations) {
-  const enc = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw', enc.encode(password), { name: 'PBKDF2' }, false, ['deriveKey']
-  );
-  return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
-    keyMaterial,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['decrypt']
-  );
-}
-
-async function decryptPayload(password, payload) {
-  const salt       = base64ToBytes(payload.salt);
-  const nonce      = base64ToBytes(payload.nonce);
-  const ciphertext = base64ToBytes(payload.ciphertext);
-  const key = await deriveAesKey(password, salt, payload.iterations);
-  const decrypted = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: nonce }, key, ciphertext
-  );
-  return JSON.parse(new TextDecoder().decode(decrypted));
-}
-
-let ENCRYPTED_PAYLOAD = null;  // Guarda o payload se for criptografado
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ─── BOOT ─────────────────────────────────────────────────────────────────────
 async function startDashboard() {
@@ -2424,56 +2399,40 @@ async function startDashboard() {
   renderExecutivo();
 }
 
-async function tryDecryptAndStart(password) {
+function showLogin(msg) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('login-pwd').focus();
+  if (msg) document.getElementById('login-error').textContent = msg;
+}
+
+async function downloadAndRender() {
   try {
-    DATA = await decryptPayload(password, ENCRYPTED_PAYLOAD);
-    // Sucesso: salva na sessão (some quando o usuário fecha o navegador)
-    sessionStorage.setItem('dash_pwd', password);
+    const { data: blob, error } = await sb.storage
+      .from('dashboard-data')
+      .download('summary.json');
+    if (error) throw new Error(error.message);
+    const text = await blob.text();
+    DATA = JSON.parse(text);
     await startDashboard();
-    return true;
   } catch (err) {
-    return false;
+    // Sessão pode ter expirado — faz logout e volta ao login
+    await sb.auth.signOut();
+    showLogin('Sessão expirada. Faça login novamente.');
   }
 }
 
 async function loadData() {
   try {
-    const res = await fetch('data/summary.json?v=' + Date.now());
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const payload = await res.json();
-
-    // Dados criptografados? Mostrar login
-    if (payload && payload.encrypted === true) {
-      ENCRYPTED_PAYLOAD = payload;
-      document.getElementById('loading').style.display = 'none';
-
-      // Tenta senha cacheada na sessão
-      const cached = sessionStorage.getItem('dash_pwd');
-      if (cached) {
-        const ok = await tryDecryptAndStart(cached);
-        if (ok) return;
-        sessionStorage.removeItem('dash_pwd');  // senha inválida (mudou)
-      }
-
-      // Mostra tela de login
-      document.getElementById('login-screen').classList.remove('hidden');
-      document.getElementById('login-pwd').focus();
-      return;
+    // Se já existe sessão ativa (localStorage), pula o login
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      await downloadAndRender();
+    } else {
+      showLogin();
     }
-
-    // Dados em texto puro (sem senha configurada)
-    DATA = payload;
-    await startDashboard();
   } catch (err) {
-    document.getElementById('loading').innerHTML =
-      `<div style="text-align:center;padding:24px;">
-        <div style="font-size:40px;margin-bottom:16px;">⚠️</div>
-        <h2>Erro ao carregar dados</h2>
-        <p style="margin-top:8px;opacity:0.7">${err.message}</p>
-        <p style="margin-top:16px;font-size:12px;opacity:0.5">
-          Execute <strong>python scripts/generate_dashboard_data.py</strong> para gerar os dados.
-        </p>
-      </div>`;
+    showLogin('Erro de conexão: ' + err.message);
   }
 }
 
@@ -2487,14 +2446,24 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       const pwd = document.getElementById('login-pwd').value;
       if (!pwd) return;
-      btn.disabled = true; btn.textContent = 'Verificando...';
+      btn.disabled = true;
+      btn.textContent = 'Autenticando...';
       err.textContent = '';
-      const ok = await tryDecryptAndStart(pwd);
-      if (!ok) {
+
+      const { data, error } = await sb.auth.signInWithPassword({
+        email: DASH_EMAIL,
+        password: pwd
+      });
+
+      if (error) {
         err.textContent = 'Senha incorreta. Tente novamente.';
-        btn.disabled = false; btn.textContent = 'Entrar';
+        btn.disabled = false;
+        btn.textContent = 'Entrar';
         document.getElementById('login-pwd').select();
+        return;
       }
+
+      await downloadAndRender();
     });
   }
 });

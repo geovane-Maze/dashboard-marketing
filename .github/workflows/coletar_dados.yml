@@ -40,18 +40,17 @@ jobs:
           GOOGLE_ADS_CLIENT_SECRET=${{ secrets.GOOGLE_ADS_CLIENT_SECRET }}
           GOOGLE_ADS_REFRESH_TOKEN=${{ secrets.GOOGLE_ADS_REFRESH_TOKEN }}
           GOOGLE_ADS_CUSTOMER_ID=${{ secrets.GOOGLE_ADS_CUSTOMER_ID }}
-          DASHBOARD_PASSWORD=${{ secrets.DASHBOARD_PASSWORD }}
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
           EOF
 
-      - name: Validar DASHBOARD_PASSWORD
+      - name: Validar credenciais Supabase
         run: |
-          if [ -z "${{ secrets.DASHBOARD_PASSWORD }}" ]; then
-            echo "::error::Secret DASHBOARD_PASSWORD nao configurado! Pipeline ABORTADO para nao expor dados em texto puro."
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_SERVICE_KEY }}" ]; then
+            echo "::error::Secrets SUPABASE_URL ou SUPABASE_SERVICE_KEY nao configurados! Pipeline ABORTADO — os dados nao serao expostos."
             exit 1
           fi
-          echo "OK: DASHBOARD_PASSWORD definido (length=${#DASHBOARD_PASSWORD})"
-        env:
-          DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
+          echo "OK: credenciais Supabase definidas."
 
       - name: Criar credenciais Google
         run: |
@@ -67,14 +66,6 @@ jobs:
           mkdir -p dashboard/data
           python scripts/generate_dashboard_data.py
 
-      - name: Publicar dados no repositorio
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add dashboard/data/summary.json
-          git diff --cached --quiet || git commit -m "chore: atualiza dados do dashboard [$(date +'%d/%m/%Y %H:%M')]"
-          git push
-
       - name: Publicar dashboard no GitHub Pages
         uses: actions/upload-pages-artifact@v3
         with:
@@ -83,11 +74,3 @@ jobs:
       - name: Deploy para GitHub Pages
         uses: actions/deploy-pages@v4
 
-      - name: Verificar rotacao do refresh token
-        if: always()
-        run: |
-          NEW_TOKEN=$(grep "RD_REFRESH_TOKEN=" .env | cut -d'=' -f2 | tr -d ' ')
-          CURRENT_TOKEN="${{ secrets.RD_REFRESH_TOKEN }}"
-          if [ "$NEW_TOKEN" != "$CURRENT_TOKEN" ] && [ -n "$NEW_TOKEN" ]; then
-            echo "::warning::Refresh token foi rotacionado. Atualize o secret RD_REFRESH_TOKEN para: $NEW_TOKEN"
-          fi
