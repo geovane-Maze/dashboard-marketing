@@ -356,16 +356,28 @@ def aggregate_leads(leads):
     }
 
 
-def aggregate_crm(deals):
+def aggregate_crm(deals, leads=None):
     by_stage = defaultdict(lambda: {"total": 0, "valor": 0.0, "ganhos": 0})
     active_stage = defaultdict(lambda: {"total": 0, "valor": 0.0})  # apenas ativos
     by_loss_reason = defaultdict(int)
+    by_loss_stage = defaultdict(int)          # perdas por etapa do funil
+    by_loss_utm_source = defaultdict(int)     # perdas por utm_source
+    by_loss_utm_campaign = defaultdict(int)   # perdas por utm_campaign
+    by_loss_utm_content = defaultdict(int)    # perdas por utm_content (anúncio)
     by_responsavel = defaultdict(lambda: {"total": 0, "ganhos": 0, "valor": 0.0})
     monthly_won = defaultdict(lambda: {"total": 0, "valor": 0.0})
     monthly_stages = defaultdict(lambda: {
         "reuniao_pdf": 0, "apresentacao_bp": 0, "perdidos": 0,
         "reuniao_agendada": 0, "reuniao_realizada": 0,
     })
+
+    # Índice de leads por e-mail para cruzar UTMs com os deals perdidos
+    lead_by_email = {}
+    if leads:
+        for lead in leads:
+            email = (lead.get("email") or "").strip().lower()
+            if email:
+                lead_by_email[email] = lead
 
     total_won = 0
     total_lost = 0
@@ -402,7 +414,19 @@ def aggregate_crm(deals):
         motivo = deal.get("motivo_perda")
         if motivo:
             by_loss_reason[motivo] += 1
+            by_loss_stage[etapa] += 1
             total_lost += 1
+
+            # Cruzar UTMs via e-mail do contato
+            email = (deal.get("contato_email") or "").strip().lower()
+            lead = lead_by_email.get(email)
+            if lead:
+                src  = lead.get("utm_source")   or "não identificado"
+                camp = lead.get("utm_campaign") or "não identificado"
+                cont = lead.get("utm_content")  or "não identificado"
+                by_loss_utm_source[src] += 1
+                by_loss_utm_campaign[camp] += 1
+                by_loss_utm_content[cont] += 1
 
         mes_criado = parse_date_to_month(deal.get("criado_em"))
         if mes_criado:
@@ -462,6 +486,22 @@ def aggregate_crm(deals):
         "losses": [
             {"motivo": k, "total": v}
             for k, v in sorted(by_loss_reason.items(), key=lambda x: -x[1])
+        ],
+        "losses_by_stage": [
+            {"etapa": k, "total": v}
+            for k, v in sorted(by_loss_stage.items(), key=lambda x: -x[1])
+        ],
+        "losses_by_utm_source": [
+            {"utm": k, "total": v}
+            for k, v in sorted(by_loss_utm_source.items(), key=lambda x: -x[1])
+        ],
+        "losses_by_utm_campaign": [
+            {"utm": k, "total": v}
+            for k, v in sorted(by_loss_utm_campaign.items(), key=lambda x: -x[1])
+        ],
+        "losses_by_utm_content": [
+            {"utm": k, "total": v}
+            for k, v in sorted(by_loss_utm_content.items(), key=lambda x: -x[1])
         ],
         "by_responsavel": [
             {"responsavel": k, "total": v["total"], "ganhos": v["ganhos"], "valor": round(v["valor"], 2)}
@@ -947,7 +987,7 @@ def main():
             "ga4_rows": len(ga4),
         },
         "leads": aggregate_leads(leads),
-        "crm": aggregate_crm(crm_deals),
+        "crm": aggregate_crm(crm_deals, leads),
         "meta_ads": meta_aggregated,
         "google_ads": aggregate_google_ads(google_ads),
         "ga4": aggregate_ga4(ga4),
