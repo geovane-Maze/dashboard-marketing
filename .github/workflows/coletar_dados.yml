@@ -40,7 +40,18 @@ jobs:
           GOOGLE_ADS_CLIENT_SECRET=${{ secrets.GOOGLE_ADS_CLIENT_SECRET }}
           GOOGLE_ADS_REFRESH_TOKEN=${{ secrets.GOOGLE_ADS_REFRESH_TOKEN }}
           GOOGLE_ADS_CUSTOMER_ID=${{ secrets.GOOGLE_ADS_CUSTOMER_ID }}
+          DASHBOARD_PASSWORD=${{ secrets.DASHBOARD_PASSWORD }}
           EOF
+
+      - name: Validar DASHBOARD_PASSWORD
+        run: |
+          if [ -z "${{ secrets.DASHBOARD_PASSWORD }}" ]; then
+            echo "::error::Secret DASHBOARD_PASSWORD nao configurado! Pipeline ABORTADO para nao expor dados em texto puro."
+            exit 1
+          fi
+          echo "OK: DASHBOARD_PASSWORD definido (length=${#DASHBOARD_PASSWORD})"
+        env:
+          DASHBOARD_PASSWORD: ${{ secrets.DASHBOARD_PASSWORD }}
 
       - name: Criar credenciais Google
         run: |
