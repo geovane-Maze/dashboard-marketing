@@ -1,4 +1,4 @@
-from collectors import rdstation, rdcrm, ads_sheets, ga4, google_ads, meta_ads
+from collectors import rdstation, rdcrm, ads_sheets, ga4, google_ads, meta_ads, clarity
 from sheets import writer
 from datetime import datetime
 
@@ -76,6 +76,22 @@ def run():
                 print(f"  ERRO Meta Ads planilha: {e}")
     else:
         print("\n[6/6] APIs OK — planilhas fallback não necessárias")
+
+    # Microsoft Clarity (acumula histórico em planilha — API só entrega últimos 1-3 dias)
+    print("\n[7/7] Microsoft Clarity")
+    try:
+        clarity_rows = clarity.get_clarity_data(num_of_days=1)
+        if clarity_rows:
+            # Dedup por (data_coleta + request_key + dimensão+métrica)
+            # As colunas variam por request, mas data_coleta + request_key + metric +
+            # dimension cols cobrem unicidade. Usamos colunas-chave fixas:
+            writer.merge_sheet(
+                "clarity_daily",
+                clarity_rows,
+                dedup_keys=["data_coleta", "request_key", "metric"],
+            )
+    except Exception as e:
+        print(f"  ERRO Clarity: {e}")
 
     print("\n" + "=" * 50)
     print("Coleta finalizada com sucesso!")

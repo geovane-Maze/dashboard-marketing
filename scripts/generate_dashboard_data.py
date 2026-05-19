@@ -1005,6 +1005,148 @@ def aggregate_utm(leads):
     }
 
 
+def aggregate_clarity(rows, leads_agg=None):
+    """
+    Agrega dados da aba `clarity_daily` (acumulada dia a dia via API Clarity).
+
+    Estrutura esperada de cada linha:
+      data_coleta, request_key (by_device|by_url|by_source_medium),
+      metric (Traffic|Scroll Depth|Engagement Time|Dead Click Count|Rage Click Count|...),
+      + colunas de dimensão (Device/URL/Source/Medium) e valores numéricos da métrica.
+    """
+    if not rows:
+        return {"enabled": False, "msg": "Clarity ainda não configurado ou sem dados coletados."}
+
+    from collections import defaultdict as _dd
+
+    def _to_float(v):
+        if v is None or v == "":
+            return None
+        try:
+            return float(str(v).replace(",", "."))
+        except Exception:
+            return None
+
+    # ── Última data coletada ─────────────────────────────────────────────────
+    latest_date = max((r.get("data_coleta") or "") for r in rows)
+    if not latest_date:
+        return {"enabled": False, "msg": "Linhas do Clarity sem campo data_coleta."}
+
+    # ── Merge multi-métrica por dimensão (no dia mais recente) ───────────────
+    # Para cada request_key, junta blocos de métricas no mesmo bucket de dimensão.
+    def merge_latest(req_key, dim_cols):
+        bucket = _dd(dict)
+        for r in rows:
+            if r.get("data_coleta") != latest_date or r.get("request_key") != req_key:
+                continue
+            # chave composta pelas dimensões
+            dim_key = tuple(str(r.get(d) or "") for d in dim_cols)
+            if all(v == "" for v in dim_key):
+                continue
+            for k, v in r.items():
+                if k in ("data_coleta", "request_key", "metric") or k in dim_cols:
+                    continue
+                num = _to_float(v)
+                if num is not None:
+                    # acumula (somatório por dimensão) — mesma métrica pode aparecer 1x
+                    bucket[dim_key][k] = bucket[dim_key].get(k, 0) + num
+            for d in dim_cols:
+                bucket[dim_key][d] = r.get(d) or ""
+        return list(bucket.values())
+
+    by_device = merge_latest("by_device", ["Device"])
+    by_url    = merge_latest("by_url", ["URL"])
+    by_source = merge_latest("by_source_medium", ["Source", "Medium"])
+
+    # ── Sessões diárias (histórico) — usa request_key=by_device, métrica=Traffic ──
+    daily_traffic = _dd(lambda: {"sessions": 0, "bots": 0, "users": 0})
+    for r in rows:
+        if r.get("request_key") != "by_device" or r.get("metric") != "Traffic":
+            continue
+        d = r.get("data_coleta") or ""
+        daily_traffic[d]["sessions"] += _to_float(r.get("totalSessionCount")) or 0
+        daily_traffic[d]["bots"]     += _to_float(r.get("totalBotSessionCount")) or 0
+        daily_traffic[d]["users"]    += (_to_float(r.get("distantUserCount")) or
+                                         _to_float(r.get("distinctUserCount")) or 0)
+
+    daily_list = [
+        {"data": d, "sessions": int(v["sessions"]), "bots": int(v["bots"]), "users": int(v["users"])}
+        for d, v in sorted(daily_traffic.items())
+    ]
+
+    # ── KPIs do dia mais recente ─────────────────────────────────────────────
+    sessions_latest = sum(d["sessions"] for d in daily_list if d["data"] == latest_date)
+    bots_latest     = sum(d["bots"]     for d in daily_list if d["data"] == latest_date)
+    users_latest    = sum(d["users"]    for d in daily_list if d["data"] == latest_date)
+    bot_rate        = round(bots_latest / (sessions_latest + bots_latest) * 100, 1) \
+                      if (sessions_latest + bots_latest) > 0 else 0
+
+    # Dead/Rage Click totals
+    def _sum_metric(metric_name, value_keys):
+        total = 0
+        for r in rows:
+            if r.get("data_coleta") != latest_date or r.get("metric") != metric_name:
+                continue
+            for vk in value_keys:
+                n = _to_float(r.get(vk))
+                if n is not None:
+                    total += n
+                    break
+        return int(total)
+
+    dead_clicks = _sum_metric("Dead Click Count", ["totalDeadClickCount", "deadClickCount", "count"])
+    rage_clicks = _sum_metric("Rage Click Count", ["totalRageClickCount", "rageClickCount", "count"])
+    quickbacks  = _sum_metric("Quickback Click",  ["totalQuickbackClickCount", "quickbackClickCount", "count"])
+    script_errs = _sum_metric("Script Error Count", ["totalScriptErrorCount", "scriptErrorCount", "count"])
+
+    # Scroll Depth + Engagement Time → médias agregadas por sessão
+    def _avg_metric(metric_name, value_keys):
+        vals = []
+        for r in rows:
+            if r.get("data_coleta") != latest_date or r.get("metric") != metric_name:
+                continue
+            for vk in value_keys:
+                n = _to_float(r.get(vk))
+                if n is not None:
+                    vals.append(n)
+                    break
+        return round(sum(vals) / len(vals), 1) if vals else None
+
+    scroll_avg     = _avg_metric("Scroll Depth", ["averageScrollDepth", "scrollDepth"])
+    engagement_avg = _avg_metric("Engagement Time", ["averageEngagementTime", "engagementTime", "totalTime"])
+
+    # ── Taxa de conversão: leads do dia / sessões do dia ─────────────────────
+    conversion_rate = None
+    if leads_agg and sessions_latest > 0:
+        leads_latest = next(
+            (r["total"] for r in (leads_agg.get("daily") or []) if r["data"] == latest_date),
+            0,
+        )
+        conversion_rate = round(leads_latest / sessions_latest * 100, 2)
+
+    return {
+        "enabled": True,
+        "latest_date": latest_date,
+        "kpis": {
+            "sessions":         sessions_latest,
+            "bots":             bots_latest,
+            "users":            users_latest,
+            "bot_rate":         bot_rate,
+            "dead_clicks":      dead_clicks,
+            "rage_clicks":      rage_clicks,
+            "quickbacks":       quickbacks,
+            "script_errors":    script_errs,
+            "scroll_avg":       scroll_avg,
+            "engagement_avg":   engagement_avg,
+            "conversion_rate":  conversion_rate,
+        },
+        "daily":     daily_list,
+        "by_device": by_device,
+        "by_url":    by_url,
+        "by_source": by_source,
+    }
+
+
 def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
     """
     Pré-calcula as métricas do Relatório Resumido para o mês atual.
@@ -1272,6 +1414,13 @@ def main():
     print("  Lendo GA4...")
     ga4 = read_sheet(gc, "ga4_sessions")
 
+    print("  Lendo Clarity...")
+    clarity_rows = []
+    try:
+        clarity_rows = read_sheet(gc, "clarity_daily")
+    except Exception as e:
+        print(f"    (sem aba clarity_daily ainda — primeira coleta vai criar)")
+
     print("  Agregando dados...")
     meta_aggregated = aggregate_meta_ads(meta_ads)
     # Enriquece criativos com leads do CRM via matching utm_content ↔ anuncio
@@ -1298,6 +1447,7 @@ def main():
         "google_ads": google_agg,
         "ga4": aggregate_ga4(ga4),
         "utm": utm_agg,
+        "clarity": aggregate_clarity(clarity_rows, leads_agg=leads_agg),
         "relatorio": build_relatorio(leads, crm_agg, meta_agg, google_agg, utm_agg, meta_rows=meta_ads),
     }
 
