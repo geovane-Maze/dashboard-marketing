@@ -2443,14 +2443,35 @@ function renderCRM() {
 
 // ─── SECTION: PERDAS ──────────────────────────────────────────────────────────
 function renderPerdas() {
-  const losses = DATA.crm.losses || [];
-  const totalLost = losses.reduce((s, r) => s + r.total, 0) || 1;
+  const datePred = getDateFilter();   // mesmo filtro usado pelas outras páginas
+
+  // ── Filtra losses_daily pelo período. Cada linha = 1 deal perdido. ──────────
+  const lossesFilt = (DATA.crm.losses_daily || [])
+    .filter(r => !datePred || datePred(r.data));
+
+  // Se backend antigo (sem losses_daily) → fallback para agregados históricos
+  const usingFallback = lossesFilt.length === 0 && !datePred;
+
+  // Helpers de agregação no front
+  const aggBy = (rows, key) => {
+    const m = {};
+    rows.forEach(r => { const k = r[key] || 'não identificado'; m[k] = (m[k] || 0) + 1; });
+    return Object.entries(m)
+      .map(([k, v]) => ({ k, v }))
+      .sort((a, b) => b.v - a.v);
+  };
+
+  // ── 1) Detalhamento de Motivos de Perda (chart + tabela) ────────────────────
+  let lossByMotivo = aggBy(lossesFilt, 'motivo')
+    .map(({ k, v }) => ({ motivo: k, total: v }));
+  if (usingFallback) lossByMotivo = DATA.crm.losses || [];
+  const totalLost = lossByMotivo.reduce((s, r) => s + r.total, 0) || 1;
 
   makeChart('chart-losses', {
     type: 'bar',
     data: {
-      labels: losses.slice(0, 10).map(r => r.motivo),
-      datasets: [{ data: losses.slice(0, 10).map(r => r.total), backgroundColor: COLORS.red + 'CC', borderRadius: 4 }]
+      labels: lossByMotivo.slice(0, 10).map(r => r.motivo),
+      datasets: [{ data: lossByMotivo.slice(0, 10).map(r => r.total), backgroundColor: COLORS.red + 'CC', borderRadius: 4 }]
     },
     options: {
       responsive: true, maintainAspectRatio: false, indexAxis: 'y',
@@ -2458,19 +2479,32 @@ function renderPerdas() {
     }
   });
 
-  const prazo = DATA.leads.by_prazo || [];
+  document.getElementById('table-losses').innerHTML = lossByMotivo.length
+    ? lossByMotivo.map((r, i) =>
+        `<tr><td>${i+1}</td><td>${r.motivo}</td><td><strong>${r.total}</strong></td><td>${(r.total/totalLost*100).toFixed(1)}%</td></tr>`
+      ).join('')
+    : '<tr><td colspan="4" class="empty">Sem perdas no período selecionado.</td></tr>';
+
+  // ── 2) Prazo de Abertura (filtrado por data) ────────────────────────────────
+  let prazo;
+  if (datePred && (DATA.leads.prazo_daily || []).length) {
+    const m = {};
+    DATA.leads.prazo_daily.filter(r => datePred(r.data))
+      .forEach(r => { if (r.prazo !== 'não informado') m[r.prazo] = (m[r.prazo] || 0) + r.total; });
+    prazo = Object.entries(m).map(([k, v]) => ({ prazo: k, total: v })).sort((a, b) => b.total - a.total);
+  } else {
+    prazo = DATA.leads.by_prazo || [];
+  }
   makeChart('chart-prazo', {
     type: 'doughnut',
     data: { labels: prazo.map(r => r.prazo), datasets: [{ data: prazo.map(r => r.total), backgroundColor: PALETTE }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
   });
 
-  document.getElementById('table-losses').innerHTML = losses.map((r, i) =>
-    `<tr><td>${i+1}</td><td>${r.motivo}</td><td><strong>${r.total}</strong></td><td>${(r.total/totalLost*100).toFixed(1)}%</td></tr>`
-  ).join('') || '<tr><td colspan="4" class="empty">Sem dados</td></tr>';
-
-  // ── Perdas por Etapa do Funil (barras horizontais) ───────────────────────────
-  const lossByStage = DATA.crm.losses_by_stage || [];
+  // ── 3) Perdas por Etapa do Funil (barras horizontais) ───────────────────────
+  let lossByStage = aggBy(lossesFilt, 'etapa')
+    .map(({ k, v }) => ({ etapa: k, total: v }));
+  if (usingFallback) lossByStage = DATA.crm.losses_by_stage || [];
   const totalLostStage = lossByStage.reduce((s, r) => s + r.total, 0) || 1;
   document.getElementById('crm-losses-by-stage').innerHTML = lossByStage.length
     ? lossByStage.map(r => {
@@ -2486,10 +2520,12 @@ function renderPerdas() {
             </div>
           </div>`;
       }).join('')
-    : '<p style="font-size:12px;color:#999;padding:8px;">Sem dados de perdas por etapa.</p>';
+    : '<p style="font-size:12px;color:#999;padding:8px;">Sem perdas no período selecionado.</p>';
 
-  // ── Perdas por UTM Source ─────────────────────────────────────────────────────
-  const lossSrc = (DATA.crm.losses_by_utm_source || []).slice(0, 8);
+  // ── 4) Perdas por UTM Source ─────────────────────────────────────────────────
+  let lossSrc = aggBy(lossesFilt, 'utm_source').slice(0, 8)
+    .map(({ k, v }) => ({ utm: k, total: v }));
+  if (usingFallback) lossSrc = (DATA.crm.losses_by_utm_source || []).slice(0, 8);
   if (lossSrc.length) {
     makeChart('chart-losses-utm-source', {
       type: 'doughnut',
@@ -2498,11 +2534,13 @@ function renderPerdas() {
     });
   } else {
     const el = document.getElementById('chart-losses-utm-source');
-    if (el) el.parentElement.innerHTML = '<p style="font-size:12px;color:#999;text-align:center;padding:24px;">Sem dados — UTMs não identificadas nos leads perdidos.</p>';
+    if (el) el.parentElement.innerHTML = '<p style="font-size:12px;color:#999;text-align:center;padding:24px;">Sem perdas no período selecionado.</p>';
   }
 
-  // ── Perdas por UTM Campaign ───────────────────────────────────────────────────
-  const lossCamp = (DATA.crm.losses_by_utm_campaign || []).slice(0, 8);
+  // ── 5) Perdas por UTM Campaign ───────────────────────────────────────────────
+  let lossCamp = aggBy(lossesFilt, 'utm_campaign').slice(0, 8)
+    .map(({ k, v }) => ({ utm: k, total: v }));
+  if (usingFallback) lossCamp = (DATA.crm.losses_by_utm_campaign || []).slice(0, 8);
   if (lossCamp.length) {
     makeChart('chart-losses-utm-campaign', {
       type: 'doughnut',
@@ -2511,11 +2549,13 @@ function renderPerdas() {
     });
   } else {
     const el = document.getElementById('chart-losses-utm-campaign');
-    if (el) el.parentElement.innerHTML = '<p style="font-size:12px;color:#999;text-align:center;padding:24px;">Sem dados — UTM Campaign não identificadas.</p>';
+    if (el) el.parentElement.innerHTML = '<p style="font-size:12px;color:#999;text-align:center;padding:24px;">Sem perdas no período selecionado.</p>';
   }
 
-  // ── Perdas por UTM Content (anúncio) ─────────────────────────────────────────
-  const lossCont = (DATA.crm.losses_by_utm_content || []).slice(0, 10);
+  // ── 6) Perdas por UTM Content (anúncio) ──────────────────────────────────────
+  let lossCont = aggBy(lossesFilt, 'utm_content').slice(0, 10)
+    .map(({ k, v }) => ({ utm: k, total: v }));
+  if (usingFallback) lossCont = (DATA.crm.losses_by_utm_content || []).slice(0, 10);
   if (lossCont.length) {
     makeChart('chart-losses-utm-content', {
       type: 'bar',
@@ -2530,7 +2570,7 @@ function renderPerdas() {
     });
   } else {
     const el = document.getElementById('chart-losses-utm-content');
-    if (el) el.parentElement.innerHTML = '<p style="font-size:12px;color:#999;text-align:center;padding:24px;">Sem dados — UTM Content não identificadas.</p>';
+    if (el) el.parentElement.innerHTML = '<p style="font-size:12px;color:#999;text-align:center;padding:24px;">Sem perdas no período selecionado.</p>';
   }
 }
 

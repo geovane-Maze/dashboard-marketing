@@ -11,7 +11,7 @@ ADS_SHEET_ID = "1GC9-gtQM--sgpEejMGh2_pfibIt9w_511cJ7Ct3ACYA"
 ADS_TAB_NAME = "[CDC -B2B Franquadora] Criativos Facebook/Google"
 
 # Planilha Google Ads com dados diários (inclui campanhas Performance Max)
-GOOGLE_ADS_SHEET_ID = "1owpXvd9f-GIo0wIlXinho3sg91TDeQwlXIRZaVIwwBg"
+GOOGLE_ADS_SHEET_ID = "12Irw9aWzpWA2Ie1jWJUDgLLWUGRfgebdinfA9OHpcKQ"
 GOOGLE_ADS_TAB_NAME = "Atualizado -"
 
 
@@ -99,7 +99,14 @@ def get_google_ads_sheet_data():
     print("Coletando Google Ads da planilha (inclui PMax)...")
     gc = _get_client()
     spreadsheet = gc.open_by_key(GOOGLE_ADS_SHEET_ID)
-    ws = spreadsheet.worksheet(GOOGLE_ADS_TAB_NAME)
+
+    # O nome da aba muda a cada atualização (ex.: "Google ads - 19.05").
+    # Tenta o nome configurado; se não achar, usa a primeira aba da planilha.
+    try:
+        ws = spreadsheet.worksheet(GOOGLE_ADS_TAB_NAME)
+    except Exception:
+        ws = spreadsheet.worksheets()[0]
+        print(f"  [aba '{GOOGLE_ADS_TAB_NAME}' não encontrada — usando '{ws.title}']")
     rows = ws.get_all_values()
 
     if len(rows) < 4:

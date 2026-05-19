@@ -280,6 +280,7 @@ def aggregate_leads(leads):
     by_lifecycle = defaultdict(int)
     by_capital = defaultdict(int)
     by_prazo = defaultdict(int)
+    prazo_daily = defaultdict(lambda: defaultdict(int))     # dia → prazo → count
     canal_monthly = defaultdict(lambda: defaultdict(int))
     canal_daily = defaultdict(lambda: defaultdict(int))
 
@@ -318,6 +319,8 @@ def aggregate_leads(leads):
 
         prazo = lead.get("prazo_abertura") or "não informado"
         by_prazo[prazo] += 1
+        if dia:
+            prazo_daily[dia][prazo] += 1
 
     pagos = sum(v for k, v in by_canal.items() if any(kw in k.lower() for kw in ["busca paga", "paid", "cpc", " paga"]))
     organicos = len(leads) - pagos
@@ -350,6 +353,11 @@ def aggregate_leads(leads):
             for k, v in sorted(by_prazo.items(), key=lambda x: -x[1])
             if k != "não informado"
         ],
+        "prazo_daily": [
+            {"data": dia, "prazo": p, "total": count}
+            for dia, prazos in sorted(prazo_daily.items())
+            for p, count in prazos.items()
+        ],
         "canal_monthly": [
             {"mes": mes, "canal": c, "total": count}
             for mes, canals in sorted(canal_monthly.items())
@@ -371,6 +379,7 @@ def aggregate_crm(deals, leads=None):
     by_loss_utm_source = defaultdict(int)     # perdas por utm_source
     by_loss_utm_campaign = defaultdict(int)   # perdas por utm_campaign
     by_loss_utm_content = defaultdict(int)    # perdas por utm_content (anúncio)
+    losses_daily = []                         # 1 linha por deal perdido (filtrável por data)
     by_responsavel = defaultdict(lambda: {"total": 0, "ganhos": 0, "valor": 0.0})
     monthly_won = defaultdict(lambda: {"total": 0, "valor": 0.0})
     monthly_stages = defaultdict(lambda: {
@@ -434,6 +443,22 @@ def aggregate_crm(deals, leads=None):
                 by_loss_utm_source[src] += 1
                 by_loss_utm_campaign[camp] += 1
                 by_loss_utm_content[cont] += 1
+            else:
+                src = camp = cont = "não identificado"
+
+            # Aggregação DIÁRIA para filtro por período no front-end.
+            # Usa data_fechamento (quando a perda foi marcada) com fallback
+            # para criado_em (quando o lead entrou).
+            dia_perda = parse_date_to_day(deal.get("data_fechamento") or deal.get("criado_em"))
+            if dia_perda:
+                losses_daily.append({
+                    "data": dia_perda,
+                    "motivo": motivo,
+                    "etapa": etapa,
+                    "utm_source": src,
+                    "utm_campaign": camp,
+                    "utm_content": cont,
+                })
 
         mes_criado = parse_date_to_month(deal.get("criado_em"))
         if mes_criado:
@@ -523,6 +548,9 @@ def aggregate_crm(deals, leads=None):
             {"utm": k, "total": v}
             for k, v in sorted(by_loss_utm_content.items(), key=lambda x: -x[1])
         ],
+        # 1 linha por deal perdido, com data + dimensões — usado pelos filtros
+        # da página "Gargalos & Perdas" no front-end.
+        "losses_daily": losses_daily,
         "by_responsavel": [
             {"responsavel": k, "total": v["total"], "ganhos": v["ganhos"], "valor": round(v["valor"], 2)}
             for k, v in sorted(by_responsavel.items(), key=lambda x: -x[1]["total"])
