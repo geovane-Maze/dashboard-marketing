@@ -42,15 +42,18 @@ def write_sheet(sheet_name, data, spreadsheet_id=None):
     print(f"  Aba '{sheet_name}' atualizada: {len(values)} linhas gravadas.")
 
 
-def merge_sheet(sheet_name, new_data, dedup_keys, spreadsheet_id=None):
+def merge_sheet(sheet_name, new_data, dedup_keys, spreadsheet_id=None,
+                date_col=None, retention_days=None):
     """
     Mescla `new_data` à aba `sheet_name`, deduplicando por `dedup_keys`.
 
     Comportamento:
-      - Se a aba não existe, cria com `new_data`.
+      - Se a aba não existe, cria com `new_data` (tamanho mínimo necessário).
       - Se existe, lê o conteúdo atual, remove linhas que batem com `new_data`
         nas chaves `dedup_keys`, anexa as novas linhas, e regrava tudo.
-      - Mantém o histórico de dias anteriores intacto.
+      - Se `date_col` e `retention_days` forem informados, descarta linhas
+        com data anterior ao período de retenção (evita estourar limite de
+        10 milhões de células do Google Sheets).
 
     Usado para dados de fontes com janela limitada (ex.: Clarity entrega apenas
     últimos 1-3 dias — precisamos acumular dia a dia em planilha).
@@ -69,7 +72,9 @@ def merge_sheet(sheet_name, new_data, dedup_keys, spreadsheet_id=None):
         worksheet = spreadsheet.worksheet(sheet_name)
         existing = worksheet.get_all_records() or []
     except gspread.WorksheetNotFound:
-        worksheet = spreadsheet.add_worksheet(title=sheet_name, rows=20000, cols=50)
+        # Tamanho conservador — sheet expande automaticamente quando precisa.
+        n_cols = max(len(new_df.columns) + 5, 20)
+        worksheet = spreadsheet.add_worksheet(title=sheet_name, rows=2000, cols=n_cols)
         existing = []
 
     if existing:
@@ -88,6 +93,16 @@ def merge_sheet(sheet_name, new_data, dedup_keys, spreadsheet_id=None):
         merged = pd.concat([old_df, new_df], ignore_index=True)
     else:
         merged = new_df
+
+    # Retenção: descarta dados muito antigos para não estourar limite de células
+    if date_col and retention_days and date_col in merged.columns:
+        from datetime import date as _date, timedelta as _td
+        cutoff = (_date.today() - _td(days=retention_days)).isoformat()
+        before = len(merged)
+        merged = merged[merged[date_col].astype(str) >= cutoff].reset_index(drop=True)
+        dropped = before - len(merged)
+        if dropped > 0:
+            print(f"  Retenção {retention_days}d: {dropped} linhas antigas descartadas.")
 
     headers = merged.columns.tolist()
     values  = merged.astype(str).where(merged.notna(), "").values.tolist()

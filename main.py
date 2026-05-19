@@ -82,13 +82,14 @@ def run():
     try:
         clarity_rows = clarity.get_clarity_data(num_of_days=1)
         if clarity_rows:
-            # Dedup por (data_coleta + request_key + dimensão+métrica)
-            # As colunas variam por request, mas data_coleta + request_key + metric +
-            # dimension cols cobrem unicidade. Usamos colunas-chave fixas:
+            # Dedup por (data_coleta + request_key + métrica); retém 90 dias para
+            # não estourar limite de células do Google Sheets.
             writer.merge_sheet(
                 "clarity_daily",
                 clarity_rows,
                 dedup_keys=["data_coleta", "request_key", "metric"],
+                date_col="data_coleta",
+                retention_days=90,
             )
     except Exception as e:
         print(f"  ERRO Clarity: {e}")

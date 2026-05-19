@@ -2536,11 +2536,11 @@ function renderClarity() {
   byUrl.sort((a, b) => urlScore(b) - urlScore(a));
 
   const urlRows = byUrl.slice(0, 15).map((u, i) => {
-    const dead = Number(u.totalDeadClickCount || u.deadClickCount || 0);
-    const rage = Number(u.totalRageClickCount || u.rageClickCount || 0);
-    const sessions = Number(u.totalSessionCount || 0);
-    const scroll = u.averageScrollDepth ? Number(u.averageScrollDepth).toFixed(0) + '%' : '—';
-    const engage = u.averageEngagementTime ? fmtTime(Number(u.averageEngagementTime)) : '—';
+    const dead = Number(u.dead_clicks || 0);
+    const rage = Number(u.rage_clicks || 0);
+    const sessions = Number(u.sessions || 0);
+    const scroll = u.scroll_depth != null ? Number(u.scroll_depth).toFixed(0) + '%' : '—';
+    const engage = u.engagement_time != null ? fmtTime(Number(u.engagement_time)) : '—';
     const url = u.URL || '';
     const urlShort = url.length > 60 ? url.slice(0, 60) + '...' : url;
     return `
@@ -2559,10 +2559,10 @@ function renderClarity() {
 
   // ── Tabela por Device ─────────────────────────────────────────────────────
   const deviceRows = (C.by_device || []).map(d => {
-    const sessions = Number(d.totalSessionCount || 0);
-    const bots = Number(d.totalBotSessionCount || 0);
-    const dead = Number(d.totalDeadClickCount || d.deadClickCount || 0);
-    const rage = Number(d.totalRageClickCount || d.rageClickCount || 0);
+    const sessions = Number(d.sessions || 0);
+    const bots = Number(d.bots || 0);
+    const dead = Number(d.dead_clicks || 0);
+    const rage = Number(d.rage_clicks || 0);
     return `
       <tr>
         <td><strong>${d.Device || '—'}</strong></td>
@@ -2665,7 +2665,7 @@ function renderClarity() {
     type: 'doughnut',
     data: {
       labels: dev.map(d => d.Device || '—'),
-      datasets: [{ data: dev.map(d => Number(d.totalSessionCount || 0)), backgroundColor: PALETTE }]
+      datasets: [{ data: dev.map(d => Number(d.sessions || 0)), backgroundColor: PALETTE }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
