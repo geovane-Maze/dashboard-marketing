@@ -340,6 +340,39 @@
     margin-top: 18px; font-size: 11px; color: #94A3B8;
   }
 
+  /* TOOLTIP — Perdas por Etapa (breakdown por fonte) */
+  .stage-row { cursor: pointer; }
+  .stage-tooltip {
+    position: absolute; bottom: calc(100% + 8px); left: 50%;
+    transform: translateX(-50%);
+    background: #1F2937; color: #fff;
+    padding: 10px 14px; border-radius: 8px;
+    font-size: 12px; line-height: 1.5;
+    min-width: 240px; max-width: 320px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.25);
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity .15s, visibility .15s, transform .15s;
+    z-index: 100;
+  }
+  .stage-tooltip::after {
+    content: ''; position: absolute; top: 100%; left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent; border-top-color: #1F2937;
+  }
+  .stage-row:hover .stage-tooltip {
+    opacity: 1; visibility: visible;
+    transform: translateX(-50%) translateY(-2px);
+  }
+  .tt-title {
+    font-weight: 700; padding-bottom: 6px; margin-bottom: 6px;
+    border-bottom: 1px solid rgba(255,255,255,.15); font-size: 12px;
+  }
+  .tt-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+  .tt-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .tt-label { flex: 1; font-size: 11px; }
+  .tt-val   { font-weight: 700; font-size: 12px; }
+  .tt-pct   { color: #9CA3AF; font-weight: 400; font-size: 11px; }
+
   /* RELATÓRIO RESUMIDO */
   .rel-section { margin-bottom: 28px; }
   .rel-section h3 {
@@ -2501,16 +2534,44 @@ function renderPerdas() {
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
   });
 
-  // ── 3) Perdas por Etapa do Funil (barras horizontais) ───────────────────────
+  // ── 3) Perdas por Etapa do Funil (barras + tooltip com breakdown por fonte) ──
   let lossByStage = aggBy(lossesFilt, 'etapa')
     .map(({ k, v }) => ({ etapa: k, total: v }));
   if (usingFallback) lossByStage = DATA.crm.losses_by_stage || [];
   const totalLostStage = lossByStage.reduce((s, r) => s + r.total, 0) || 1;
+
+  // Cross-tab: etapa → utm_source (pago vs orgânico)
+  const stageBySource = {};
+  lossesFilt.forEach(r => {
+    const et = r.etapa || 'sem etapa';
+    if (!stageBySource[et]) stageBySource[et] = { googlecpc: 0, metaads: 0, organico: 0 };
+    if (r.utm_source === 'googlecpc')      stageBySource[et].googlecpc++;
+    else if (r.utm_source === 'metaads')   stageBySource[et].metaads++;
+    else                                    stageBySource[et].organico++;
+  });
+
+  const tooltipRow = (color, label, val, total) => {
+    const p = total > 0 ? (val/total*100).toFixed(1) : '0.0';
+    return `<div class="tt-row">
+      <span class="tt-dot" style="background:${color}"></span>
+      <span class="tt-label">${label}</span>
+      <span class="tt-val">${val}<span class="tt-pct"> (${p}%)</span></span>
+    </div>`;
+  };
+
   document.getElementById('crm-losses-by-stage').innerHTML = lossByStage.length
     ? lossByStage.map(r => {
         const pct = (r.total / totalLostStage * 100).toFixed(1);
+        const bd  = stageBySource[r.etapa] || { googlecpc: 0, metaads: 0, organico: 0 };
+        const tooltipHtml = `
+          <div class="stage-tooltip">
+            <div class="tt-title">${r.etapa} — ${r.total} perda${r.total === 1 ? '' : 's'}</div>
+            ${tooltipRow('#1A73E8', '🔍 Google CPC', bd.googlecpc, r.total)}
+            ${tooltipRow('#3B5998', '📘 Meta Ads',   bd.metaads,   r.total)}
+            ${tooltipRow('#16A34A', '🌱 Orgânico',   bd.organico,  r.total)}
+          </div>`;
         return `
-          <div style="margin-bottom:10px;">
+          <div class="stage-row" style="margin-bottom:10px;position:relative;">
             <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;">
               <span>${r.etapa}</span>
               <span style="color:var(--red);font-weight:600;">${r.total} perdas</span>
@@ -2518,6 +2579,7 @@ function renderPerdas() {
             <div style="background:#F1F5F9;border-radius:4px;height:10px;overflow:hidden;">
               <div style="width:${pct}%;background:var(--red);height:100%;border-radius:4px;transition:width .4s;"></div>
             </div>
+            ${tooltipHtml}
           </div>`;
       }).join('')
     : '<p style="font-size:12px;color:#999;padding:8px;">Sem perdas no período selecionado.</p>';
