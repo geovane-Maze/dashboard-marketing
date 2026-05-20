@@ -83,27 +83,25 @@ class _ApiContext:
             self.headers = {"Authorization": f"Bearer {self.token}"}
 
 
-def _request_with_retry(url, ctx, params=None, max_retries=4, kind="details"):
-    """GET com retry exponencial. Refaz token em 401. Backoff em 429/5xx."""
-    backoff = 1.0
+def _request_with_retry(url, ctx, params=None, max_retries=8, kind="details"):
+    """GET com retry exponencial. Refaz token em 401. Backoff em 429/5xx.
+    Mais retries (8) e backoff maior pra lidar com rate limit da API RD."""
+    backoff = 2.0
     for attempt in range(max_retries):
         try:
-            resp = requests.get(url, headers=ctx.headers, params=params, timeout=20)
+            resp = requests.get(url, headers=ctx.headers, params=params, timeout=30)
         except requests.RequestException as e:
             print(f"  [Retry {attempt+1}/{max_retries}] rede falhou: {e}")
-            time.sleep(backoff); backoff *= 2; continue
+            time.sleep(backoff); backoff = min(backoff * 2, 60); continue
 
         if resp.status_code == 200:
             return resp
         if resp.status_code == 401:
-            # Token expirou — refaz e tenta de novo
             ctx.refresh()
             continue
         if resp.status_code in (429, 500, 502, 503, 504):
-            # Rate limit ou erro temporário — backoff
             retry_after = float(resp.headers.get("Retry-After", backoff))
-            time.sleep(retry_after); backoff *= 2; continue
-        # Outros erros (404 etc): não retenta
+            time.sleep(retry_after); backoff = min(backoff * 2, 60); continue
         return resp
 
     ctx.failures[kind] += 1
@@ -222,7 +220,7 @@ def _fetch_contact_full(uuid_and_contact, ctx):
     }
 
 
-def get_all_leads(max_workers=12):
+def get_all_leads(max_workers=4):
     """
     Coleta todos os leads do RD Station com paginação + paralelização.
     Cada contato faz 2 chamadas (details + events). Com 8 workers em paralelo
