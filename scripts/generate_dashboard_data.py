@@ -590,6 +590,10 @@ def aggregate_meta_ads(rows):
         "gasto": 0.0, "leads": 0.0, "impressoes": 0.0, "cliques": 0.0,
         "thumbnail": "", "campanha": "", "conjunto": "", "permalink": "",
     })
+    # Diário por criativo — permite filtro de data no front-end (Top 5 do período)
+    creatives_daily = defaultdict(lambda: defaultdict(lambda: {
+        "gasto": 0.0, "leads": 0.0, "impressoes": 0.0, "cliques": 0.0,
+    }))
 
     for row in rows:
         mes = parse_date_to_month(row.get("data"))
@@ -648,6 +652,13 @@ def aggregate_meta_ads(rows):
                 creatives[anuncio]["conjunto"] = row.get("conjunto")
             if campanha:  # sempre atualiza para o nome mais recente da campanha
                 creatives[anuncio]["campanha"] = campanha
+
+            # Diário por criativo (para filtro de data no Top 5 da página Criativos)
+            if dia:
+                creatives_daily[anuncio][dia]["gasto"] += gasto
+                creatives_daily[anuncio][dia]["leads"] += leads
+                creatives_daily[anuncio][dia]["impressoes"] += impressoes
+                creatives_daily[anuncio][dia]["cliques"] += cliques
 
     monthly_list = []
     for mes, d in sorted(monthly.items()):
@@ -711,6 +722,20 @@ def aggregate_meta_ads(rows):
         for d, v in sorted(daily.items())
     ]
 
+    # Lista flat (anuncio x data) para permitir filtro de data no Top 5 Criativos.
+    # NÃO inclui thumbnail/permalink (acharia inflar 5MB+) — front faz lookup no array `creatives`.
+    creatives_daily_list = []
+    for nome, dias in creatives_daily.items():
+        for dia, v in sorted(dias.items()):
+            if v["gasto"] == 0 and v["leads"] == 0:
+                continue
+            creatives_daily_list.append({
+                "data":    dia,
+                "anuncio": nome,
+                "gasto":   round(v["gasto"], 2),
+                "leads":   int(round(v["leads"])),
+            })
+
     return {
         "total_gasto": round(total_gasto, 2),
         "total_leads": int(round(total_leads)),
@@ -721,6 +746,7 @@ def aggregate_meta_ads(rows):
         "campaign_monthly": campaign_monthly_list,
         "campaign_names": sorted(camp_monthly.keys()),
         "creatives": creatives_list,
+        "creatives_daily": creatives_daily_list,
     }
 
 
@@ -1006,6 +1032,86 @@ def aggregate_utm(leads):
 
 
 
+def aggregate_google_ads_creatives(rows):
+    """
+    Agrega criativos do Google Ads (sheet 'google_ads_creatives').
+
+    Cada linha de entrada = (data, anúncio). Para o dashboard:
+      - daily: lista flat (data x anuncio) para filtro de data no Top 5
+      - creatives: agregado por anúncio (sem filtro de data — todos os meses)
+    """
+    if not rows:
+        return {"daily": [], "creatives": []}
+
+    daily_list = []
+    by_ad = defaultdict(lambda: {
+        "gasto": 0.0, "conversoes": 0.0,
+        "campanha": "", "grupo": "", "tipo": "",
+        "url_final": "", "cta": "", "qualidade": "",
+        "headlines": "", "descriptions": "",
+        "primeira_data": "", "ultima_data": "",
+    })
+
+    for r in rows:
+        data = (r.get("data") or "").strip()
+        nome = (r.get("anuncio") or "").strip()
+        if not data or not nome:
+            continue
+        gasto = parse_num(r.get("custo"))
+        conv  = parse_num(r.get("conversoes"))
+
+        # Linha flat (data, anuncio) — para Top 5 com filtro de data
+        if gasto > 0 or conv > 0:
+            daily_list.append({
+                "data": data,
+                "anuncio": nome,
+                "campanha": r.get("campanha") or "",
+                "tipo": r.get("tipo") or "",
+                "gasto": round(gasto, 2),
+                "conversoes": int(round(conv)) if conv else 0,
+            })
+
+        # Agregado por anuncio
+        d = by_ad[nome]
+        d["gasto"]      += gasto
+        d["conversoes"] += conv
+        # Metadados: pega o mais recente (textuais variam pouco; mantém o último visto)
+        for f in ("campanha", "grupo", "tipo", "url_final", "cta", "qualidade",
+                  "headlines", "descriptions"):
+            v = (r.get(f) or "").strip()
+            if v:
+                d[f] = v
+        if not d["primeira_data"] or data < d["primeira_data"]:
+            d["primeira_data"] = data
+        if data > d["ultima_data"]:
+            d["ultima_data"] = data
+
+    creatives_list = []
+    for nome, d in sorted(by_ad.items(), key=lambda x: -x[1]["gasto"]):
+        cpl = round(d["gasto"] / d["conversoes"], 2) if d["conversoes"] > 0 else 0
+        creatives_list.append({
+            "anuncio":     nome,
+            "campanha":    d["campanha"],
+            "grupo":       d["grupo"],
+            "tipo":        d["tipo"],
+            "url_final":   d["url_final"],
+            "cta":         d["cta"],
+            "qualidade":   d["qualidade"],
+            "headlines":   d["headlines"],
+            "descriptions":d["descriptions"],
+            "gasto":       round(d["gasto"], 2),
+            "conversoes":  int(round(d["conversoes"])),
+            "cpl":         cpl,
+            "primeira_data": d["primeira_data"],
+            "ultima_data":   d["ultima_data"],
+        })
+
+    return {
+        "daily":     daily_list,
+        "creatives": creatives_list,
+    }
+
+
 def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
     """
     Pré-calcula as métricas do Relatório Resumido para o mês atual.
@@ -1273,6 +1379,13 @@ def main():
     print("  Lendo GA4...")
     ga4 = read_sheet(gc, "ga4_sessions")
 
+    print("  Lendo Google Ads Criativos...")
+    google_ads_creatives_rows = []
+    try:
+        google_ads_creatives_rows = read_sheet(gc, "google_ads_creatives")
+    except Exception:
+        print(f"    (sem aba google_ads_creatives ainda — primeira coleta vai criar)")
+
     print("  Agregando dados...")
     meta_aggregated = aggregate_meta_ads(meta_ads)
     # Enriquece criativos com leads do CRM via matching utm_content ↔ anuncio
@@ -1299,6 +1412,7 @@ def main():
         "google_ads": google_agg,
         "ga4": aggregate_ga4(ga4),
         "utm": utm_agg,
+        "google_ads_creatives": aggregate_google_ads_creatives(google_ads_creatives_rows),
         "relatorio": build_relatorio(leads, crm_agg, meta_agg, google_agg, utm_agg, meta_rows=meta_ads),
     }
 

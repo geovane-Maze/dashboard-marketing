@@ -82,6 +82,15 @@ def run():
     else:
         print("\n[6/6] APIs OK — planilhas fallback não necessárias")
 
+    # Google Ads creatives (texto por anúncio — sem thumbnail por limitação da planilha)
+    print("\n[7/7] Google Ads Criativos")
+    try:
+        creatives_data = ads_sheets.get_google_ads_creatives_sheet_data()
+        if creatives_data:
+            writer.write_sheet("google_ads_creatives", creatives_data)
+    except Exception as e:
+        print(f"  ERRO Google Ads Criativos: {e}")
+
     print("\n" + "=" * 50)
     print("Coleta finalizada com sucesso!")
     print("=" * 50)

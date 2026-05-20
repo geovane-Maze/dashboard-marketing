@@ -14,6 +14,9 @@ ADS_TAB_NAME = "[CDC -B2B Franquadora] Criativos Facebook/Google"
 GOOGLE_ADS_SHEET_ID = "1qQ-t_jaX_Cmod-VJtxQwBTAt39yHgY6OngQEvMjx46U"
 GOOGLE_ADS_TAB_NAME = "Atualizado -"
 
+# Planilha Google Ads no nível de ANÚNCIO (criativos) — texto + métricas
+GOOGLE_ADS_CREATIVES_SHEET_ID = "1RlKT7nLfQzw_8qQssNz6fDdTyp4OADPKBqXpNEDuOhY"
+
 
 def _get_client():
     creds = Credentials.from_service_account_file(
@@ -156,3 +159,106 @@ def get_google_ads_sheet_data():
         print("  Google Ads: formato de planilha não reconhecido.")
 
     return google_ads
+
+
+def get_google_ads_creatives_sheet_data():
+    """
+    Lê dados de CRIATIVOS do Google Ads (nível de anúncio, não de campanha).
+    Planilha tem 1 linha por (dia, anúncio) com textos + métricas.
+
+    Estrutura esperada:
+      Linha 1: título "Relatório de anúncios"
+      Linha 2: período "1 de janeiro de 2026 - 20 de maio de 2026"
+      Linha 3: header com 96 colunas
+      Linha 4+: dados
+
+    Retorna lista de dicts (1 por linha de dia x anúncio):
+      data, anuncio, campanha, grupo, tipo, status, url_final, qualidade,
+      headlines (lista até 15), descriptions (lista até 5), cta,
+      custo, conversoes, custo_por_conversao
+    """
+    print("Coletando criativos Google Ads (textos por anúncio)...")
+    gc = _get_client()
+    spreadsheet = gc.open_by_key(GOOGLE_ADS_CREATIVES_SHEET_ID)
+    # Pega a primeira aba (nome muda a cada export)
+    ws = spreadsheet.worksheets()[0]
+    print(f"  Aba: {ws.title}")
+    rows = ws.get_all_values()
+
+    if len(rows) < 4:
+        print("  Sem dados suficientes.")
+        return []
+
+    header = rows[2]
+    def col(name):
+        try:
+            return header.index(name)
+        except ValueError:
+            return None
+
+    I = {
+        'dia':       col('Dia'),
+        'status_ad': col('Status do anúncio'),
+        'url':       col('URL final'),
+        'nome_ad':   col('Nome do anúncio'),
+        'campanha':  col('Campanha'),
+        'grupo':     col('Grupo de anúncios'),
+        'tipo':      col('Tipo de anúncio'),
+        'qualidade': col('Qualidade do anúncio'),
+        'cta':       col('Texto de call-to-action'),
+        'custo':     col('Custo'),
+        'conv':      col('Conversões'),
+        'cpc':       col('Custo / conv.'),
+    }
+
+    # Indices dos 15 títulos e 5 descrições
+    title_idx = [col(f'Título {i}') for i in range(1, 16)]
+    desc_idx  = [col(f'Descrição {i}') for i in range(1, 6)]
+
+    def _clean(v):
+        v = (v or '').strip()
+        return '' if v in ('--', '') else v
+
+    out = []
+    skipped = 0
+    for r in rows[3:]:
+        # Garante tamanho
+        while len(r) < 96:
+            r.append('')
+
+        dia = _clean(r[I['dia']] if I['dia'] is not None else '')
+        nome = _clean(r[I['nome_ad']] if I['nome_ad'] is not None else '')
+
+        # Filtros básicos: ignora linhas sem data ou sem nome
+        if not dia or dia.lower() in ('dia', 'total', 'day'):
+            skipped += 1
+            continue
+        # Sem nome de anúncio (search dinâmicos) — não dá pra rankear individualmente
+        if not nome:
+            skipped += 1
+            continue
+
+        headlines = [_clean(r[i]) for i in title_idx if i is not None]
+        headlines = [h for h in headlines if h]
+        descriptions = [_clean(r[i]) for i in desc_idx if i is not None]
+        descriptions = [d for d in descriptions if d]
+
+        out.append({
+            'data':        dia,
+            'anuncio':     nome,
+            'campanha':    _clean(r[I['campanha']] if I['campanha'] is not None else ''),
+            'grupo':       _clean(r[I['grupo']] if I['grupo'] is not None else ''),
+            'tipo':        _clean(r[I['tipo']] if I['tipo'] is not None else ''),
+            'status':      _clean(r[I['status_ad']] if I['status_ad'] is not None else ''),
+            'url_final':   _clean(r[I['url']] if I['url'] is not None else ''),
+            'qualidade':   _clean(r[I['qualidade']] if I['qualidade'] is not None else ''),
+            'cta':         _clean(r[I['cta']] if I['cta'] is not None else ''),
+            'headlines':   ' | '.join(headlines[:5]),  # top 5 unidos em string
+            'descriptions':' | '.join(descriptions[:2]),
+            'custo':       _parse_number(r[I['custo']]) or 0,
+            'conversoes':  _parse_number(r[I['conv']]) or 0,
+            'custo_por_conversao': _parse_number(r[I['cpc']]) or 0,
+        })
+
+    print(f"  Criativos Google: {len(out)} linhas (puladas: {skipped})")
+    return out
