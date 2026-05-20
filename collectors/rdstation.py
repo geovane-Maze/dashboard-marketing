@@ -4,6 +4,8 @@ import base64
 import json
 import requests
 from urllib.parse import parse_qs, unquote
+from concurrent.futures import ThreadPoolExecutor
+import threading
 import config
 
 BASE_URL = "https://api.rd.services"
@@ -67,15 +69,18 @@ def _get_segmentation_id(headers):
 
 
 class _ApiContext:
-    """Encapsula token + headers para permitir refresh durante run longo."""
+    """Encapsula token + headers para permitir refresh durante run longo.
+    Thread-safe: usa lock no refresh para evitar refresh concorrente."""
     def __init__(self):
         self.token = get_access_token()
         self.headers = {"Authorization": f"Bearer {self.token}"}
         self.failures = {"details": 0, "events": 0}
+        self._lock = threading.Lock()
 
     def refresh(self):
-        self.token = get_access_token()
-        self.headers = {"Authorization": f"Bearer {self.token}"}
+        with self._lock:
+            self.token = get_access_token()
+            self.headers = {"Authorization": f"Bearer {self.token}"}
 
 
 def _request_with_retry(url, ctx, params=None, max_retries=4, kind="details"):
@@ -174,10 +179,58 @@ def _get_conversion_utms(uuid, ctx):
     return {}
 
 
-def get_all_leads():
+def _fetch_contact_full(uuid_and_contact, ctx):
+    """Busca details + UTMs de 1 contato. Usado pelo ThreadPoolExecutor."""
+    uuid, contact = uuid_and_contact
+    details = _get_contact_details(uuid, ctx)
+    utms = _get_conversion_utms(uuid, ctx)
+
+    origem_raw = details.get("cf_plug_opportunity_origin") or ""
+    partes = [p.strip() for p in origem_raw.split("|")] if "|" in origem_raw else [origem_raw.strip(), ""]
+    canal = partes[0] if partes[0] else None
+    fonte = partes[1] if len(partes) > 1 and partes[1] else None
+
+    return {
+        "id": uuid,
+        "nome": details.get("name") or contact.get("name"),
+        "email": details.get("email") or contact.get("email"),
+        "telefone": details.get("mobile_phone") or details.get("personal_phone"),
+        "cidade": details.get("city"),
+        "estado": details.get("state"),
+        "criado_em": details.get("created_at") or contact.get("created_at"),
+        "atualizado_em": details.get("updated_at"),
+        "tags": ", ".join(details.get("tags", [])),
+        "lifecycle_stage": details.get("lifecycle_stage"),
+        "canal": canal,
+        "fonte": fonte,
+        "origem_completa": origem_raw or None,
+        "utm_source": utms.get("utm_source"),
+        "utm_medium": utms.get("utm_medium"),
+        "utm_campaign": utms.get("utm_campaign"),
+        "utm_term": utms.get("utm_term"),
+        "utm_content": utms.get("utm_content"),
+        "utm_id": utms.get("utm_id"),
+        "origem_detalhes": utms.get("origem_detalhes"),
+        "estagio_funil": details.get("cf_plug_funnel_stage"),
+        "responsavel": details.get("cf_plug_contact_owner"),
+        "pipeline": details.get("cf_plug_deal_pipeline"),
+        "score": details.get("cf_plug_opportunity_score"),
+        "valor_oportunidade": details.get("cf_plug_opportunity_value"),
+        "capital_disponivel": details.get("cf_faixa_de_capital_disponivel"),
+        "prazo_abertura": details.get("cf_em_quanto_tempo_pretende_abrir_a_sua_franquia_2"),
+        "meio_contato": details.get("cf_melhor_meio_para_contato"),
+    }
+
+
+def get_all_leads(max_workers=12):
+    """
+    Coleta todos os leads do RD Station com paginação + paralelização.
+    Cada contato faz 2 chamadas (details + events). Com 8 workers em paralelo
+    e leads chegando em batches de 20, ganha ~6-8x de velocidade vs serial.
+    """
     ctx = _ApiContext()
     leads = []
-    seen_uuids = set()  # Dedup: evita coletar o mesmo contato em múltiplas páginas
+    seen_uuids = set()
     page = 1
     duplicate_count = 0
     contacts_processed = 0
@@ -185,85 +238,52 @@ def get_all_leads():
     print("Buscando segmentacao de contatos...")
     seg_id, seg_name = _get_segmentation_id(ctx.headers)
     print(f"  Usando segmentacao: {seg_name} (ID: {seg_id})")
-    print("Coletando leads do RD Station...")
+    print(f"Coletando leads do RD Station (paralelo: {max_workers} workers)...")
 
-    while True:
-        # Lista contatos da segmentação (com retry)
-        resp = _request_with_retry(
-            f"{BASE_URL}/platform/segmentations/{seg_id}/contacts",
-            ctx, params={"page": page, "page_size": 20}, kind="details"
-        )
+    executor = ThreadPoolExecutor(max_workers=max_workers)
 
-        if resp is None or resp.status_code == 404:
-            break
-        if resp.status_code != 200:
-            print(f"  ERRO segmentação página {page}: HTTP {resp.status_code}")
-            break
+    try:
+        while True:
+            resp = _request_with_retry(
+                f"{BASE_URL}/platform/segmentations/{seg_id}/contacts",
+                ctx, params={"page": page, "page_size": 20}, kind="details"
+            )
+            if resp is None or resp.status_code == 404:
+                break
+            if resp.status_code != 200:
+                print(f"  ERRO segmentação página {page}: HTTP {resp.status_code}")
+                break
 
-        data = resp.json()
-        contacts = data.get("contacts", [])
+            data = resp.json()
+            contacts = data.get("contacts", [])
+            if not contacts:
+                break
 
-        if not contacts:
-            break
+            # Filtra dedup primeiro
+            to_fetch = []
+            for contact in contacts:
+                uuid = contact.get("uuid")
+                if not uuid:
+                    continue
+                if uuid in seen_uuids:
+                    duplicate_count += 1
+                    continue
+                seen_uuids.add(uuid)
+                to_fetch.append((uuid, contact))
 
-        for contact in contacts:
-            uuid = contact.get("uuid")
-            if not uuid:
-                continue
-            # Dedup: pula contatos já coletados (paginação RD pode repetir)
-            if uuid in seen_uuids:
-                duplicate_count += 1
-                continue
-            seen_uuids.add(uuid)
-
-            # Refresh proativo do token a cada 100 contatos (evita expiração mid-run)
-            contacts_processed += 1
-            if contacts_processed % 100 == 0:
+            # Refresh proativo do token a cada ~100 contatos
+            if contacts_processed > 0 and contacts_processed // 100 != (contacts_processed + len(to_fetch)) // 100:
                 ctx.refresh()
+            contacts_processed += len(to_fetch)
 
-            details = _get_contact_details(uuid, ctx)
-            utms = _get_conversion_utms(uuid, ctx)
-            time.sleep(0.25)  # Sleep maior para evitar rate limit (era 0.15)
+            # Fetch em paralelo (cada worker pega 1 contato → 2 chamadas API)
+            for lead in executor.map(lambda x: _fetch_contact_full(x, ctx), to_fetch):
+                leads.append(lead)
 
-            origem_raw = details.get("cf_plug_opportunity_origin") or ""
-            partes = [p.strip() for p in origem_raw.split("|")] if "|" in origem_raw else [origem_raw.strip(), ""]
-            canal = partes[0] if partes[0] else None
-            fonte = partes[1] if len(partes) > 1 and partes[1] else None
-
-            lead = {
-                "id": uuid,
-                "nome": details.get("name") or contact.get("name"),
-                "email": details.get("email") or contact.get("email"),
-                "telefone": details.get("mobile_phone") or details.get("personal_phone"),
-                "cidade": details.get("city"),
-                "estado": details.get("state"),
-                "criado_em": details.get("created_at") or contact.get("created_at"),
-                "atualizado_em": details.get("updated_at"),
-                "tags": ", ".join(details.get("tags", [])),
-                "lifecycle_stage": details.get("lifecycle_stage"),
-                "canal": canal,
-                "fonte": fonte,
-                "origem_completa": origem_raw or None,
-                "utm_source": utms.get("utm_source"),
-                "utm_medium": utms.get("utm_medium"),
-                "utm_campaign": utms.get("utm_campaign"),
-                "utm_term": utms.get("utm_term"),
-                "utm_content": utms.get("utm_content"),
-                "utm_id": utms.get("utm_id"),
-                "origem_detalhes": utms.get("origem_detalhes"),
-                "estagio_funil": details.get("cf_plug_funnel_stage"),
-                "responsavel": details.get("cf_plug_contact_owner"),
-                "pipeline": details.get("cf_plug_deal_pipeline"),
-                "score": details.get("cf_plug_opportunity_score"),
-                "valor_oportunidade": details.get("cf_plug_opportunity_value"),
-                "capital_disponivel": details.get("cf_faixa_de_capital_disponivel"),
-                "prazo_abertura": details.get("cf_em_quanto_tempo_pretende_abrir_a_sua_franquia_2"),
-                "meio_contato": details.get("cf_melhor_meio_para_contato"),
-            }
-            leads.append(lead)
-
-        print(f"  Pagina {page}: {len(contacts)} leads coletados")
-        page += 1
+            print(f"  Pagina {page}: {len(contacts)} leads coletados")
+            page += 1
+    finally:
+        executor.shutdown(wait=True)
 
     if duplicate_count > 0:
         print(f"  Avisos: {duplicate_count} contatos duplicados (paginação RD) foram ignorados.")

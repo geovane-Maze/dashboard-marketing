@@ -60,7 +60,7 @@ jobs:
 
       - name: Executar coleta de dados
         run: python -u main.py
-        timeout-minutes: 15
+        timeout-minutes: 30
 
       - name: Gerar dados do dashboard
         run: |
