@@ -1182,7 +1182,8 @@
         <h3 style="margin-top:0;">🏆 Top 5 Criativos do Período — <span id="top5-period-label">selecione período</span></h3>
         <p style="font-size:11px;color:#92400E;margin:0 0 12px;">
           Mistura criativos de Meta Ads + Google Ads, ranqueado por <strong>volume de leads/conversões</strong>.
-          Filtra pelo período selecionado abaixo.
+          Leads do Meta são contados a partir do <strong>CRM (RD Station)</strong> via utm_content do criativo —
+          não da métrica da plataforma. Filtra pelo período selecionado abaixo.
         </p>
         <div id="top5-criativos-grid" class="criativos-mes-grid"></div>
       </div>
@@ -3029,6 +3030,9 @@ function renderCreatives() {
 
   // ════════════════════════════════════════════════════════════════════
   // 1) TOP 5 CRIATIVOS DO PERÍODO (Meta + Google mixed, por volume)
+  // Meta: leads vêm do CRM (RD Station) via matching utm_content ↔ anuncio.
+  // Fallback para `leads` (plataforma Meta) apenas se `leads_rd` não existir
+  // no JSON ainda — durante a transição entre versões do summary.json.
   // ════════════════════════════════════════════════════════════════════
   const metaByAd = {};
   (DATA.meta_ads.creatives_daily || [])
@@ -3036,7 +3040,8 @@ function renderCreatives() {
     .forEach(r => {
       const k = r.anuncio;
       if (!metaByAd[k]) metaByAd[k] = { volume: 0, gasto: 0 };
-      metaByAd[k].volume += r.leads || 0;
+      const leadsRd = (r.leads_rd != null) ? r.leads_rd : (r.leads || 0);
+      metaByAd[k].volume += leadsRd;
       metaByAd[k].gasto  += r.gasto || 0;
     });
 

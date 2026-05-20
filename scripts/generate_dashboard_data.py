@@ -70,15 +70,17 @@ def _jaccard(a, b):
         return 0.0
     return len(a & b) / len(a | b)
 
-def attach_rd_leads_to_creatives(creatives_list, meta_rows, leads, threshold=0.4):
+def attach_rd_leads_to_creatives(creatives_list, creatives_daily_list, meta_rows, leads, threshold=0.4):
     """Conta leads do CRM por criativo via matching token-based de utm_content ↔ anuncio.
 
     Estratégia:
       1. Constrói pool com TODOS os anúncios da aba meta_ads (não só os top 50)
       2. Para cada lead com utm_source=metaads e utm_content, encontra anuncio
          com maior Jaccard >= threshold
-      3. Acumula contagem por anuncio
-      4. Anexa leads_rd e cpl_rd em cada item de creatives_list
+      3. Acumula contagem por anuncio (total) e por (anuncio, dia)
+      4. Anexa leads_rd/cpl_rd em creatives_list (totais)
+      5. Anexa leads_rd em creatives_daily_list (por dia) — fonte de verdade
+         para o filtro de período no Top 5 Criativos
     """
     # 1. Pool de TODOS os anúncios (do meta_ads raw)
     all_anuncios = set()
@@ -91,8 +93,9 @@ def attach_rd_leads_to_creatives(creatives_list, meta_rows, leads, threshold=0.4
         all_anuncios.add(c["anuncio"])
     anuncio_tokens = [(a, _tokens(a)) for a in all_anuncios]
 
-    # 2. Para cada lead metaads, achar melhor anuncio
+    # 2. Para cada lead metaads, achar melhor anuncio (e dia de criação)
     leads_per_anuncio = defaultdict(int)
+    leads_per_anuncio_day = defaultdict(int)   # (anuncio, dia) → count
     unmatched = 0
     for lead in leads:
         if (lead.get("utm_source") or "").strip() != "metaads":
@@ -111,17 +114,44 @@ def attach_rd_leads_to_creatives(creatives_list, meta_rows, leads, threshold=0.4
                 best_score, best = s, anuncio
         if best_score >= threshold and best:
             leads_per_anuncio[best] += 1
+            dia = parse_date_to_day(lead.get("criado_em"))
+            if dia:
+                leads_per_anuncio_day[(best, dia)] += 1
         else:
             unmatched += 1
 
-    # 3. Anexa em creatives_list
+    # 3. Anexa em creatives_list (totais)
     for c in creatives_list:
         leads_rd = leads_per_anuncio.get(c["anuncio"], 0)
         c["leads_rd"] = leads_rd
         c["cpl_rd"] = round(c["gasto"] / leads_rd, 2) if leads_rd > 0 else 0
 
+    # 4. Anexa em creatives_daily_list (por dia)
+    daily_index = {}
+    for d in creatives_daily_list:
+        d["leads_rd"] = 0
+        daily_index[(d["anuncio"], d["data"])] = d
+
+    extra_rows = 0
+    for (anuncio, dia), count in leads_per_anuncio_day.items():
+        key = (anuncio, dia)
+        if key in daily_index:
+            daily_index[key]["leads_rd"] = count
+        else:
+            # Lead chegou em dia sem registro Meta (gasto=0). Adiciona linha
+            # para que o lead apareça no filtro de período do Top 5.
+            creatives_daily_list.append({
+                "data":     dia,
+                "anuncio":  anuncio,
+                "gasto":    0.0,
+                "leads":    0,
+                "leads_rd": count,
+            })
+            extra_rows += 1
+
     total_matched = sum(leads_per_anuncio.values())
-    print(f"  [Match RD/Meta] leads matched: {total_matched}, sem match: {unmatched}")
+    print(f"  [Match RD/Meta] leads matched: {total_matched}, sem match: {unmatched}, "
+          f"+{extra_rows} dias adicionados ao daily (sem gasto Meta)")
     return creatives_list
 
 
@@ -1263,21 +1293,34 @@ def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
     ]
 
     # ── Top criativos do mês ──────────────────────────────────────────────────
+    # Usa leads do CRM (RD Station) matched via utm_content — NÃO a métrica
+    # "leads" da plataforma Meta Ads, que pode divergir do CRM.
     top_criativos = []
     if meta_rows:
         criat_mes = defaultdict(lambda: {
-            "gasto": 0.0, "leads": 0.0, "thumbnail": "", "permalink": "", "campanha": "", "conjunto": ""
+            "gasto": 0.0, "leads_rd": 0,
+            "thumbnail": "", "permalink": "", "campanha": "", "conjunto": "",
         })
+
+        # 1) Soma gasto + leads_rd (CRM) do mês a partir de creatives_daily
+        for d in meta_agg.get("creatives_daily", []) or []:
+            data = d.get("data") or ""
+            if not data.startswith(mes_atual):
+                continue
+            nome = (d.get("anuncio") or "").strip()
+            if not nome:
+                continue
+            criat_mes[nome]["gasto"]    += d.get("gasto", 0) or 0
+            criat_mes[nome]["leads_rd"] += d.get("leads_rd", 0) or 0
+
+        # 2) Enriquece com metadados (thumbnail/permalink/campanha/conjunto)
+        #    a partir dos rows brutos de meta_ads
         for row in meta_rows:
-            # Usa parse_date_to_month (mesma lógica do resto do script) para
-            # tolerar formatos de data diferentes na planilha (ex.: dd/mm/yyyy)
             if parse_date_to_month(row.get("data")) != mes_atual:
                 continue
             nome = (row.get("anuncio") or "").strip()
-            if not nome:
+            if not nome or nome not in criat_mes:
                 continue
-            criat_mes[nome]["gasto"]  += parse_num(row.get("gasto"))
-            criat_mes[nome]["leads"]  += parse_num(row.get("leads"))
             if row.get("thumbnail") and not criat_mes[nome]["thumbnail"]:
                 criat_mes[nome]["thumbnail"] = row.get("thumbnail")
             if row.get("permalink") and not criat_mes[nome]["permalink"]:
@@ -1287,8 +1330,10 @@ def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
             if row.get("conjunto") and not criat_mes[nome]["conjunto"]:
                 criat_mes[nome]["conjunto"] = row.get("conjunto")
 
-        for nome, d in sorted(criat_mes.items(), key=lambda x: -x[1]["leads"])[:5]:
-            cpl_c = round(d["gasto"] / d["leads"], 2) if d["leads"] > 0 else None
+        # 3) Ranqueia por leads_rd (CRM) — só inclui quem teve lead no mês
+        ranked = [(n, d) for n, d in criat_mes.items() if d["leads_rd"] > 0]
+        for nome, d in sorted(ranked, key=lambda x: -x[1]["leads_rd"])[:5]:
+            cpl_c = round(d["gasto"] / d["leads_rd"], 2) if d["leads_rd"] > 0 else None
             top_criativos.append({
                 "anuncio":   nome,
                 "campanha":  d["campanha"],
@@ -1296,7 +1341,7 @@ def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
                 "thumbnail": d["thumbnail"],
                 "permalink": d["permalink"],
                 "gasto":     round(d["gasto"], 2),
-                "leads":     int(round(d["leads"])),
+                "leads":     int(d["leads_rd"]),
                 "cpl":       cpl_c,
             })
 
@@ -1389,7 +1434,13 @@ def main():
     print("  Agregando dados...")
     meta_aggregated = aggregate_meta_ads(meta_ads)
     # Enriquece criativos com leads do CRM via matching utm_content ↔ anuncio
-    attach_rd_leads_to_creatives(meta_aggregated["creatives"], meta_ads, leads)
+    # (total em "creatives" + por dia em "creatives_daily" para filtro de período)
+    attach_rd_leads_to_creatives(
+        meta_aggregated["creatives"],
+        meta_aggregated["creatives_daily"],
+        meta_ads,
+        leads,
+    )
 
     crm_agg     = aggregate_crm(crm_deals, leads)
     meta_agg    = meta_aggregated
