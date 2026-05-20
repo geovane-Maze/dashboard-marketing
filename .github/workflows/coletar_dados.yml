@@ -60,12 +60,14 @@ jobs:
           echo '${{ secrets.GA4_TOKEN_JSON }}' > credentials/ga4_token.json
 
       - name: Executar coleta de dados
-        run: python main.py
+        run: python -u main.py
+        timeout-minutes: 15
 
       - name: Gerar dados do dashboard
         run: |
           mkdir -p dashboard/data
-          python scripts/generate_dashboard_data.py
+          python -u scripts/generate_dashboard_data.py
+        timeout-minutes: 10
 
       - name: Publicar dashboard no GitHub Pages
         uses: actions/upload-pages-artifact@v3

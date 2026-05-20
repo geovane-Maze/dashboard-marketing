@@ -1,3 +1,8 @@
+import sys
+# Força output sem buffer pra ver progresso em tempo real (GitHub Actions e logs)
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
+
 from collectors import rdstation, rdcrm, ads_sheets, ga4, google_ads, meta_ads, clarity
 from sheets import writer
 from datetime import datetime

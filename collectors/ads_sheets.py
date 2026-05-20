@@ -11,7 +11,7 @@ ADS_SHEET_ID = "1GC9-gtQM--sgpEejMGh2_pfibIt9w_511cJ7Ct3ACYA"
 ADS_TAB_NAME = "[CDC -B2B Franquadora] Criativos Facebook/Google"
 
 # Planilha Google Ads com dados diários (inclui campanhas Performance Max)
-GOOGLE_ADS_SHEET_ID = "12Irw9aWzpWA2Ie1jWJUDgLLWUGRfgebdinfA9OHpcKQ"
+GOOGLE_ADS_SHEET_ID = "1BsuRarJYIidqjAttLOkxT7wH9-ugITXoHBG4WaRZhIs"
 GOOGLE_ADS_TAB_NAME = "Atualizado -"
 
 
