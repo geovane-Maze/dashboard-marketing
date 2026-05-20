@@ -27,11 +27,6 @@ META_AD_ACCOUNT_ID = os.getenv("META_AD_ACCOUNT_ID")
 GOOGLE_SHEET_ID = os.getenv("GOOGLE_SHEET_ID")
 GOOGLE_CREDENTIALS_FILE = "credentials/google_service_account.json"
 
-# Microsoft Clarity
-# Token JWT gerado em clarity.microsoft.com → Settings → Data Export → Generate new API token
-# Limites: 10 requests/dia, dados dos últimos 1-3 dias (precisa acumular diariamente em planilha)
-CLARITY_API_TOKEN = os.getenv("CLARITY_API_TOKEN")
-
 # Supabase (autenticação e armazenamento seguro dos dados)
 SUPABASE_URL         = os.getenv("SUPABASE_URL")          # ex: https://xxxx.supabase.co
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")  # service_role key (NUNCA expor no front)

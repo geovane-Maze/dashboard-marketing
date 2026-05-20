@@ -55,8 +55,8 @@ def merge_sheet(sheet_name, new_data, dedup_keys, spreadsheet_id=None,
         com data anterior ao período de retenção (evita estourar limite de
         10 milhões de células do Google Sheets).
 
-    Usado para dados de fontes com janela limitada (ex.: Clarity entrega apenas
-    últimos 1-3 dias — precisamos acumular dia a dia em planilha).
+    Usado para dados de fontes com janela retroativa limitada — acumular dia a dia
+    em planilha sem perder histórico.
     """
     if not new_data:
         print(f"  Sem dados novos para mesclar na aba '{sheet_name}'.")
