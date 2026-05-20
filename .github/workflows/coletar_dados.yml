@@ -2,7 +2,9 @@ name: Coletar Dados Dashboard Marketing
 
 on:
   schedule:
-    - cron: '30 10 * * *'  # 07:30 BRT (UTC-3)
+    - cron: '30 10 * * *'  # 07:30 BRT (UTC-3) — manhã
+    - cron: '30 16 * * *'  # 13:30 BRT — pós-almoço
+    - cron: '0 19 * * *'   # 16:00 BRT — meio da tarde
   workflow_dispatch:
 
 jobs:
