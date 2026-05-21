@@ -1181,7 +1181,8 @@
       <div class="table-card" style="margin-bottom:24px;background:linear-gradient(135deg,#FEF3C7 0%,#FFF7ED 100%);border:1px solid #FCD34D;">
         <h3 style="margin-top:0;">🏆 Top 5 Criativos do Período — <span id="top5-period-label">selecione período</span></h3>
         <p style="font-size:11px;color:#92400E;margin:0 0 12px;">
-          Mistura criativos de Meta Ads + Google Ads, ranqueado por <strong>volume de leads/conversões</strong>.
+          Mistura criativos de Meta Ads + Google Ads, ranqueado por <strong>volume de leads do CRM</strong>
+          (RD Station, via matching utm_content ↔ anúncio). <strong>Não</strong> usa números das plataformas.
           Filtra pelo período selecionado abaixo.
         </p>
         <div id="top5-criativos-grid" class="criativos-mes-grid"></div>
@@ -3028,8 +3029,11 @@ function renderCreatives() {
   populateCriatCampDropdown(activeCamps, periodCamps);
 
   // ════════════════════════════════════════════════════════════════════
-  // 1) TOP 5 CRIATIVOS DO PERÍODO (Meta + Google mixed, por volume)
+  // 1) TOP 5 CRIATIVOS DO PERÍODO (Meta + Google mixed)
   // ════════════════════════════════════════════════════════════════════
+  // IMPORTANTE: campo `leads` em creatives_daily de AMBOS é leads do CRM
+  // (matching utm_content ↔ anuncio via Jaccard). NÃO é o "leads" da
+  // plataforma Meta nem "conversões" do Google — fonte de verdade.
   const metaByAd = {};
   (DATA.meta_ads.creatives_daily || [])
     .filter(r => !fromVal && !toVal ? true : dateInRange(r.data))
@@ -3046,7 +3050,7 @@ function renderCreatives() {
     .forEach(r => {
       const k = r.anuncio;
       if (!googleByAd[k]) googleByAd[k] = { volume: 0, gasto: 0, campanha: r.campanha || '', tipo: r.tipo || '' };
-      googleByAd[k].volume += r.conversoes || 0;
+      googleByAd[k].volume += r.leads || 0;
       googleByAd[k].gasto  += r.gasto || 0;
     });
 
@@ -3091,7 +3095,7 @@ function renderCreatives() {
           : `<div class="criativo-mes-thumb-placeholder" style="display:flex;background:#FEF3C7;color:#B45309;">📝</div>`;
         const cardTag = (isMeta && c.permalink) ? 'a' : 'div';
         const linkAttrs = (isMeta && c.permalink) ? `href="${c.permalink}" target="_blank" rel="noopener"` : '';
-        const volLabel = isMeta ? 'leads' : 'conv';
+        // Sempre "leads" (CRM) — não importa a fonte, é leads do RD Station
         return `
           <${cardTag} class="criativo-mes-card" ${linkAttrs}>
             <div class="criativo-mes-rank">${i+1}</div>
@@ -3101,7 +3105,7 @@ function renderCreatives() {
               <div class="criativo-mes-nome">${c.anuncio}</div>
               <div class="criativo-mes-camp">${c.campanha || '—'}</div>
               <div class="criativo-mes-stats">
-                <div class="criativo-mes-stat">${c.volume}<span>${volLabel}</span></div>
+                <div class="criativo-mes-stat" title="Leads do CRM (RD Station)">${c.volume}<span>leads</span></div>
                 <div class="criativo-mes-stat">${c.cpl > 0 ? fmt.currency(c.cpl) : '—'}<span>CPL</span></div>
               </div>
             </div>
@@ -3159,15 +3163,15 @@ function renderCreatives() {
   // ════════════════════════════════════════════════════════════════════
   // 3) GOOGLE ADS — Cards textuais (sem thumbnail)
   // ════════════════════════════════════════════════════════════════════
-  // Aggrega criativos Google filtrados por data
+  // Aggrega criativos Google filtrados por data — `leads` é do CRM (RD Station)
   const googleCardsByAd = {};
   (DATA.google_ads_creatives?.daily || [])
     .filter(r => !fromVal && !toVal ? true : dateInRange(r.data))
     .forEach(r => {
       const k = r.anuncio;
-      if (!googleCardsByAd[k]) googleCardsByAd[k] = { gasto: 0, conversoes: 0 };
-      googleCardsByAd[k].gasto      += r.gasto || 0;
-      googleCardsByAd[k].conversoes += r.conversoes || 0;
+      if (!googleCardsByAd[k]) googleCardsByAd[k] = { gasto: 0, leads: 0 };
+      googleCardsByAd[k].gasto += r.gasto || 0;
+      googleCardsByAd[k].leads += r.leads || 0;   // CRM
     });
 
   // Junta com metadados dos creatives agregados (headlines, etc.)
@@ -3184,13 +3188,13 @@ function renderCreatives() {
       headlines:    meta.headlines || '',
       descriptions: meta.descriptions || '',
       gasto:        d.gasto,
-      conversoes:   d.conversoes,
-      cpl:          d.conversoes > 0 ? d.gasto / d.conversoes : 0,
+      leads:        d.leads,                       // CRM
+      cpl:          d.leads > 0 ? d.gasto / d.leads : 0,
     };
   });
 
   // Ordena conforme o filtro selecionado
-  if (sort === 'leads') googleList.sort((a, b) => b.conversoes - a.conversoes);
+  if (sort === 'leads') googleList.sort((a, b) => b.leads - a.leads);
   else if (sort === 'cpl_asc') googleList.sort((a, b) => ((a.cpl || 99999) || 99999) - ((b.cpl || 99999) || 99999));
   else googleList.sort((a, b) => b.gasto - a.gasto);
 
@@ -3228,7 +3232,7 @@ function renderCreatives() {
           ${c.url_final ? `<a class="gc-link" href="${c.url_final}" target="_blank" rel="noopener">🔗 ${c.url_final.slice(0, 80)}${c.url_final.length > 80 ? '...' : ''}</a>` : ''}
           <div class="gc-stats">
             <div class="gc-stat">${fmt.currency(c.gasto)}<span>gasto</span></div>
-            <div class="gc-stat">${c.conversoes}<span>conv</span></div>
+            <div class="gc-stat" title="Leads do CRM (RD Station)">${c.leads}<span>leads</span></div>
             <div class="gc-stat ${c.cpl > 300 ? 'red' : ''}">${c.cpl > 0 ? fmt.currency(c.cpl) : '—'}<span>CPL</span></div>
           </div>
         </div>`).join('')}</div>`

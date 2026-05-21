@@ -70,6 +70,71 @@ def _jaccard(a, b):
         return 0.0
     return len(a & b) / len(a | b)
 
+def match_rd_leads_daily(meta_rows, google_creatives_rows, leads, threshold=0.4):
+    """
+    Faz matching token-based (Jaccard) entre utm_content de leads do RD Station
+    e nomes de anúncios (Meta + Google). Retorna dicts diários.
+
+    Como funciona:
+      • Constroi pools separados de anúncios Meta e Google
+      • Para cada lead com utm_content, decide o pool baseado em utm_source
+      • Encontra melhor anúncio por Jaccard >= threshold
+      • Atribui +1 ao (anúncio, data_de_criacao_do_lead)
+
+    Returns:
+      meta_daily:   {anuncio: {data: count}}
+      google_daily: {anuncio: {data: count}}
+      stats: {"meta_matched": N, "google_matched": N, "unmatched": N}
+    """
+    meta_pool = {(r.get("anuncio") or "").strip() for r in meta_rows}
+    meta_pool.discard("")
+    google_pool = {(r.get("anuncio") or "").strip() for r in google_creatives_rows}
+    google_pool.discard("")
+
+    meta_tokens   = [(a, _tokens(a)) for a in meta_pool]
+    google_tokens = [(a, _tokens(a)) for a in google_pool]
+
+    meta_daily   = defaultdict(lambda: defaultdict(int))
+    google_daily = defaultdict(lambda: defaultdict(int))
+    stats = {"meta_matched": 0, "google_matched": 0, "unmatched": 0}
+
+    for lead in leads:
+        utm_c = (lead.get("utm_content") or "").strip()
+        if not utm_c:
+            continue
+        tc = _tokens(utm_c)
+        if not tc:
+            stats["unmatched"] += 1
+            continue
+
+        src = (lead.get("utm_source") or "").strip()
+        day = parse_date_to_day(lead.get("criado_em"))
+        if not day:
+            continue
+
+        if src == "metaads":
+            pool, daily, key = meta_tokens, meta_daily, "meta_matched"
+        elif src == "googlecpc":
+            pool, daily, key = google_tokens, google_daily, "google_matched"
+        else:
+            continue
+
+        best, best_score = None, 0.0
+        for anuncio, ta in pool:
+            s = _jaccard(tc, ta)
+            if s > best_score:
+                best_score, best = s, anuncio
+
+        if best_score >= threshold and best:
+            daily[best][day] += 1
+            stats[key] += 1
+        else:
+            stats["unmatched"] += 1
+
+    print(f"  [Match RD/Ads] Meta={stats['meta_matched']}  Google={stats['google_matched']}  sem_match={stats['unmatched']}")
+    return dict(meta_daily), dict(google_daily), stats
+
+
 def attach_rd_leads_to_creatives(creatives_list, meta_rows, leads, threshold=0.4):
     """Conta leads do CRM por criativo via matching token-based de utm_content ↔ anuncio.
 
@@ -573,7 +638,7 @@ def aggregate_crm(deals, leads=None):
     }
 
 
-def aggregate_meta_ads(rows):
+def aggregate_meta_ads(rows, leads_daily_map=None):
     monthly = defaultdict(lambda: {
         "gasto": 0.0, "leads": 0.0, "impressoes": 0.0, "cliques": 0.0,
         "expansao_gasto": 0.0, "repasse_gasto": 0.0,
@@ -722,18 +787,22 @@ def aggregate_meta_ads(rows):
         for d, v in sorted(daily.items())
     ]
 
-    # Lista flat (anuncio x data) para permitir filtro de data no Top 5 Criativos.
-    # NÃO inclui thumbnail/permalink (acharia inflar 5MB+) — front faz lookup no array `creatives`.
+    # Lista flat (anuncio x data). Campo `leads` = LEADS DO CRM (via matching
+    # utm_content ↔ anuncio), NÃO os "leads" da plataforma Meta (que são imprecisos).
+    # Sem thumbnail/permalink (otimização de tamanho — front faz lookup no `creatives`).
     creatives_daily_list = []
+    leads_daily_map = leads_daily_map or {}
     for nome, dias in creatives_daily.items():
+        ad_leads_map = leads_daily_map.get(nome, {})
         for dia, v in sorted(dias.items()):
-            if v["gasto"] == 0 and v["leads"] == 0:
+            leads_crm = ad_leads_map.get(dia, 0)
+            if v["gasto"] == 0 and leads_crm == 0:
                 continue
             creatives_daily_list.append({
                 "data":    dia,
                 "anuncio": nome,
                 "gasto":   round(v["gasto"], 2),
-                "leads":   int(round(v["leads"])),
+                "leads":   leads_crm,   # <-- CRM, não plataforma!
             })
 
     return {
@@ -1032,25 +1101,30 @@ def aggregate_utm(leads):
 
 
 
-def aggregate_google_ads_creatives(rows):
+def aggregate_google_ads_creatives(rows, leads_daily_map=None):
     """
     Agrega criativos do Google Ads (sheet 'google_ads_creatives').
 
     Cada linha de entrada = (data, anúncio). Para o dashboard:
-      - daily: lista flat (data x anuncio) para filtro de data no Top 5
-      - creatives: agregado por anúncio (sem filtro de data — todos os meses)
+      - daily: lista flat (data x anuncio) com leads do CRM (matching utm_content)
+      - creatives: agregado por anúncio com leads_crm/cpl_crm
+
+    Importante: As "conversões" da planilha Google são da plataforma — imprecisas.
+    `leads_crm` é a fonte de verdade (vem do RD Station via Jaccard match).
     """
     if not rows:
         return {"daily": [], "creatives": []}
 
     daily_list = []
     by_ad = defaultdict(lambda: {
-        "gasto": 0.0, "conversoes": 0.0,
+        "gasto": 0.0, "conversoes_plataforma": 0.0,
         "campanha": "", "grupo": "", "tipo": "",
         "url_final": "", "cta": "", "qualidade": "",
         "headlines": "", "descriptions": "",
         "primeira_data": "", "ultima_data": "",
     })
+
+    leads_daily_map = leads_daily_map or {}
 
     for r in rows:
         data = (r.get("data") or "").strip()
@@ -1059,23 +1133,24 @@ def aggregate_google_ads_creatives(rows):
             continue
         gasto = parse_num(r.get("custo"))
         conv  = parse_num(r.get("conversoes"))
+        # Leads do CRM neste dia para este anúncio (matching prévio)
+        leads_crm = leads_daily_map.get(nome, {}).get(data, 0)
 
         # Linha flat (data, anuncio) — para Top 5 com filtro de data
-        if gasto > 0 or conv > 0:
+        if gasto > 0 or leads_crm > 0:
             daily_list.append({
-                "data": data,
-                "anuncio": nome,
+                "data":     data,
+                "anuncio":  nome,
                 "campanha": r.get("campanha") or "",
-                "tipo": r.get("tipo") or "",
-                "gasto": round(gasto, 2),
-                "conversoes": int(round(conv)) if conv else 0,
+                "tipo":     r.get("tipo") or "",
+                "gasto":    round(gasto, 2),
+                "leads":    leads_crm,   # <-- CRM, fonte de verdade
             })
 
         # Agregado por anuncio
         d = by_ad[nome]
-        d["gasto"]      += gasto
-        d["conversoes"] += conv
-        # Metadados: pega o mais recente (textuais variam pouco; mantém o último visto)
+        d["gasto"]                 += gasto
+        d["conversoes_plataforma"] += conv
         for f in ("campanha", "grupo", "tipo", "url_final", "cta", "qualidade",
                   "headlines", "descriptions"):
             v = (r.get(f) or "").strip()
@@ -1086,22 +1161,27 @@ def aggregate_google_ads_creatives(rows):
         if data > d["ultima_data"]:
             d["ultima_data"] = data
 
+    # Soma de leads_crm por anúncio (todos os dias)
+    leads_crm_total = {nome: sum(dias.values()) for nome, dias in leads_daily_map.items()}
+
     creatives_list = []
     for nome, d in sorted(by_ad.items(), key=lambda x: -x[1]["gasto"]):
-        cpl = round(d["gasto"] / d["conversoes"], 2) if d["conversoes"] > 0 else 0
+        leads_crm = leads_crm_total.get(nome, 0)
+        cpl_crm   = round(d["gasto"] / leads_crm, 2) if leads_crm > 0 else 0
         creatives_list.append({
-            "anuncio":     nome,
-            "campanha":    d["campanha"],
-            "grupo":       d["grupo"],
-            "tipo":        d["tipo"],
-            "url_final":   d["url_final"],
-            "cta":         d["cta"],
-            "qualidade":   d["qualidade"],
-            "headlines":   d["headlines"],
-            "descriptions":d["descriptions"],
-            "gasto":       round(d["gasto"], 2),
-            "conversoes":  int(round(d["conversoes"])),
-            "cpl":         cpl,
+            "anuncio":      nome,
+            "campanha":     d["campanha"],
+            "grupo":        d["grupo"],
+            "tipo":         d["tipo"],
+            "url_final":    d["url_final"],
+            "cta":          d["cta"],
+            "qualidade":    d["qualidade"],
+            "headlines":    d["headlines"],
+            "descriptions": d["descriptions"],
+            "gasto":        round(d["gasto"], 2),
+            "leads_crm":    leads_crm,                                    # <-- VERDADE
+            "cpl_crm":      cpl_crm,                                      # <-- VERDADE
+            "conversoes_plataforma": int(round(d["conversoes_plataforma"])),  # ref
             "primeira_data": d["primeira_data"],
             "ultima_data":   d["ultima_data"],
         })
@@ -1387,8 +1467,15 @@ def main():
         print(f"    (sem aba google_ads_creatives ainda — primeira coleta vai criar)")
 
     print("  Agregando dados...")
-    meta_aggregated = aggregate_meta_ads(meta_ads)
-    # Enriquece criativos com leads do CRM via matching utm_content ↔ anuncio
+
+    # Faz o matching utm_content ↔ anuncio UMA VEZ para Meta e Google (com data)
+    print("  Matching RD Station leads <-> criativos (Meta + Google)...")
+    meta_leads_daily, google_leads_daily, _match_stats = match_rd_leads_daily(
+        meta_ads, google_ads_creatives_rows, leads
+    )
+
+    meta_aggregated = aggregate_meta_ads(meta_ads, leads_daily_map=meta_leads_daily)
+    # Mantém agregação total no creatives (já existente — para legacy compatibility)
     attach_rd_leads_to_creatives(meta_aggregated["creatives"], meta_ads, leads)
 
     crm_agg     = aggregate_crm(crm_deals, leads)
@@ -1412,7 +1499,7 @@ def main():
         "google_ads": google_agg,
         "ga4": aggregate_ga4(ga4),
         "utm": utm_agg,
-        "google_ads_creatives": aggregate_google_ads_creatives(google_ads_creatives_rows),
+        "google_ads_creatives": aggregate_google_ads_creatives(google_ads_creatives_rows, leads_daily_map=google_leads_daily),
         "relatorio": build_relatorio(leads, crm_agg, meta_agg, google_agg, utm_agg, meta_rows=meta_ads),
     }
 
