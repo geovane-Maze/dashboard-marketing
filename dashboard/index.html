@@ -922,16 +922,14 @@
         <div class="chart-wrap tall"><canvas id="chart-exec-evolucao"></canvas></div>
       </div>
 
-      <!-- Bloco 4: Funil CRM + Por Responsável -->
-      <div class="charts-row">
-        <div class="chart-card">
-          <h3>Negócios por Etapa</h3>
-          <div id="exec-funnel-bars" style="padding:8px 0;"></div>
-        </div>
-        <div class="chart-card">
-          <h3>Por Responsável</h3>
-          <div class="chart-wrap tall"><canvas id="chart-exec-resp"></canvas></div>
-        </div>
+      <!-- Bloco 4: Funil de Conversão do Período -->
+      <div class="chart-card" style="margin-bottom:24px">
+        <h3>🔻 Funil de Conversão do Período — <span id="funil-periodo-label" style="font-weight:400;color:#666;font-size:13px;">selecione período</span></h3>
+        <p style="font-size:11px;color:#666;margin:0 0 14px;">
+          Quantidade de deals que passaram em cada etapa entre os deals criados no período + <strong>conversão entre etapas</strong>.
+          Filtra pelo período do topbar.
+        </p>
+        <div id="exec-funil-conversao" style="padding:8px 0;"></div>
       </div>
 
       <!-- Bloco 5: Capital + Motivos de Perda -->
@@ -2145,34 +2143,90 @@ function renderExecutivo() {
     }
   });
 
-  // ── Bloco 4: Funil — apenas negócios ATIVOS (sem ganhos e sem perdidos) ────────
-  const activeFunnel = crm.active_funnel || [];
-  const totalAtivos = crm.total_active || activeFunnel.reduce((s, r) => s + r.total, 0);
-  const maxFunnel = Math.max(...activeFunnel.map(s => s.total), 1);
-  document.getElementById('exec-funnel-bars').innerHTML = activeFunnel.length
-    ? activeFunnel.map(s => `
-    <div class="funnel-bar-container">
-      <div class="funnel-bar-label">
-        <span class="stage-name">${s.etapa}</span>
-        <span class="stage-count">${fmt.num(s.total)} negócios</span>
-      </div>
-      <div class="funnel-bar-track"><div class="funnel-bar-fill" style="width:${(s.total/maxFunnel*100).toFixed(1)}%"></div></div>
-    </div>`).join('')
-    : '<p style="color:#999;padding:1rem">Sem negócios ativos</p>';
+  // ── Bloco 4: Funil de Conversão do Período (passed-through + % stage-to-stage) ──
+  // Conta quantos deals (criados no período) passaram em cada etapa.
+  // Um deal passa por uma etapa se sua etapa atual >= aquela etapa no pipeline.
+  const FUNIL_STAGES = [
+    'Entrada de Lead',
+    'Tentativa de Conexão',
+    'Lead Respondente',
+    'Pré-qualificado',
+    'Reunião PDF',
+    'Apresentação do Business Plan',
+    'Envio de COF',
+    'Workshop',
+  ];
+  const stageIdxOf = (etapa) => {
+    const el = (etapa || '').toLowerCase().trim();
+    for (let i = 0; i < FUNIL_STAGES.length; i++) {
+      const s = FUNIL_STAGES[i].toLowerCase();
+      if (el === s || el.includes(s) || s.includes(el)) return i;
+    }
+    return -1;  // etapa não reconhecida (ex: Etapa Descarte)
+  };
 
-  // Por Responsável
-  const resp = crm.by_responsavel.slice(0, 8);
-  makeChart('chart-exec-resp', {
-    type: 'bar',
-    data: {
-      labels: resp.map(r => r.responsavel),
-      datasets: [
-        { label: 'Total',  data: resp.map(r => r.total),  backgroundColor: COLORS.secondary + 'CC', borderRadius: 4 },
-        { label: 'Ganhos', data: resp.map(r => r.ganhos), backgroundColor: COLORS.green     + 'CC', borderRadius: 4 },
-      ]
-    },
-    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { position: 'bottom' } } }
+  // Filtra deals pelo período do topbar (criado_em)
+  const dealsAll = crm.deals_minimal || [];
+  const dealsPeriodo = datePred
+    ? dealsAll.filter(d => datePred(d.criado_em))
+    : dealsAll;
+
+  // Label do período
+  const fmtBR = (s) => s ? s.split('-').reverse().join('/') : '';
+  const startVal = document.getElementById('filter-date-start').value;
+  const endVal   = document.getElementById('filter-date-end').value;
+  const labelEl = document.getElementById('funil-periodo-label');
+  if (labelEl) {
+    labelEl.textContent = (startVal || endVal)
+      ? `${fmtBR(startVal) || 'início'} → ${fmtBR(endVal) || 'hoje'}  (${dealsPeriodo.length} deals)`
+      : `todo o histórico  (${dealsPeriodo.length} deals)`;
+  }
+
+  // Conta passed-through por etapa
+  const passedCounts = FUNIL_STAGES.map((stage, i) => {
+    const count = dealsPeriodo.filter(d => {
+      const idx = stageIdxOf(d.etapa);
+      // Entrada de Lead: TODOS os deals passaram (inclusive "Etapa Descarte" que tem idx=-1)
+      if (i === 0) return true;
+      return idx >= i;
+    }).length;
+    return { etapa: stage, total: count };
   });
+
+  // Renderiza barras com conversão entre etapas
+  const maxFunil = Math.max(...passedCounts.map(c => c.total), 1);
+  document.getElementById('exec-funil-conversao').innerHTML = passedCounts.map((s, i) => {
+    const prevCount = i > 0 ? passedCounts[i-1].total : s.total;
+    let convPct = '—';
+    let convClass = 'stage-count';
+    let convColor = '#666';
+    if (prevCount > 0) {
+      const pct = (s.total / prevCount * 100);
+      convPct = pct.toFixed(1) + '%';
+      if (i === 0) convPct = '100%';
+      // Cor: < 30% vermelho (alerta), 30-60% laranja, >60% verde
+      if (i > 0) {
+        if (pct < 30) convColor = '#dc2626';
+        else if (pct < 60) convColor = '#ea580c';
+        else convColor = '#16a34a';
+      }
+    }
+    const barWidth = (s.total / maxFunil * 100).toFixed(1);
+    return `
+      <div class="funnel-bar-container" style="margin-bottom:12px;">
+        <div class="funnel-bar-label" style="display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:4px;">
+          <span class="stage-name" style="font-weight:600;flex:1;">${s.etapa}</span>
+          <span style="color:${convColor};font-weight:700;margin-right:12px;font-size:11px;">${convPct}</span>
+          <span style="color:#666;min-width:90px;text-align:right;">${fmt.num(s.total)} deals</span>
+        </div>
+        <div class="funnel-bar-track" style="background:#F1F5F9;border-radius:4px;height:12px;overflow:hidden;">
+          <div class="funnel-bar-fill" style="width:${barWidth}%;background:linear-gradient(to right, var(--primary), var(--secondary));height:100%;border-radius:4px;transition:width .4s;"></div>
+        </div>
+      </div>`;
+  }).join('') + `
+    <p style="font-size:10px;color:#999;margin-top:12px;font-style:italic;">
+      <strong>%</strong> = conversão da etapa anterior para esta · <strong>verde</strong> &gt; 60% · <strong>laranja</strong> 30-60% · <strong>vermelho</strong> &lt; 30%
+    </p>`;
 
   // ── Bloco 5: Capital + Motivos de Perda ──────────────────────────────────────
   const cap = DATA.leads.by_capital.slice(0, 8);

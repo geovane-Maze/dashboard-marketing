@@ -567,6 +567,16 @@ def aggregate_crm(deals, leads=None):
 
     active_funnel_sorted = sorted(active_stage.items(), key=lambda x: stage_sort_key(x[0]))
 
+    # ── Lista minimal de deals para "Funil de Conversão do Período" no frontend ──
+    # Permite filtro por data e cálculo de passed-through por etapa.
+    # Mantém leve: só campos necessários (etapa normalizada + criado_em).
+    deals_minimal = []
+    for deal in deals:
+        etapa = normalize_etapa(deal.get("etapa") or "sem etapa")
+        criado = parse_date_to_day(deal.get("criado_em"))
+        if criado:
+            deals_minimal.append({"etapa": etapa, "criado_em": criado})
+
     # ── Perdas: separação pago vs orgânico ───────────────────────────────────
     # Considera-se "pago" qualquer lead cuja utm_source seja googlecpc ou metaads.
     # Os demais (direto, organico, e-mail, "não identificado", etc.) entram em
@@ -585,6 +595,7 @@ def aggregate_crm(deals, leads=None):
         "total_active": sum(v["total"] for v in active_stage.values()),
         "total_value_won": round(total_value, 2),
         "taxa_fechamento": round(total_won / len(deals) * 100, 1) if deals else 0,
+        "deals_minimal": deals_minimal,   # para Funil de Conversão do Período
         "funnel": [
             {"etapa": k, "total": v["total"], "valor": round(v["valor"], 2), "ganhos": v["ganhos"]}
             for k, v in funnel
