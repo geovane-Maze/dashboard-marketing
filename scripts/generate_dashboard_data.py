@@ -135,6 +135,157 @@ def match_rd_leads_daily(meta_rows, google_creatives_rows, leads, threshold=0.4)
     return dict(meta_daily), dict(google_daily), stats
 
 
+def compute_creative_funnel_quality(meta_rows, google_creatives_rows, leads, deals, threshold=0.4):
+    """
+    Para cada criativo (Meta + Google), calcula:
+      - Total de leads atribuídos
+      - Quantos chegaram a etapas QUALIFICADAS (Reunião PDF, Apresentação BP, Envio COF, Workshop)
+      - Taxa de qualidade = qualificados / leads_total
+      - CPL geral e CPL por lead qualificado
+
+    Usa matching Jaccard de utm_content + lookup de email no CRM.
+
+    Returns: list ordenada por leads qualificados (decrescente).
+    """
+    PIPELINE = [
+        'entrada de lead', 'tentativa de conexão', 'lead respondente',
+        'pré-qualificado', 'reunião pdf', 'apresentação do business plan',
+        'envio de cof', 'workshop',
+    ]
+    QUALIFIED_FROM = 4  # 'reunião pdf' em diante = qualificado
+
+    def stage_idx(etapa):
+        el = (etapa or '').lower().strip()
+        for i, s in enumerate(PIPELINE):
+            if el == s or el in s or s in el: return i
+        return -1
+
+    # ── 1. Pools de anúncios (Meta + Google) ─────────────────────────────
+    meta_pool = {(r.get("anuncio") or "").strip() for r in meta_rows}
+    meta_pool.discard("")
+    google_pool = {(r.get("anuncio") or "").strip() for r in google_creatives_rows}
+    google_pool.discard("")
+    meta_tokens   = [(a, _tokens(a)) for a in meta_pool]
+    google_tokens = [(a, _tokens(a)) for a in google_pool]
+
+    # ── 2. Email → etapa atual do CRM ───────────────────────────────────
+    email_to_stage = {}
+    for d in deals:
+        email = (d.get("contato_email") or "").strip().lower()
+        etapa = normalize_etapa(d.get("etapa") or "")
+        if email:
+            email_to_stage[email] = etapa
+
+    # ── 3. Pra cada lead, match → criativo + lookup etapa ────────────────
+    creative_funnel = defaultdict(lambda: {
+        "source": None,
+        "campanha": "",
+        "thumbnail": "",
+        "permalink": "",
+        "leads_total": 0,
+        "stages": defaultdict(int),
+    })
+
+    # Metadados de campanha/thumb (vem dos creatives agregados Meta e Google)
+    meta_meta_by_ad = {}
+    for r in meta_rows:
+        a = (r.get("anuncio") or "").strip()
+        if not a or a in meta_meta_by_ad: continue
+        meta_meta_by_ad[a] = {
+            "campanha": r.get("campanha", ""),
+            "thumbnail": r.get("thumbnail", ""),
+            "permalink": r.get("permalink", ""),
+        }
+
+    google_meta_by_ad = {}
+    for r in google_creatives_rows:
+        a = (r.get("anuncio") or "").strip()
+        if not a or a in google_meta_by_ad: continue
+        google_meta_by_ad[a] = {
+            "campanha": r.get("campanha", ""),
+        }
+
+    for lead in leads:
+        utm_c = (lead.get("utm_content") or "").strip()
+        if not utm_c: continue
+        tc = _tokens(utm_c)
+        if not tc: continue
+
+        src = (lead.get("utm_source") or "").strip()
+        if src == "metaads":
+            pool = meta_tokens; src_label = "meta"
+        elif src == "googlecpc":
+            pool = google_tokens; src_label = "google"
+        else:
+            continue
+
+        best, best_score = None, 0.0
+        for anuncio, ta in pool:
+            s = _jaccard(tc, ta)
+            if s > best_score:
+                best_score, best = s, anuncio
+
+        if best_score < threshold or not best:
+            continue
+
+        # Etapa atual do lead (via email → CRM)
+        lead_email = (lead.get("email") or "").strip().lower()
+        etapa = email_to_stage.get(lead_email, "Entrada de Lead")
+
+        # Acumula
+        cf = creative_funnel[best]
+        cf["source"] = src_label
+        if not cf["campanha"]:
+            metadata = meta_meta_by_ad.get(best) if src_label == "meta" else google_meta_by_ad.get(best)
+            if metadata:
+                cf["campanha"]  = metadata.get("campanha", "")
+                cf["thumbnail"] = metadata.get("thumbnail", "")
+                cf["permalink"] = metadata.get("permalink", "")
+        cf["leads_total"] += 1
+        cf["stages"][etapa] += 1
+
+    # ── 4. Soma gasto por anúncio (Meta + Google) ───────────────────────
+    meta_gasto = defaultdict(float)
+    for r in meta_rows:
+        a = (r.get("anuncio") or "").strip()
+        if a:
+            try: meta_gasto[a] += float(str(r.get("gasto", 0) or 0).replace(",", "."))
+            except: pass
+
+    google_gasto = defaultdict(float)
+    for r in google_creatives_rows:
+        a = (r.get("anuncio") or "").strip()
+        if a:
+            try: google_gasto[a] += parse_num(r.get("custo"))
+            except: pass
+
+    # ── 5. Constrói resultado ────────────────────────────────────────────
+    results = []
+    for anuncio, info in creative_funnel.items():
+        leads_total = info["leads_total"]
+        stages = dict(info["stages"])
+        qualif = sum(c for stage, c in stages.items() if stage_idx(stage) >= QUALIFIED_FROM)
+        gasto = meta_gasto[anuncio] if info["source"] == "meta" else google_gasto[anuncio]
+        results.append({
+            "anuncio":        anuncio,
+            "source":         info["source"],
+            "campanha":       info["campanha"],
+            "thumbnail":      info["thumbnail"],
+            "permalink":      info["permalink"],
+            "leads_total":    leads_total,
+            "qualificados":   qualif,
+            "quality_rate":   round(qualif / leads_total * 100, 1) if leads_total else 0,
+            "gasto":          round(gasto, 2),
+            "cpl":            round(gasto / leads_total, 2) if leads_total else 0,
+            "cpl_qualificado": round(gasto / qualif, 2) if qualif else 0,
+            "stages":         stages,
+        })
+
+    # Ordena por qualificados DESC, depois por quality_rate
+    results.sort(key=lambda x: (-x["qualificados"], -x["quality_rate"]))
+    return results
+
+
 def attach_rd_leads_to_creatives(creatives_list, meta_rows, leads, threshold=0.4):
     """Conta leads do CRM por criativo via matching token-based de utm_content ↔ anuncio.
 
@@ -1505,6 +1656,13 @@ def main():
     # Mantém agregação total no creatives (já existente — para legacy compatibility)
     attach_rd_leads_to_creatives(meta_aggregated["creatives"], meta_ads, leads)
 
+    # Qualidade de cada criativo: quantos leads avançaram para etapas qualificadas
+    print("  Calculando qualidade dos criativos (etapa do lead no funil)...")
+    creative_quality = compute_creative_funnel_quality(
+        meta_ads, google_ads_creatives_rows, leads, crm_deals
+    )
+    print(f"    {len(creative_quality)} criativos com qualidade atribuída")
+
     crm_agg     = aggregate_crm(crm_deals, leads)
     meta_agg    = meta_aggregated
     google_agg  = aggregate_google_ads(google_ads)
@@ -1527,6 +1685,7 @@ def main():
         "ga4": aggregate_ga4(ga4),
         "utm": utm_agg,
         "google_ads_creatives": aggregate_google_ads_creatives(google_ads_creatives_rows, leads_daily_map=google_leads_daily),
+        "creative_quality": creative_quality,
         "previsibilidade": previsibilidade_data,
         "relatorio": build_relatorio(leads, crm_agg, meta_agg, google_agg, utm_agg, meta_rows=meta_ads),
     }

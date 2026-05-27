@@ -1265,6 +1265,39 @@
         <div id="top5-criativos-grid" class="criativos-mes-grid"></div>
       </div>
 
+      <!-- 🎯 CRIATIVOS POR QUALIDADE (leads que avançam no funil) -->
+      <div class="table-card" style="margin-bottom:24px;background:linear-gradient(135deg,#EEF2FF 0%,#F0F9FF 100%);border:1px solid #93C5FD;">
+        <h3 style="margin-top:0;">🎯 Top Criativos por QUALIDADE de Lead</h3>
+        <p style="font-size:11px;color:#1E3A8A;margin:0 0 12px;">
+          Ranqueado por <strong>quantos leads chegaram em etapas qualificadas</strong> (Reunião PDF, Apresentação BP, Envio COF, Workshop).
+          <strong>Diferente</strong> do Top 5 acima (que vê volume) — aqui é QUALIDADE: criativos que trazem leads que realmente avançam.
+        </p>
+        <div style="overflow-x:auto;">
+          <table id="table-creative-quality" style="width:100%;min-width:900px;border-collapse:collapse;font-size:12px;">
+            <thead>
+              <tr style="background:#1F4068;color:#fff;">
+                <th style="padding:10px;text-align:left;">#</th>
+                <th style="padding:10px;text-align:left;">Origem</th>
+                <th style="padding:10px;text-align:left;min-width:240px;">Criativo</th>
+                <th style="padding:10px;text-align:right;">Leads Total</th>
+                <th style="padding:10px;text-align:right;">Qualificados</th>
+                <th style="padding:10px;text-align:right;">Taxa Qualidade</th>
+                <th style="padding:10px;text-align:right;">Gasto</th>
+                <th style="padding:10px;text-align:right;">CPL Geral</th>
+                <th style="padding:10px;text-align:right;">CPL Qualif</th>
+                <th style="padding:10px;text-align:center;min-width:180px;">Funil do Lead</th>
+              </tr>
+            </thead>
+            <tbody id="creative-quality-body">
+              <tr><td colspan="10" style="padding:20px;text-align:center;color:#999;">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="font-size:11px;color:#1E3A8A;margin:12px 0 0;font-style:italic;">
+          💡 Compare com o Top 5 acima: um criativo pode trazer MUITO lead mas se ninguém qualifica, é um sinal pra pausar/trocar mensagem.
+        </p>
+      </div>
+
       <!-- 🟦 META ADS — filtros + tabela existente -->
       <div class="section-title" style="font-size:18px;margin-top:24px;">🟦 Meta Ads</div>
       <div class="filter-group" style="margin-bottom:20px;flex-wrap:wrap;gap:10px;align-items:center;">
@@ -3399,6 +3432,67 @@ function renderCreatives() {
           </div>
         </div>`).join('')}</div>`
     : '<p style="color:#999;font-size:13px;padding:16px;">Sem criativos Google no período selecionado.</p>';
+
+  // ════════════════════════════════════════════════════════════════════
+  // 4) CRIATIVOS POR QUALIDADE DE LEAD (atinge etapas qualificadas no CRM)
+  // ════════════════════════════════════════════════════════════════════
+  const qualityList = DATA.creative_quality || [];
+  const qualBody = document.getElementById('creative-quality-body');
+  if (qualBody) {
+    if (!qualityList.length) {
+      qualBody.innerHTML = '<tr><td colspan="10" style="padding:20px;text-align:center;color:#999;">Sem dados de qualidade ainda — leads precisam estar no CRM com email para serem cruzados.</td></tr>';
+    } else {
+      // Ordem das etapas para mini-funil
+      const STAGES_ORDER = [
+        'Entrada de Lead', 'Tentativa de Conexão', 'Lead Respondente',
+        'Pré-qualificado', 'Reunião PDF', 'Apresentação do Business Plan',
+        'Envio de COF', 'Workshop'
+      ];
+      const QUALIFIED_FROM = 4; // Reunião PDF em diante
+
+      qualBody.innerHTML = qualityList.slice(0, 20).map((c, i) => {
+        const isMeta = c.source === 'meta';
+        const sourceBadge = isMeta
+          ? '<span style="background:#1877F2;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;">META</span>'
+          : '<span style="background:#EA4335;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:700;">GOOGLE</span>';
+
+        // Mini funil visual (bolinhas por etapa)
+        let miniFunil = '<div style="display:flex;gap:2px;align-items:center;justify-content:center;">';
+        STAGES_ORDER.forEach((stage, si) => {
+          const count = c.stages?.[stage] || 0;
+          const isQualif = si >= QUALIFIED_FROM;
+          const bg = count > 0 ? (isQualif ? '#16A34A' : '#3B82F6') : '#E5E7EB';
+          const size = count > 0 ? 18 : 12;
+          miniFunil += `<div title="${stage}: ${count}" style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;">${count > 0 ? count : ''}</div>`;
+        });
+        miniFunil += '</div>';
+
+        // Cor da taxa de qualidade
+        let taxaColor = '#999';
+        if (c.quality_rate >= 25) taxaColor = '#16A34A';
+        else if (c.quality_rate >= 10) taxaColor = '#EA580C';
+        else if (c.quality_rate > 0) taxaColor = '#DC2626';
+
+        const linkAd = (isMeta && c.permalink)
+          ? `<a href="${c.permalink}" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:none;">${c.anuncio}</a>`
+          : c.anuncio;
+
+        return `
+          <tr style="border-bottom:1px solid #E5E7EB;${i < 3 ? 'background:#FEF9C3;' : ''}">
+            <td style="padding:8px 10px;color:#999;font-weight:700;">${i + 1}${i === 0 ? ' 🥇' : (i === 1 ? ' 🥈' : (i === 2 ? ' 🥉' : ''))}</td>
+            <td style="padding:8px 10px;">${sourceBadge}</td>
+            <td style="padding:8px 10px;font-weight:600;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${c.anuncio}">${linkAd}<br><small style="color:#999;font-weight:400;font-size:10px;">${(c.campanha || '').slice(0, 60)}</small></td>
+            <td style="padding:8px 10px;text-align:right;font-weight:600;">${c.leads_total}</td>
+            <td style="padding:8px 10px;text-align:right;font-weight:700;color:#16A34A;font-size:14px;">${c.qualificados}</td>
+            <td style="padding:8px 10px;text-align:right;font-weight:700;color:${taxaColor};">${c.quality_rate}%</td>
+            <td style="padding:8px 10px;text-align:right;">${fmt.currency(c.gasto)}</td>
+            <td style="padding:8px 10px;text-align:right;">${c.cpl > 0 ? fmt.currency(c.cpl) : '—'}</td>
+            <td style="padding:8px 10px;text-align:right;font-weight:600;">${c.cpl_qualificado > 0 ? fmt.currency(c.cpl_qualificado) : '—'}</td>
+            <td style="padding:8px 10px;">${miniFunil}</td>
+          </tr>`;
+      }).join('');
+    }
+  }
 }
 
 // ─── SECTION: UTM ─────────────────────────────────────────────────────────────
