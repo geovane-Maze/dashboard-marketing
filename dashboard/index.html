@@ -2378,13 +2378,31 @@ function renderExecutivo() {
   });
 
   const losses = crm.losses || [];
+  const lossByReasonStage = crm.losses_by_reason_stage || {};
   makeChart('chart-exec-losses', {
     type: 'bar',
     data: {
       labels: losses.slice(0, 10).map(r => r.motivo),
       datasets: [{ data: losses.slice(0, 10).map(r => r.total), backgroundColor: COLORS.red + 'CC', borderRadius: 4 }]
     },
-    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.parsed.x} leads perdidos`,
+            afterBody: ctx => {
+              const motivo = ctx[0]?.label;
+              const stages = lossByReasonStage[motivo];
+              if (!stages || !stages.length) return [];
+              return ['', '📍 Por etapa do funil:', ...stages.map(s => `  • ${s.etapa}: ${s.total}`)];
+            }
+          }
+        }
+      },
+      scales: { x: { beginAtZero: true } }
+    }
   });
 
   // ── Bloco 6: UTM / Atribuição ────────────────────────────────────────────────

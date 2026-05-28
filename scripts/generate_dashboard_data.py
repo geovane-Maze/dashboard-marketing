@@ -591,6 +591,7 @@ def aggregate_crm(deals, leads=None):
     by_stage = defaultdict(lambda: {"total": 0, "valor": 0.0, "ganhos": 0})
     active_stage = defaultdict(lambda: {"total": 0, "valor": 0.0})  # apenas ativos
     by_loss_reason = defaultdict(int)
+    by_loss_reason_stage = defaultdict(lambda: defaultdict(int))  # motivo → etapa → count
     by_loss_stage = defaultdict(int)          # perdas por etapa do funil
     by_loss_utm_source = defaultdict(int)     # perdas por utm_source
     by_loss_utm_campaign = defaultdict(int)   # perdas por utm_campaign
@@ -646,6 +647,7 @@ def aggregate_crm(deals, leads=None):
         motivo = deal.get("motivo_perda")
         if motivo:
             by_loss_reason[motivo] += 1
+            by_loss_reason_stage[motivo][etapa] += 1
             by_loss_stage[etapa] += 1
             total_lost += 1
 
@@ -759,6 +761,11 @@ def aggregate_crm(deals, leads=None):
             {"motivo": k, "total": v}
             for k, v in sorted(by_loss_reason.items(), key=lambda x: -x[1])
         ],
+        "losses_by_reason_stage": {
+            motivo: [{"etapa": etapa, "total": cnt}
+                     for etapa, cnt in sorted(stages.items(), key=lambda x: -x[1])]
+            for motivo, stages in by_loss_reason_stage.items()
+        },
         "losses_by_stage": [
             {"etapa": k, "total": v}
             for k, v in sorted(by_loss_stage.items(), key=lambda x: -x[1])
