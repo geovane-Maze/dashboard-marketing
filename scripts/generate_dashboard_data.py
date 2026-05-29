@@ -1605,6 +1605,78 @@ def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
     }
 
 
+def aggregate_meetings(tarefas, today=None):
+    """
+    Agrega tarefas do tipo 'meeting' (reuniões) do RD CRM.
+
+    Classifica cada reunião pela data agendada (campo 'data') + status:
+      - realizada:      concluída (concluida=TRUE) ou status 'completed'
+      - agendada:       data >= hoje e ainda não concluída (reunião futura)
+      - nao_realizada:  data < hoje e não concluída (PROXY de No-Show —
+                        RD não tem campo nativo, ver com o time)
+
+    Emite meetings_daily (1 linha por reunião) para o front filtrar por período,
+    no mesmo padrão de losses_daily.
+    """
+    if today is None:
+        today = datetime.now().strftime("%Y-%m-%d")
+
+    meetings_daily = []
+    by_resp = defaultdict(lambda: {"total": 0, "realizada": 0, "agendada": 0, "nao_realizada": 0})
+    monthly = defaultdict(lambda: {"total": 0, "realizada": 0, "agendada": 0, "nao_realizada": 0})
+
+    for t in (tarefas or []):
+        if (t.get("tipo") or "").strip().lower() != "meeting":
+            continue
+        dia = parse_date_to_day(t.get("data"))
+        if not dia:
+            continue
+        concluida = str(t.get("concluida") or "").strip().lower() in ("true", "1", "sim", "yes")
+        status = (t.get("status") or "").strip().lower()
+        realizada = concluida or status == "completed"
+        if realizada:
+            classe = "realizada"
+        elif dia >= today:
+            classe = "agendada"
+        else:
+            classe = "nao_realizada"
+
+        resp = t.get("responsavel") or "sem responsável"
+        meetings_daily.append({
+            "data": dia,
+            "hora": t.get("hora") or "",
+            "classe": classe,
+            "deal_nome": t.get("deal_nome") or "—",
+            "responsavel": resp,
+        })
+        by_resp[resp]["total"] += 1
+        by_resp[resp][classe] += 1
+        mes = dia[:7]
+        monthly[mes]["total"] += 1
+        monthly[mes][classe] += 1
+
+    realizada     = sum(1 for m in meetings_daily if m["classe"] == "realizada")
+    agendada      = sum(1 for m in meetings_daily if m["classe"] == "agendada")
+    nao_realizada = sum(1 for m in meetings_daily if m["classe"] == "nao_realizada")
+    base = realizada + nao_realizada
+
+    return {
+        "total": len(meetings_daily),
+        "realizada": realizada,
+        "agendada": agendada,
+        "nao_realizada": nao_realizada,
+        "taxa_comparecimento": round(realizada / base * 100, 1) if base else 0,
+        "meetings_daily": sorted(meetings_daily, key=lambda x: x["data"]),
+        "by_responsavel": [
+            {"responsavel": k, **v}
+            for k, v in sorted(by_resp.items(), key=lambda x: -x[1]["total"])
+        ],
+        "monthly": [
+            {"mes": k, **v} for k, v in sorted(monthly.items())
+        ],
+    }
+
+
 def main():
     print("Gerando dados do dashboard...")
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -1618,6 +1690,13 @@ def main():
     print("  Lendo CRM deals...")
     crm_deals = read_sheet(gc, "crm_deals")
     crm_deals = dedupe_by_id(crm_deals, "crm_deals")
+
+    print("  Lendo CRM tarefas (reuniões)...")
+    crm_tarefas = []
+    try:
+        crm_tarefas = read_sheet(gc, "crm_tarefas")
+    except Exception:
+        print("    (sem aba crm_tarefas ainda)")
 
     print("  Lendo Meta Ads...")
     meta_ads = read_sheet(gc, "meta_ads")
@@ -1671,6 +1750,7 @@ def main():
     print(f"    {len(creative_quality)} criativos com qualidade atribuída")
 
     crm_agg     = aggregate_crm(crm_deals, leads)
+    meetings_agg = aggregate_meetings(crm_tarefas)
     meta_agg    = meta_aggregated
     google_agg  = aggregate_google_ads(google_ads)
     utm_agg     = aggregate_utm(leads)
@@ -1687,6 +1767,7 @@ def main():
         },
         "leads": leads_agg,
         "crm": crm_agg,
+        "meetings": meetings_agg,
         "meta_ads": meta_agg,
         "google_ads": google_agg,
         "ga4": aggregate_ga4(ga4),

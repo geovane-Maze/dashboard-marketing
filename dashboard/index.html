@@ -1143,6 +1143,32 @@
           <div class="chart-wrap"><canvas id="chart-capital"></canvas></div>
         </div>
       </div>
+
+      <!-- Reuniões (RD CRM) -->
+      <div class="section-title" style="font-size:1.05rem;margin-top:28px;">📅 Reuniões (RD CRM)</div>
+      <p style="font-size:12px;color:#888;margin:-8px 0 14px;">
+        Reuniões registradas como tarefa no RD CRM, no período filtrado.
+        <strong>"Não realizada" é uma estimativa de No-Show</strong> (reunião com data passada não
+        marcada como concluída) — o RD não tem campo nativo; alinhar a marcação com o time.
+      </p>
+      <div class="kpi-grid-crm" id="kpi-meetings"></div>
+      <div class="charts-row">
+        <div class="chart-card">
+          <h3>Reuniões por Mês</h3>
+          <div class="chart-wrap"><canvas id="chart-meetings-monthly"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Reuniões por Responsável</h3>
+          <div class="chart-wrap"><canvas id="chart-meetings-resp"></canvas></div>
+        </div>
+      </div>
+      <div class="table-card">
+        <h3>Detalhe das Reuniões no Período</h3>
+        <table>
+          <thead><tr><th>Data</th><th>Hora</th><th>Cliente</th><th>Responsável</th><th>Status</th></tr></thead>
+          <tbody id="table-meetings"></tbody>
+        </table>
+      </div>
     </div>
 
     <!-- GARGALOS & PERDAS -->
@@ -2757,6 +2783,88 @@ function renderCRM() {
     data: { labels: cap.map(r => r.capital), datasets: [{ data: cap.map(r => r.total), backgroundColor: PALETTE }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
   });
+
+  // ── Reuniões (RD CRM) — respeita o filtro de data global ───────────────────
+  const datePredM = getDateFilter();
+  const mAll  = (DATA.meetings && DATA.meetings.meetings_daily) || [];
+  const mFilt = mAll.filter(r => !datePredM || datePredM(r.data));
+
+  const STATUS_META = {
+    realizada:     { label: '✅ Realizada',     color: COLORS.green },
+    agendada:      { label: '⏳ Agendada',      color: COLORS.secondary },
+    nao_realizada: { label: '⚠️ Não realizada', color: COLORS.red },
+  };
+
+  const mCount     = c => mFilt.filter(r => r.classe === c).length;
+  const mRealizada = mCount('realizada');
+  const mAgendada  = mCount('agendada');
+  const mNao       = mCount('nao_realizada');
+  const mBase      = mRealizada + mNao;
+  const mTaxa      = mBase ? (mRealizada / mBase * 100) : 0;
+
+  const kpiM = document.getElementById('kpi-meetings');
+  if (kpiM) kpiM.innerHTML = [
+    { label: 'Reuniões no Período',     value: fmt.num(mFilt.length), sub: 'total agendadas',          cls: ''      },
+    { label: 'Realizadas',              value: fmt.num(mRealizada),   sub: 'marcadas como concluídas', cls: 'green' },
+    { label: 'Agendadas (futuras)',     value: fmt.num(mAgendada),    sub: 'ainda vão acontecer',      cls: 'blue'  },
+    { label: 'Não realizadas',          value: fmt.num(mNao),         sub: 'proxy de No-Show',         cls: 'red'   },
+    { label: 'Taxa de Comparecimento',  value: fmt.pct(mTaxa),        sub: 'realiz. ÷ (realiz.+não)',  cls: 'teal'  },
+  ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
+
+  // Reuniões por mês (barras empilhadas)
+  const mByMonth = {};
+  mFilt.forEach(r => {
+    const mes = r.data.slice(0, 7);
+    if (!mByMonth[mes]) mByMonth[mes] = { realizada: 0, agendada: 0, nao_realizada: 0 };
+    mByMonth[mes][r.classe]++;
+  });
+  const mMonths = Object.keys(mByMonth).sort();
+  makeChart('chart-meetings-monthly', {
+    type: 'bar',
+    data: {
+      labels: mMonths.map(mesLabel),
+      datasets: [
+        { label: 'Realizada',     data: mMonths.map(m => mByMonth[m].realizada),     backgroundColor: COLORS.green + 'CC',     borderRadius: 4 },
+        { label: 'Agendada',      data: mMonths.map(m => mByMonth[m].agendada),      backgroundColor: COLORS.secondary + 'CC', borderRadius: 4 },
+        { label: 'Não realizada', data: mMonths.map(m => mByMonth[m].nao_realizada), backgroundColor: COLORS.red + 'CC',       borderRadius: 4 },
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+
+  // Reuniões por responsável (barras empilhadas horizontais)
+  const mByResp = {};
+  mFilt.forEach(r => {
+    const k = r.responsavel || 'sem responsável';
+    if (!mByResp[k]) mByResp[k] = { realizada: 0, agendada: 0, nao_realizada: 0, total: 0 };
+    mByResp[k][r.classe]++; mByResp[k].total++;
+  });
+  const mResps = Object.entries(mByResp).sort((a, b) => b[1].total - a[1].total).slice(0, 8).map(e => e[0]);
+  makeChart('chart-meetings-resp', {
+    type: 'bar',
+    data: {
+      labels: mResps,
+      datasets: [
+        { label: 'Realizada',     data: mResps.map(k => mByResp[k].realizada),     backgroundColor: COLORS.green + 'CC',     borderRadius: 4 },
+        { label: 'Agendada',      data: mResps.map(k => mByResp[k].agendada),      backgroundColor: COLORS.secondary + 'CC', borderRadius: 4 },
+        { label: 'Não realizada', data: mResps.map(k => mByResp[k].nao_realizada), backgroundColor: COLORS.red + 'CC',       borderRadius: 4 },
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true, beginAtZero: true }, y: { stacked: true } } }
+  });
+
+  // Tabela detalhada das reuniões no período
+  const tblM = document.getElementById('table-meetings');
+  if (tblM) {
+    const sorted = [...mFilt].sort((a, b) => (b.data + b.hora).localeCompare(a.data + a.hora));
+    tblM.innerHTML = sorted.length
+      ? sorted.map(r => {
+          const sm = STATUS_META[r.classe] || { label: r.classe, color: '#999' };
+          const [y, mo, d] = r.data.split('-');
+          return `<tr><td>${d}/${mo}/${y}</td><td>${r.hora || '—'}</td><td>${r.deal_nome}</td><td>${r.responsavel}</td><td><span style="color:${sm.color};font-weight:600;">${sm.label}</span></td></tr>`;
+        }).join('')
+      : '<tr><td colspan="5" class="empty">Sem reuniões no período selecionado.</td></tr>';
+  }
 }
 
 // ─── SECTION: PERDAS ──────────────────────────────────────────────────────────
