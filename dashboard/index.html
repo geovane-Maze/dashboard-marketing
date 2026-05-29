@@ -2482,10 +2482,18 @@ function renderExecutivo() {
   const leadsByContent  = {};
   (DATA.utm.contents  || []).forEach(r => { leadsByContent[r.content]   = r.total; });
 
-  // Paleta vermelha para gráficos de perda
+  // Paleta diversificada para gráficos de perda (cores bem distintas entre si)
   const RED_PALETTE = [
-    '#EF4444','#DC2626','#B91C1C','#F97316','#EA580C',
-    '#C2410C','#FBBF24','#D97706','#B45309','#7C2D12',
+    '#EF4444', // vermelho
+    '#3B82F6', // azul
+    '#10B981', // verde
+    '#F59E0B', // âmbar
+    '#8B5CF6', // violeta
+    '#06B6D4', // ciano
+    '#EC4899', // rosa
+    '#F97316', // laranja
+    '#84CC16', // lima
+    '#6366F1', // índigo
   ];
 
   function makeLossDoughnut(canvasId, lossData, leadsLookup, keyField) {
