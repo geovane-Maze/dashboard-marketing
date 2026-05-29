@@ -2777,6 +2777,23 @@ function renderPerdas() {
   if (usingFallback) lossByMotivo = DATA.crm.losses || [];
   const totalLost = lossByMotivo.reduce((s, r) => s + r.total, 0) || 1;
 
+  // Breakdown motivo × etapa (filtrado por data via lossesFilt; fallback para pré-agregado)
+  const lbrsGargalos = {};
+  if (!usingFallback && lossesFilt.length) {
+    lossesFilt.forEach(r => {
+      const m = r.motivo || 'não identificado';
+      const e = r.etapa  || 'sem etapa';
+      if (!lbrsGargalos[m]) lbrsGargalos[m] = {};
+      lbrsGargalos[m][e] = (lbrsGargalos[m][e] || 0) + 1;
+    });
+  } else {
+    // fallback: converte losses_by_reason_stage (array) para objeto
+    Object.entries(DATA.crm.losses_by_reason_stage || {}).forEach(([m, arr]) => {
+      lbrsGargalos[m] = {};
+      arr.forEach(s => { lbrsGargalos[m][s.etapa] = s.total; });
+    });
+  }
+
   makeChart('chart-losses', {
     type: 'bar',
     data: {
@@ -2785,7 +2802,22 @@ function renderPerdas() {
     },
     options: {
       responsive: true, maintainAspectRatio: false, indexAxis: 'y',
-      plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } }
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.parsed.x} leads perdidos`,
+            afterBody: ctx => {
+              const motivo = ctx[0]?.label;
+              const stages = lbrsGargalos[motivo];
+              if (!stages || !Object.keys(stages).length) return [];
+              const sorted = Object.entries(stages).sort((a, b) => b[1] - a[1]);
+              return ['', '📍 Por etapa do funil:', ...sorted.map(([e, t]) => `  • ${e}: ${t}`)];
+            }
+          }
+        }
+      },
+      scales: { x: { beginAtZero: true } }
     }
   });
 
