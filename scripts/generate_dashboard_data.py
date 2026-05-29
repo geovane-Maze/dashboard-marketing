@@ -587,6 +587,30 @@ def aggregate_leads(leads):
     }
 
 
+def clean_loss_reason(m):
+    """
+    Limpa o motivo de perda para exibição: remove o prefixo de CATEGORIA
+    (tudo antes do primeiro '/' ou ' - ') e mantém só o motivo em si.
+    Normaliza separadores internos (',' e '/') para ' / '.
+
+    Ex.: 'DESENGAJAMENTO DURANTE FUNIL/ Não responde'            -> 'Não responde'
+         'LEADS INACESSÍVEIS/ Fornecedor,Consumidor/Oferta...'   -> 'Fornecedor / Consumidor / Oferta...'
+         'DESENGAJAMENTO - Parou de se corresponder'             -> 'Parou de se corresponder'
+         'Cliente optou por não realizar o projeto'              -> (sem separador, mantém igual)
+    """
+    if not m:
+        return m
+    s = str(m).strip()
+    idx_slash = s.find('/')
+    idx_dash = s.find(' - ')
+    cands = [i for i in (idx_slash, idx_dash) if i != -1]
+    if cands:
+        i = min(cands)
+        s = s[i + 1:] if i == idx_slash else s[i + 3:]
+    s = re.sub(r'\s*[,/]\s*', ' / ', s).strip()
+    return s
+
+
 def aggregate_crm(deals, leads=None):
     by_stage = defaultdict(lambda: {"total": 0, "valor": 0.0, "ganhos": 0})
     active_stage = defaultdict(lambda: {"total": 0, "valor": 0.0})  # apenas ativos
@@ -644,7 +668,7 @@ def aggregate_crm(deals, leads=None):
                 monthly_won[mes]["total"] += 1
                 monthly_won[mes]["valor"] += valor
 
-        motivo = deal.get("motivo_perda")
+        motivo = clean_loss_reason(deal.get("motivo_perda"))
         if motivo:
             by_loss_reason[motivo] += 1
             by_loss_reason_stage[motivo][etapa] += 1
