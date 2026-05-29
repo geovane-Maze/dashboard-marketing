@@ -7,6 +7,7 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect x='6' y='4' width='52' height='56' rx='5' fill='%23B3D4F0' stroke='%23000' stroke-width='3'/><rect x='38' y='10' width='14' height='5' rx='1.5' fill='%23FFFFFF' stroke='%23000' stroke-width='2'/><circle cx='22' cy='22' r='9' fill='%23E74C3C' stroke='%23000' stroke-width='2'/><path d='M22 22 L22 13 A9 9 0 0 1 31 22 Z' fill='%2327AE60'/><line x1='34' y1='30' x2='52' y2='30' stroke='%23000' stroke-width='2'/><line x1='34' y1='36' x2='46' y2='36' stroke='%23000' stroke-width='2'/><rect x='12' y='42' width='8' height='12' fill='%23F4D35E' stroke='%23000' stroke-width='2'/><rect x='22' y='38' width='8' height='16' fill='%23F4A24A' stroke='%23000' stroke-width='2'/><rect x='32' y='34' width='8' height='20' fill='%23E67E22' stroke='%23000' stroke-width='2'/><rect x='42' y='40' width='8' height='14' fill='%23D35400' stroke='%23000' stroke-width='2'/></svg>">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <style>
   :root {
     --primary: #0D3B66;
@@ -464,8 +465,16 @@
 
   /* Relatório / Próximos Passos */
   .prev-report { display: flex; flex-direction: column; gap: 18px; padding: 4px 0; }
-  .prev-report .rep-head { font-size: 13px; color: #6B7280; }
+  .prev-report .rep-topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .prev-report .rep-head { font-size: 13px; color: #6B7280; margin: 0; }
   .prev-report .rep-head strong { color: var(--primary); }
+  .rep-pdf-btn {
+    background: var(--primary); color: #fff; border: none; border-radius: 8px;
+    padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+    white-space: nowrap; transition: background .15s, transform .1s;
+  }
+  .rep-pdf-btn:hover { background: var(--secondary); }
+  .rep-pdf-btn:active { transform: scale(.97); }
   .prev-report .rep-card {
     border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; background: #fff;
   }
@@ -4070,25 +4079,20 @@ function renderPrevisibilidade() {
   _prevAttachTooltip(wrap);
 }
 
-// ── Relatório / Próximos Passos: análise Real vs Meta do mês fechado ─────────
-function renderPrevReport() {
-  const cont = document.getElementById('prev-report-container');
+// ── Análise Real vs Meta do último mês fechado (compartilhada tela + PDF) ─────
+function _prevAnalyze() {
   const P = DATA.previsibilidade;
-  if (!cont) return;
-  if (!P || !P.atingimento || !P.previsibilidade) {
-    cont.innerHTML = '<p class="rep-empty" style="padding:20px;">Dados de previsibilidade ainda não coletados.</p>';
-    return;
-  }
+  if (!P || !P.atingimento || !P.previsibilidade) return null;
 
   const meses    = P.atingimento.meses || [];
   const realRows = P.atingimento.rows || [];
   const metaByLabel = {};
   (P.previsibilidade.rows || []).forEach(mr => { metaByLabel[_prevNorm(mr.label)] = mr; });
-
-  // Detecta o último mês com dado real "substancial" (Vendas/Receita/Leads/CPL preenchidos e ≠ placeholder)
-  const coreLabels = ['vendas', 'receita faturada', 'leads', 'cpl'];
   const realByLabel = {};
   realRows.forEach(rr => { realByLabel[_prevNorm(rr.label)] = rr; });
+
+  // Detecta o último mês com dado real "substancial" (Vendas/Receita/Leads/CPL ≠ placeholder)
+  const coreLabels = ['vendas', 'receita faturada', 'leads', 'cpl'];
   let mesIdx = -1;
   for (let i = meses.length - 1; i >= 0; i--) {
     const temReal = coreLabels.some(l => {
@@ -4098,24 +4102,16 @@ function renderPrevReport() {
     });
     if (temReal) { mesIdx = i; break; }
   }
+  if (mesIdx < 0) return { mesNome: null, bons: [], ruins: [], passos: [], mesIdx: -1 };
 
-  if (mesIdx < 0) {
-    cont.innerHTML = '<div class="prev-report"><p class="rep-empty">Ainda não há mês com resultado real preenchido para analisar.</p></div>';
-    return;
-  }
-
-  const mesNome = meses[mesIdx] || '';
   const bons = [], ruins = [], passos = [];
   const passosSet = new Set();
-
   realRows.forEach(rr => {
     const cfg = _prevKpiConfig(rr);
     if (!cfg) return;
     const metaRow = metaByLabel[_prevNorm(rr.label)];
     if (!metaRow) return;
-    const metaV = (metaRow.valores[mesIdx] || {}).v || '';
-    const realV = (rr.valores[mesIdx] || {}).v || '';
-    const cmp = _prevCompare(realV, metaV, cfg.dir);
+    const cmp = _prevCompare((rr.valores[mesIdx] || {}).v, (metaRow.valores[mesIdx] || {}).v, cfg.dir);
     if (!cmp) return;
     const item = { label: rr.label, cmp, cfg };
     if (cmp.good) bons.push(item);
@@ -4124,30 +4120,119 @@ function renderPrevReport() {
       if (!passosSet.has(cfg.ruim)) { passosSet.add(cfg.ruim); passos.push(cfg.ruim); }
     }
   });
+  return { mesNome: meses[mesIdx] || '', bons, ruins, passos, mesIdx };
+}
+
+// ── Relatório / Próximos Passos (tela) ───────────────────────────────────────
+function renderPrevReport() {
+  const cont = document.getElementById('prev-report-container');
+  if (!cont) return;
+  const A = _prevAnalyze();
+  if (!A) {
+    cont.innerHTML = '<p class="rep-empty" style="padding:20px;">Dados de previsibilidade ainda não coletados.</p>';
+    return;
+  }
+  if (!A.mesNome) {
+    cont.innerHTML = '<div class="prev-report"><p class="rep-empty">Ainda não há mês com resultado real preenchido para analisar.</p></div>';
+    return;
+  }
 
   const liGood = it => `<li><span class="rep-metric">${it.label}</span> — Real ${it.cmp.realStr} vs Meta ${it.cmp.metaStr} <span class="rep-sub">(${it.cmp.gapTxt})</span></li>`;
-  const liBad  = liGood;
 
   cont.innerHTML = `
     <div class="prev-report">
-      <p class="rep-head">Análise referente a <strong>${mesNome}</strong> (Real × Meta) — último mês com resultado preenchido.</p>
+      <div class="rep-topbar">
+        <p class="rep-head">Análise referente a <strong>${A.mesNome}</strong> (Real × Meta) — último mês com resultado preenchido.</p>
+        <button class="rep-pdf-btn" onclick="downloadPrevReportPDF()">⬇️ Baixar PDF</button>
+      </div>
 
       <div class="rep-card good">
-        <h4>✅ O que melhoramos / batemos a meta (${bons.length})</h4>
-        ${bons.length ? `<ul>${bons.map(liGood).join('')}</ul>` : '<p class="rep-empty">Nenhum KPI superou a meta neste mês.</p>'}
+        <h4>✅ O que melhoramos / batemos a meta (${A.bons.length})</h4>
+        ${A.bons.length ? `<ul>${A.bons.map(liGood).join('')}</ul>` : '<p class="rep-empty">Nenhum KPI superou a meta neste mês.</p>'}
       </div>
 
       <div class="rep-card bad">
-        <h4>⚠️ O que ficou abaixo da meta (${ruins.length})</h4>
-        ${ruins.length ? `<ul>${ruins.map(liBad).join('')}</ul>` : '<p class="rep-empty">Nenhum KPI ficou abaixo da meta — excelente mês! 🎉</p>'}
+        <h4>⚠️ O que ficou abaixo da meta (${A.ruins.length})</h4>
+        ${A.ruins.length ? `<ul>${A.ruins.map(liGood).join('')}</ul>` : '<p class="rep-empty">Nenhum KPI ficou abaixo da meta — excelente mês! 🎉</p>'}
       </div>
 
       <div class="rep-card next">
         <h4>🎯 Próximos passos</h4>
-        ${passos.length ? `<ul>${passos.map(s => `<li>${s}</li>`).join('')}</ul>` : '<p class="rep-empty">Sem pontos críticos. Manter a estratégia atual e monitorar.</p>'}
+        ${A.passos.length ? `<ul>${A.passos.map(s => `<li>${s}</li>`).join('')}</ul>` : '<p class="rep-empty">Sem pontos críticos. Manter a estratégia atual e monitorar.</p>'}
       </div>
     </div>
   `;
+}
+
+// ── Gera e baixa o relatório em PDF (jsPDF, texto nativo) ─────────────────────
+function downloadPrevReportPDF() {
+  const A = _prevAnalyze();
+  if (!A || !A.mesNome) { alert('Não há mês com resultado real preenchido para gerar o relatório.'); return; }
+  const jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
+  if (!jsPDFCtor) { alert('Biblioteca de PDF ainda não carregou. Recarregue a página e tente novamente.'); return; }
+
+  const doc = new jsPDFCtor({ unit: 'mm', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const mL = 15, mR = 15, contentW = pageW - mL - mR;
+  let y = 0;
+
+  const NAVY = [13, 59, 102], BLUE = [63, 169, 245], GREEN = [34, 197, 94],
+        RED = [239, 68, 68], GRAY = [107, 114, 128], DARK = [31, 41, 55];
+
+  const ensureSpace = h => { if (y + h > pageH - 15) { doc.addPage(); y = 18; } };
+
+  // Cabeçalho
+  doc.setFillColor(NAVY[0], NAVY[1], NAVY[2]); doc.rect(0, 0, pageW, 26, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
+  doc.text('Clínica da Cidade — Expansão CDC', mL, 11);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+  doc.text('Relatório de Previsibilidade 2026 · Próximos Passos', mL, 18);
+  y = 36;
+
+  // Subtítulo
+  doc.setTextColor(DARK[0], DARK[1], DARK[2]); doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
+  doc.text(`Análise referente a ${A.mesNome} (Real x Meta)`, mL, y); y += 6;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
+  doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')} · último mês com resultado preenchido`, mL, y);
+  y += 10;
+
+  function section(title, color, items, isText) {
+    ensureSpace(12);
+    doc.setFillColor(color[0], color[1], color[2]); doc.rect(mL, y - 4.5, 2.5, 7, 'F');
+    doc.setTextColor(DARK[0], DARK[1], DARK[2]); doc.setFont('helvetica', 'bold'); doc.setFontSize(11.5);
+    doc.text(title, mL + 5, y); y += 8;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+    if (!items.length) {
+      ensureSpace(6); doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
+      doc.text('—', mL + 5, y); y += 8; return;
+    }
+    doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+    items.forEach(it => {
+      const line = isText
+        ? `•  ${it}`
+        : `•  ${it.label}: Real ${it.cmp.realStr} vs Meta ${it.cmp.metaStr}  (${it.cmp.gapTxt})`;
+      const wrapped = doc.splitTextToSize(line, contentW - 4);
+      ensureSpace(wrapped.length * 5 + 2);
+      doc.text(wrapped, mL + 5, y); y += wrapped.length * 5 + 2;
+    });
+    y += 5;
+  }
+
+  section(`O que melhoramos / batemos a meta (${A.bons.length})`, GREEN, A.bons, false);
+  section(`O que ficou abaixo da meta (${A.ruins.length})`, RED, A.ruins, false);
+  section('Próximos passos', BLUE, A.passos, true);
+
+  // Rodapé em todas as páginas
+  const pages = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= pages; p++) {
+    doc.setPage(p); doc.setFontSize(8); doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
+    doc.text('Dashboard Marketing — Clínica da Cidade Franchising', mL, pageH - 8);
+    doc.text(`Página ${p}/${pages}`, pageW - mR, pageH - 8, { align: 'right' });
+  }
+
+  doc.save(`Relatorio_Previsibilidade_${A.mesNome}_2026.pdf`);
 }
 
 // ─── SUPABASE: configuração ───────────────────────────────────────────────────
