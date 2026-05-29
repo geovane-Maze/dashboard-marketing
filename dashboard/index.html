@@ -449,6 +449,36 @@
   /* Custo / Leads em fonte menor itálico */
   .prev-custo-col { font-size: 11px; font-style: italic; color: #6B7280; }
 
+  /* Coloração Real vs Meta (aba Atingimento) */
+  .prev-table td.prev-cell-good { background: rgba(34,197,94,.16); cursor: help; font-weight: 600; }
+  .prev-table td.prev-cell-bad  { background: rgba(239,68,68,.16); cursor: help; font-weight: 600; }
+  .prev-ico { font-size: 9px; margin-left: 3px; vertical-align: middle; }
+  .prev-ico.up   { color: #16A34A; }
+  .prev-ico.down { color: #DC2626; }
+  #prev-tip {
+    position: fixed; display: none; z-index: 9999; max-width: 320px;
+    background: #1F2937; color: #fff; padding: 11px 14px; border-radius: 8px;
+    font-size: 12px; line-height: 1.55; white-space: pre-line;
+    box-shadow: 0 8px 24px rgba(0,0,0,.32); pointer-events: none;
+  }
+
+  /* Relatório / Próximos Passos */
+  .prev-report { display: flex; flex-direction: column; gap: 18px; padding: 4px 0; }
+  .prev-report .rep-head { font-size: 13px; color: #6B7280; }
+  .prev-report .rep-head strong { color: var(--primary); }
+  .prev-report .rep-card {
+    border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; background: #fff;
+  }
+  .prev-report .rep-card h4 { margin: 0 0 12px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .prev-report .rep-card.good { border-left: 4px solid #22C55E; }
+  .prev-report .rep-card.bad  { border-left: 4px solid #EF4444; }
+  .prev-report .rep-card.next { border-left: 4px solid #3FA9F5; }
+  .prev-report ul { margin: 0; padding-left: 20px; }
+  .prev-report li { margin: 7px 0; font-size: 13px; line-height: 1.5; color: var(--text); }
+  .prev-report .rep-metric { font-weight: 700; color: var(--primary); }
+  .prev-report .rep-sub { color: #6B7280; font-size: 12px; }
+  .prev-report .rep-empty { color: #9CA3AF; font-style: italic; font-size: 13px; }
+
   /* RELATÓRIO RESUMIDO */
   .rel-section { margin-bottom: 28px; }
   .rel-section h3 {
@@ -1452,7 +1482,7 @@
         <span id="prev-ultima-atualizacao" style="color:var(--primary);font-weight:600;"></span>
       </p>
 
-      <!-- Tabs PREVISIBILIDADE vs ATINGIMENTO -->
+      <!-- Tabs PREVISIBILIDADE vs ATINGIMENTO vs RELATÓRIO -->
       <div class="prev-tabs">
         <button class="prev-tab active" id="prev-tab-prev" onclick="switchPrevTab('previsibilidade')">
           📊 PREVISIBILIDADE (Meta)
@@ -1460,11 +1490,21 @@
         <button class="prev-tab" id="prev-tab-real" onclick="switchPrevTab('atingimento')">
           ✅ ATINGIMENTO (Real)
         </button>
+        <button class="prev-tab" id="prev-tab-relatorio" onclick="switchPrevTab('relatorio')">
+          📝 Relatório / Próximos Passos
+        </button>
       </div>
+
+      <p id="prev-hint-real" style="display:none;font-size:11px;color:#888;margin:0 0 10px;">
+        🟢 Verde = bateu/superou a meta · 🔴 Vermelho = abaixo da meta. Passe o mouse nas células
+        coloridas para ver o diagnóstico e a sugestão. Meses ainda não fechados não são coloridos.
+      </p>
 
       <div id="prev-table-container" class="prev-table-wrap">
         <p style="color:#999;padding:20px;">Carregando dados de previsibilidade...</p>
       </div>
+
+      <div id="prev-report-container" style="display:none;"></div>
 
       <p style="font-size:11px;color:#999;margin-top:16px;font-style:italic;">
         💡 Pra editar os dados, abre a planilha <a href="https://docs.google.com/spreadsheets/d/1f_G15gb637rTU7JfO1lWt7lYuYJBmrM3lvMezNuj0-U/edit#gid=593567545" target="_blank" rel="noopener" style="color:var(--primary);">PREVISIBILIDADE IA</a>.
@@ -3772,7 +3812,143 @@ function switchPrevTab(tab) {
   _prevTabAtual = tab;
   document.getElementById('prev-tab-prev').classList.toggle('active', tab === 'previsibilidade');
   document.getElementById('prev-tab-real').classList.toggle('active', tab === 'atingimento');
-  renderPrevisibilidade();
+  const relBtn = document.getElementById('prev-tab-relatorio');
+  if (relBtn) relBtn.classList.toggle('active', tab === 'relatorio');
+
+  const tableC  = document.getElementById('prev-table-container');
+  const reportC = document.getElementById('prev-report-container');
+  const hint    = document.getElementById('prev-hint-real');
+
+  if (tab === 'relatorio') {
+    if (tableC)  tableC.style.display  = 'none';
+    if (reportC) reportC.style.display = 'block';
+    if (hint)    hint.style.display    = 'none';
+    renderPrevReport();
+  } else {
+    if (tableC)  tableC.style.display  = 'block';
+    if (reportC) reportC.style.display = 'none';
+    if (hint)    hint.style.display    = (tab === 'atingimento') ? 'block' : 'none';
+    renderPrevisibilidade();
+  }
+}
+
+// ── Parser pt-BR: "R$ 1.000.000,00" / "78,33%" / "-58,51%" → número ──────────
+function _prevParseBR(s) {
+  if (s === null || s === undefined) return null;
+  let t = String(s).trim();
+  if (t === '') return null;
+  t = t.replace(/r\$/i, '').replace(/%/g, '').replace(/\s/g, '');
+  t = t.replace(/\./g, '').replace(',', '.');
+  const n = parseFloat(t);
+  return isNaN(n) ? null : n;
+}
+
+function _prevNorm(s) {
+  return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+}
+
+// ── Playbook: direção (up=maior melhor, down=menor melhor) + diagnóstico ─────
+const PREV_KPI = {
+  'crescimento mensal': { dir: 'up',
+    ruim: 'Crescimento abaixo do previsto. Reavaliar o mix de canais, reforçar campanhas de maior ROAS e revisar a meta de investimento do mês.',
+    bom: 'Crescimento acima da meta — ótimo ritmo! Documentar o que puxou o resultado para repetir.' },
+  'vendas': { dir: 'up',
+    ruim: 'Vendas abaixo da meta. Priorizar leads quentes de fundo de funil, acelerar o follow-up Reunião PDF → COF e revisar a abordagem comercial.',
+    bom: 'Vendas acima da meta — parabéns! Replicar a abordagem dos negócios fechados.' },
+  'receita faturada': { dir: 'up',
+    ruim: 'Receita abaixo do previsto. Focar em deals de maior ticket e reduzir o tempo de ciclo entre Apresentação BP e Envio de COF.',
+    bom: 'Receita acima da meta — excelente! Garantir capacidade de atendimento para sustentar o volume.' },
+  'leads': { dir: 'up',
+    ruim: 'Volume de leads abaixo da meta. Aumentar verba nos criativos de melhor CPL, testar novos públicos e revisar a LP.',
+    bom: 'Geração de leads acima da meta — ótimo! Atenção para manter a qualidade junto do volume.' },
+  'cpl': { dir: 'down',
+    ruim: 'CPL acima da meta. Pausar criativos caros, realocar verba para os anúncios de melhor desempenho e refinar a segmentação.',
+    bom: 'CPL abaixo da meta — eficiência ótima! Escalar os criativos campeões com cautela para manter o custo.' },
+  'sessoes': { dir: 'up',
+    ruim: 'Sessões abaixo do previsto. Revisar o investimento em topo de funil e otimizar palavras-chave/criativos de tráfego.',
+    bom: 'Tráfego acima da meta — bom volume! Garantir que a LP converte esse aumento de sessões.' },
+  'taxa de conversao lp': { dir: 'up',
+    ruim: 'Conversão da LP abaixo da meta. Testar headline, prova social e um formulário mais curto (teste A/B).',
+    bom: 'Conversão da LP acima da meta — ótimo! Documentar a versão vencedora como padrão.' },
+  'cps (geral)': { dir: 'down',
+    ruim: 'Custo por sessão acima da meta. Otimizar lances, pausar termos/criativos caros e melhorar o índice de qualidade.',
+    bom: 'CPS abaixo da meta — tráfego eficiente! Escalar os canais de melhor custo.' },
+  'roas faturado': { dir: 'up',
+    ruim: 'ROAS abaixo da meta. Concentrar a verba nas campanhas de maior retorno e cortar as de baixo desempenho.',
+    bom: 'ROAS acima da meta — retorno excelente! Avaliar aumentar o investimento nas campanhas vencedoras.' },
+  'cac': { dir: 'down',
+    ruim: 'CAC acima da meta. Melhorar a qualificação de leads e as taxas de conversão do funil para diluir o custo de aquisição.',
+    bom: 'CAC abaixo da meta — aquisição eficiente! Manter a qualidade do funil que gera esse custo baixo.' },
+  'lucro de media': { dir: 'up',
+    ruim: 'Lucro abaixo do previsto. Rever ticket, custos de mídia e a eficiência do funil comercial.',
+    bom: 'Lucro acima da meta — parabéns! Resultado financeiro saudável.' },
+  'taxa de conversao lead > venda': { dir: 'up',
+    ruim: 'Conversão lead → venda abaixo da meta. Reforçar a qualificação no topo e a cadência/treinamento do time comercial.',
+    bom: 'Conversão lead → venda acima da meta — time comercial afiado! Documentar as boas práticas.' },
+};
+
+function _prevKpiConfig(row) {
+  if (row.categoria === 'etapa_funil' || row.categoria === 'etapa_funil_top') {
+    return { dir: 'up',
+      ruim: 'Volume nesta etapa abaixo do previsto. Investigar o gargalo na etapa anterior e reforçar o follow-up dos leads.',
+      bom: 'Etapa acima da meta — bom avanço no funil! Manter o ritmo de progressão dos leads.' };
+  }
+  return PREV_KPI[_prevNorm(row.label)] || null;
+}
+
+// Compara real x meta. Retorna null quando não há base p/ comparar (mês não fechado).
+function _prevCompare(realStr, metaStr, dir) {
+  const realNum = _prevParseBR(realStr);
+  const metaNum = _prevParseBR(metaStr);
+  if (realNum === null || metaNum === null) return null;
+  if (realNum === 0 && metaNum > 0) return null; // ainda não realizado (placeholder zero)
+  const good = dir === 'up' ? realNum >= metaNum : realNum <= metaNum;
+  const diff = realNum - metaNum;
+  const magPct = metaNum !== 0 ? Math.abs(diff / metaNum * 100).toFixed(1) + '%' : '—';
+  const dirWord = diff >= 0 ? 'acima' : 'abaixo';
+  return { good, realStr, metaStr, gapTxt: `${magPct} ${dirWord} da meta` };
+}
+
+function _prevEscAttr(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function _prevBuildTip(label, cmp, cfg) {
+  const head = cmp.good ? `✅ ${label}` : `⚠️ ${label}`;
+  const linha = `Real: ${cmp.realStr}   |   Meta: ${cmp.metaStr}`;
+  const conselho = cmp.good ? `👏 ${cfg.bom}` : `💡 ${cfg.ruim}`;
+  return `${head}\n${linha}\n${cmp.gapTxt}\n\n${conselho}`;
+}
+
+// Tooltip flutuante único (evita corte pelo overflow da tabela)
+let _prevTipEl = null;
+function _prevAttachTooltip(container) {
+  if (!_prevTipEl) {
+    _prevTipEl = document.createElement('div');
+    _prevTipEl.id = 'prev-tip';
+    document.body.appendChild(_prevTipEl);
+  }
+  if (container._tipBound) return;
+  container._tipBound = true;
+  container.addEventListener('mouseover', e => {
+    const td = e.target.closest('td[data-tip]');
+    if (!td) return;
+    _prevTipEl.textContent = td.getAttribute('data-tip');
+    _prevTipEl.style.display = 'block';
+  });
+  container.addEventListener('mousemove', e => {
+    if (_prevTipEl.style.display !== 'block') return;
+    const pad = 14;
+    const r = _prevTipEl.getBoundingClientRect();
+    let x = e.clientX + pad, y = e.clientY + pad;
+    if (x + r.width  > window.innerWidth)  x = e.clientX - r.width  - pad;
+    if (y + r.height > window.innerHeight) y = e.clientY - r.height - pad;
+    _prevTipEl.style.left = x + 'px';
+    _prevTipEl.style.top  = y + 'px';
+  });
+  container.addEventListener('mouseout', e => {
+    if (e.target.closest('td[data-tip]')) _prevTipEl.style.display = 'none';
+  });
 }
 
 function renderPrevisibilidade() {
@@ -3847,14 +4023,33 @@ function renderPrevisibilidade() {
   });
   headerSub += '</tr>';
 
+  // ── Coloração Real vs Meta: só na aba Atingimento ──────────────────────────
+  const isReal = _prevTabAtual === 'atingimento';
+  const metaByLabel = {};
+  ((P.previsibilidade && P.previsibilidade.rows) || []).forEach(mr => {
+    metaByLabel[_prevNorm(mr.label)] = mr;
+  });
+
   // ── Linhas de dados ──
   let bodyHtml = '';
   bloco.rows.forEach(r => {
     const rowClass = `prev-row-${r.categoria}`;
+    const cfg = isReal ? _prevKpiConfig(r) : null;
+    const metaRow = cfg ? metaByLabel[_prevNorm(r.label)] : null;
     bodyHtml += `<tr class="${rowClass}">`;
     bodyHtml += `<td>${r.label}</td>`;
-    r.valores.forEach(v => {
-      bodyHtml += `<td>${v.v || ''}</td>`;
+    r.valores.forEach((v, i) => {
+      let cls = '', ico = '', tipAttr = '';
+      if (cfg && metaRow) {
+        const metaV = (metaRow.valores[i] || {}).v || '';
+        const cmp = _prevCompare(v.v, metaV, cfg.dir);
+        if (cmp) {
+          cls = cmp.good ? 'prev-cell-good' : 'prev-cell-bad';
+          ico = cmp.good ? ' <span class="prev-ico up">▲</span>' : ' <span class="prev-ico down">▼</span>';
+          tipAttr = ` data-tip="${_prevEscAttr(_prevBuildTip(r.label, cmp, cfg))}"`;
+        }
+      }
+      bodyHtml += `<td class="${cls}"${tipAttr}>${(v.v || '')}${ico}</td>`;
       bodyHtml += `<td class="prev-pct-col">${v.pct || ''}</td>`;
       bodyHtml += `<td class="prev-custo-col">${v.custo || ''}</td>`;
     });
@@ -3870,6 +4065,88 @@ function renderPrevisibilidade() {
       </thead>
       <tbody>${bodyHtml}</tbody>
     </table>
+  `;
+
+  _prevAttachTooltip(wrap);
+}
+
+// ── Relatório / Próximos Passos: análise Real vs Meta do mês fechado ─────────
+function renderPrevReport() {
+  const cont = document.getElementById('prev-report-container');
+  const P = DATA.previsibilidade;
+  if (!cont) return;
+  if (!P || !P.atingimento || !P.previsibilidade) {
+    cont.innerHTML = '<p class="rep-empty" style="padding:20px;">Dados de previsibilidade ainda não coletados.</p>';
+    return;
+  }
+
+  const meses    = P.atingimento.meses || [];
+  const realRows = P.atingimento.rows || [];
+  const metaByLabel = {};
+  (P.previsibilidade.rows || []).forEach(mr => { metaByLabel[_prevNorm(mr.label)] = mr; });
+
+  // Detecta o último mês com dado real "substancial" (Vendas/Receita/Leads/CPL preenchidos e ≠ placeholder)
+  const coreLabels = ['vendas', 'receita faturada', 'leads', 'cpl'];
+  const realByLabel = {};
+  realRows.forEach(rr => { realByLabel[_prevNorm(rr.label)] = rr; });
+  let mesIdx = -1;
+  for (let i = meses.length - 1; i >= 0; i--) {
+    const temReal = coreLabels.some(l => {
+      const rr = realByLabel[l]; if (!rr) return false;
+      const n = _prevParseBR((rr.valores[i] || {}).v);
+      return n !== null && n !== 0;
+    });
+    if (temReal) { mesIdx = i; break; }
+  }
+
+  if (mesIdx < 0) {
+    cont.innerHTML = '<div class="prev-report"><p class="rep-empty">Ainda não há mês com resultado real preenchido para analisar.</p></div>';
+    return;
+  }
+
+  const mesNome = meses[mesIdx] || '';
+  const bons = [], ruins = [], passos = [];
+  const passosSet = new Set();
+
+  realRows.forEach(rr => {
+    const cfg = _prevKpiConfig(rr);
+    if (!cfg) return;
+    const metaRow = metaByLabel[_prevNorm(rr.label)];
+    if (!metaRow) return;
+    const metaV = (metaRow.valores[mesIdx] || {}).v || '';
+    const realV = (rr.valores[mesIdx] || {}).v || '';
+    const cmp = _prevCompare(realV, metaV, cfg.dir);
+    if (!cmp) return;
+    const item = { label: rr.label, cmp, cfg };
+    if (cmp.good) bons.push(item);
+    else {
+      ruins.push(item);
+      if (!passosSet.has(cfg.ruim)) { passosSet.add(cfg.ruim); passos.push(cfg.ruim); }
+    }
+  });
+
+  const liGood = it => `<li><span class="rep-metric">${it.label}</span> — Real ${it.cmp.realStr} vs Meta ${it.cmp.metaStr} <span class="rep-sub">(${it.cmp.gapTxt})</span></li>`;
+  const liBad  = liGood;
+
+  cont.innerHTML = `
+    <div class="prev-report">
+      <p class="rep-head">Análise referente a <strong>${mesNome}</strong> (Real × Meta) — último mês com resultado preenchido.</p>
+
+      <div class="rep-card good">
+        <h4>✅ O que melhoramos / batemos a meta (${bons.length})</h4>
+        ${bons.length ? `<ul>${bons.map(liGood).join('')}</ul>` : '<p class="rep-empty">Nenhum KPI superou a meta neste mês.</p>'}
+      </div>
+
+      <div class="rep-card bad">
+        <h4>⚠️ O que ficou abaixo da meta (${ruins.length})</h4>
+        ${ruins.length ? `<ul>${ruins.map(liBad).join('')}</ul>` : '<p class="rep-empty">Nenhum KPI ficou abaixo da meta — excelente mês! 🎉</p>'}
+      </div>
+
+      <div class="rep-card next">
+        <h4>🎯 Próximos passos</h4>
+        ${passos.length ? `<ul>${passos.map(s => `<li>${s}</li>`).join('')}</ul>` : '<p class="rep-empty">Sem pontos críticos. Manter a estratégia atual e monitorar.</p>'}
+      </div>
+    </div>
   `;
 }
 
