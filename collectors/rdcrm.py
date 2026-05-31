@@ -29,6 +29,36 @@ def _paginate(endpoint, key):
     return results
 
 
+def _extract_reuniao_fields(deal):
+    """Extrai campos personalizados de reunião/No-Show do negócio.
+
+    No RD CRM esses campos ficam em deal_custom_fields (cada item tem
+    custom_field.label + value). Os de interesse:
+      - '1ª Reunião' / '2ª Reunião': 'Sim' = compareceu, 'Não' = No-Show
+      - 'Justificativa No show'
+      - 'FPQ'
+    Match por label normalizado (robusto a acento/ordinal).
+    """
+    res = {"reuniao_1": None, "reuniao_2": None,
+           "justificativa_no_show": None, "fpq": None}
+    for cf in (deal.get("deal_custom_fields") or []):
+        label = ((cf.get("custom_field") or {}).get("label") or "").strip().lower()
+        val = cf.get("value")
+        if val in (None, "", [], {}):
+            continue
+        if isinstance(val, list):
+            val = ", ".join(str(x) for x in val)
+        if "reuni" in label and "2" in label:
+            res["reuniao_2"] = val
+        elif "reuni" in label and "1" in label:
+            res["reuniao_1"] = val
+        elif "justificativa" in label and "show" in label:
+            res["justificativa_no_show"] = val
+        elif label == "fpq":
+            res["fpq"] = val
+    return res
+
+
 def get_deals():
     print("Coletando negócios (deals)...")
     raw = _paginate("deals", "deals")
@@ -38,6 +68,7 @@ def get_deals():
         emails = contact.get("emails") or []
         phones = contact.get("phones") or []
         lost = d.get("deal_lost_reason") or {}
+        reunioes = _extract_reuniao_fields(d)
         deals.append({
             "id": d.get("id"),
             "nome": d.get("name"),
@@ -61,6 +92,10 @@ def get_deals():
             "contato_email": emails[0].get("email") if emails else None,
             "contato_telefone": phones[0].get("phone") if phones else None,
             "em_espera": d.get("hold"),
+            "reuniao_1": reunioes["reuniao_1"],
+            "reuniao_2": reunioes["reuniao_2"],
+            "justificativa_no_show": reunioes["justificativa_no_show"],
+            "fpq": reunioes["fpq"],
         })
     print(f"  Total de negócios: {len(deals)}")
     return deals

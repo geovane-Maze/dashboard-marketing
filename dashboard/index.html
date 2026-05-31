@@ -1183,28 +1183,28 @@
         </div>
       </div>
 
-      <!-- Reuniões (RD CRM) -->
-      <div class="section-title" style="font-size:1.05rem;margin-top:28px;">📅 Reuniões (RD CRM)</div>
+      <!-- Reuniões / No-Show (RD CRM) -->
+      <div class="section-title" style="font-size:1.05rem;margin-top:28px;">🤝 Reuniões & No-Show (RD CRM)</div>
       <p style="font-size:12px;color:#888;margin:-8px 0 14px;">
-        Reuniões registradas como tarefa no RD CRM, no período filtrado.
-        <strong>"Não realizada" é uma estimativa de No-Show</strong> (reunião com data passada não
-        marcada como concluída) — o RD não tem campo nativo; alinhar a marcação com o time.
+        Dados reais dos campos <strong>1ª Reunião</strong> e <strong>2ª Reunião</strong> do negócio:
+        <strong style="color:#16A34A;">Sim = compareceu</strong> · <strong style="color:#DC2626;">Não = No-Show</strong>.
+        Referência de data = criação do negócio (o RD não guarda a data da reunião nesses campos).
       </p>
       <div class="kpi-grid-crm" id="kpi-meetings"></div>
       <div class="charts-row">
         <div class="chart-card">
-          <h3>Reuniões por Mês</h3>
+          <h3>Comparecimento × No-Show por Mês</h3>
           <div class="chart-wrap"><canvas id="chart-meetings-monthly"></canvas></div>
         </div>
         <div class="chart-card">
-          <h3>Reuniões por Responsável</h3>
+          <h3>Comparecimento × No-Show por Responsável</h3>
           <div class="chart-wrap"><canvas id="chart-meetings-resp"></canvas></div>
         </div>
       </div>
       <div class="table-card">
         <h3>Detalhe das Reuniões no Período</h3>
         <table>
-          <thead><tr><th>Data</th><th>Hora</th><th>Cliente</th><th>Responsável</th><th>Status</th></tr></thead>
+          <thead><tr><th>Data (criação)</th><th>Cliente</th><th>Responsável</th><th>1ª Reunião</th><th>2ª Reunião</th><th>Justificativa No-Show</th></tr></thead>
           <tbody id="table-meetings"></tbody>
         </table>
       </div>
@@ -2833,39 +2833,45 @@ function renderCRM() {
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
   });
 
-  // ── Reuniões (RD CRM) — respeita o filtro de data global ───────────────────
+  // ── Reuniões & No-Show (RD CRM) — dados reais 1ª/2ª Reunião ─────────────────
   const datePredM = getDateFilter();
-  const mAll  = (DATA.meetings && DATA.meetings.meetings_daily) || [];
-  const mFilt = mAll.filter(r => !datePredM || datePredM(r.data));
+  const mAll  = (DATA.meetings && DATA.meetings.detail) || [];
+  // filtra por data (criação do negócio); inclui linhas sem data
+  const mFilt = mAll.filter(r => !datePredM || !r.data || datePredM(r.data));
 
-  const STATUS_META = {
-    realizada:     { label: '✅ Realizada',     color: COLORS.green },
-    agendada:      { label: '⏳ Agendada',      color: COLORS.secondary },
-    nao_realizada: { label: '⚠️ Não realizada', color: COLORS.red },
+  // Sim → compareceu · Não → noshow
+  const clsR = v => {
+    const s = (v || '').trim().toLowerCase();
+    if (s === 'sim') return 'compareceu';
+    if (s === 'não' || s === 'nao') return 'noshow';
+    return null;
   };
-
-  const mCount     = c => mFilt.filter(r => r.classe === c).length;
-  const mRealizada = mCount('realizada');
-  const mAgendada  = mCount('agendada');
-  const mNao       = mCount('nao_realizada');
-  const mBase      = mRealizada + mNao;
-  const mTaxa      = mBase ? (mRealizada / mBase * 100) : 0;
+  const countR = (field, klass) => mFilt.filter(r => clsR(r[field]) === klass).length;
+  const r1c = countR('r1', 'compareceu'), r1n = countR('r1', 'noshow');
+  const r2c = countR('r2', 'compareceu'), r2n = countR('r2', 'noshow');
+  const r1base = r1c + r1n, r2base = r2c + r2n;
+  const r1taxa = r1base ? (r1n / r1base * 100) : 0;
+  const r2taxa = r2base ? (r2n / r2base * 100) : 0;
 
   const kpiM = document.getElementById('kpi-meetings');
   if (kpiM) kpiM.innerHTML = [
-    { label: 'Reuniões no Período',     value: fmt.num(mFilt.length), sub: 'total agendadas',          cls: ''      },
-    { label: 'Realizadas',              value: fmt.num(mRealizada),   sub: 'marcadas como concluídas', cls: 'green' },
-    { label: 'Agendadas (futuras)',     value: fmt.num(mAgendada),    sub: 'ainda vão acontecer',      cls: 'blue'  },
-    { label: 'Não realizadas',          value: fmt.num(mNao),         sub: 'proxy de No-Show',         cls: 'red'   },
-    { label: 'Taxa de Comparecimento',  value: fmt.pct(mTaxa),        sub: 'realiz. ÷ (realiz.+não)',  cls: 'teal'  },
+    { label: '1ª Reunião — Compareceu', value: fmt.num(r1c),     sub: 'campo 1ª Reunião = Sim',  cls: 'green' },
+    { label: '1ª Reunião — No-Show',    value: fmt.num(r1n),     sub: 'campo 1ª Reunião = Não',  cls: 'red'   },
+    { label: 'Taxa de No-Show (1ª)',    value: fmt.pct(r1taxa),  sub: 'No-Show ÷ total 1ª reun.', cls: 'orange' },
+    { label: '2ª Reunião — Compareceu', value: fmt.num(r2c),     sub: 'campo 2ª Reunião = Sim',  cls: 'green' },
+    { label: '2ª Reunião — No-Show',    value: fmt.num(r2n),     sub: 'campo 2ª Reunião = Não',  cls: 'red'   },
   ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
 
-  // Reuniões por mês (barras empilhadas)
+  // Comparecimento × No-Show por mês (mês de criação do negócio)
   const mByMonth = {};
   mFilt.forEach(r => {
+    if (!r.data) return;
     const mes = r.data.slice(0, 7);
-    if (!mByMonth[mes]) mByMonth[mes] = { realizada: 0, agendada: 0, nao_realizada: 0 };
-    mByMonth[mes][r.classe]++;
+    if (!mByMonth[mes]) mByMonth[mes] = { r1c: 0, r1n: 0, r2c: 0, r2n: 0 };
+    if (clsR(r.r1) === 'compareceu') mByMonth[mes].r1c++;
+    if (clsR(r.r1) === 'noshow')     mByMonth[mes].r1n++;
+    if (clsR(r.r2) === 'compareceu') mByMonth[mes].r2c++;
+    if (clsR(r.r2) === 'noshow')     mByMonth[mes].r2n++;
   });
   const mMonths = Object.keys(mByMonth).sort();
   makeChart('chart-meetings-monthly', {
@@ -2873,46 +2879,54 @@ function renderCRM() {
     data: {
       labels: mMonths.map(mesLabel),
       datasets: [
-        { label: 'Realizada',     data: mMonths.map(m => mByMonth[m].realizada),     backgroundColor: COLORS.green + 'CC',     borderRadius: 4 },
-        { label: 'Agendada',      data: mMonths.map(m => mByMonth[m].agendada),      backgroundColor: COLORS.secondary + 'CC', borderRadius: 4 },
-        { label: 'Não realizada', data: mMonths.map(m => mByMonth[m].nao_realizada), backgroundColor: COLORS.red + 'CC',       borderRadius: 4 },
+        { label: '1ª Compareceu', data: mMonths.map(m => mByMonth[m].r1c), backgroundColor: COLORS.green + 'CC',  borderRadius: 4 },
+        { label: '1ª No-Show',    data: mMonths.map(m => mByMonth[m].r1n), backgroundColor: COLORS.red + 'CC',    borderRadius: 4 },
+        { label: '2ª Compareceu', data: mMonths.map(m => mByMonth[m].r2c), backgroundColor: COLORS.teal + 'CC',   borderRadius: 4 },
+        { label: '2ª No-Show',    data: mMonths.map(m => mByMonth[m].r2n), backgroundColor: COLORS.orange + 'CC', borderRadius: 4 },
       ]
     },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } } }
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
   });
 
-  // Reuniões por responsável (barras empilhadas horizontais)
+  // Comparecimento × No-Show por responsável (1ª reunião, empilhado horizontal)
   const mByResp = {};
   mFilt.forEach(r => {
     const k = r.responsavel || 'sem responsável';
-    if (!mByResp[k]) mByResp[k] = { realizada: 0, agendada: 0, nao_realizada: 0, total: 0 };
-    mByResp[k][r.classe]++; mByResp[k].total++;
+    if (!mByResp[k]) mByResp[k] = { comp: 0, ns: 0, total: 0 };
+    const c = clsR(r.r1);
+    if (c === 'compareceu') { mByResp[k].comp++; mByResp[k].total++; }
+    else if (c === 'noshow') { mByResp[k].ns++; mByResp[k].total++; }
   });
-  const mResps = Object.entries(mByResp).sort((a, b) => b[1].total - a[1].total).slice(0, 8).map(e => e[0]);
+  const mResps = Object.entries(mByResp).filter(e => e[1].total > 0)
+    .sort((a, b) => b[1].total - a[1].total).slice(0, 8).map(e => e[0]);
   makeChart('chart-meetings-resp', {
     type: 'bar',
     data: {
       labels: mResps,
       datasets: [
-        { label: 'Realizada',     data: mResps.map(k => mByResp[k].realizada),     backgroundColor: COLORS.green + 'CC',     borderRadius: 4 },
-        { label: 'Agendada',      data: mResps.map(k => mByResp[k].agendada),      backgroundColor: COLORS.secondary + 'CC', borderRadius: 4 },
-        { label: 'Não realizada', data: mResps.map(k => mByResp[k].nao_realizada), backgroundColor: COLORS.red + 'CC',       borderRadius: 4 },
+        { label: 'Compareceu (1ª)', data: mResps.map(k => mByResp[k].comp), backgroundColor: COLORS.green + 'CC', borderRadius: 4 },
+        { label: 'No-Show (1ª)',    data: mResps.map(k => mByResp[k].ns),   backgroundColor: COLORS.red + 'CC',   borderRadius: 4 },
       ]
     },
     options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { position: 'bottom' } }, scales: { x: { stacked: true, beginAtZero: true }, y: { stacked: true } } }
   });
 
-  // Tabela detalhada das reuniões no período
+  // Tabela detalhada
   const tblM = document.getElementById('table-meetings');
+  const badge = v => {
+    const c = clsR(v);
+    if (c === 'compareceu') return '<span style="color:#16A34A;font-weight:600;">✅ Sim</span>';
+    if (c === 'noshow')     return '<span style="color:#DC2626;font-weight:600;">❌ Não</span>';
+    return '<span style="color:#9CA3AF;">—</span>';
+  };
   if (tblM) {
-    const sorted = [...mFilt].sort((a, b) => (b.data + b.hora).localeCompare(a.data + a.hora));
+    const sorted = [...mFilt].sort((a, b) => (b.data || '').localeCompare(a.data || ''));
     tblM.innerHTML = sorted.length
       ? sorted.map(r => {
-          const sm = STATUS_META[r.classe] || { label: r.classe, color: '#999' };
-          const [y, mo, d] = r.data.split('-');
-          return `<tr><td>${d}/${mo}/${y}</td><td>${r.hora || '—'}</td><td>${r.deal_nome}</td><td>${r.responsavel}</td><td><span style="color:${sm.color};font-weight:600;">${sm.label}</span></td></tr>`;
+          const dt = r.data ? r.data.split('-').reverse().join('/') : '—';
+          return `<tr><td>${dt}</td><td>${r.deal_nome}</td><td>${r.responsavel}</td><td>${badge(r.r1)}</td><td>${badge(r.r2)}</td><td>${r.justificativa || '<span style="color:#9CA3AF;">—</span>'}</td></tr>`;
         }).join('')
-      : '<tr><td colspan="5" class="empty">Sem reuniões no período selecionado.</td></tr>';
+      : '<tr><td colspan="6" class="empty">Sem reuniões registradas no período selecionado.</td></tr>';
   }
 }
 

@@ -1629,75 +1629,64 @@ def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
     }
 
 
-def aggregate_meetings(tarefas, today=None):
+def _classify_reuniao(v):
+    """'Sim' → compareceu · 'Não' → noshow · resto → None."""
+    s = str(v or "").strip().lower()
+    if s in ("sim", "compareceu", "yes", "true", "1"):
+        return "compareceu"
+    if s in ("não", "nao", "no-show", "noshow", "no", "false", "0"):
+        return "noshow"
+    return None
+
+
+def aggregate_meetings(deals):
     """
-    Agrega tarefas do tipo 'meeting' (reuniões) do RD CRM.
+    Reuniões a partir dos CAMPOS PERSONALIZADOS do negócio no RD CRM:
+      - reuniao_1 / reuniao_2: 'Sim' = compareceu, 'Não' = No-Show
 
-    Classifica cada reunião pela data agendada (campo 'data') + status:
-      - realizada:      concluída (concluida=TRUE) ou status 'completed'
-      - agendada:       data >= hoje e ainda não concluída (reunião futura)
-      - nao_realizada:  data < hoje e não concluída (PROXY de No-Show —
-                        RD não tem campo nativo, ver com o time)
-
-    Emite meetings_daily (1 linha por reunião) para o front filtrar por período,
-    no mesmo padrão de losses_daily.
+    Gera detalhe (1 linha por negócio com pelo menos uma reunião registrada)
+    para o front filtrar por período. Usa criado_em como data de referência
+    (o RD não guarda a data da reunião nesses campos — é a melhor aproximação).
+    Inclui também contagem de FPQ (Sim/Não).
     """
-    if today is None:
-        today = datetime.now().strftime("%Y-%m-%d")
+    fpq = {"sim": 0, "nao": 0}
+    detail = []
 
-    meetings_daily = []
-    by_resp = defaultdict(lambda: {"total": 0, "realizada": 0, "agendada": 0, "nao_realizada": 0})
-    monthly = defaultdict(lambda: {"total": 0, "realizada": 0, "agendada": 0, "nao_realizada": 0})
+    for d in (deals or []):
+        c1 = _classify_reuniao(d.get("reuniao_1"))
+        c2 = _classify_reuniao(d.get("reuniao_2"))
 
-    for t in (tarefas or []):
-        if (t.get("tipo") or "").strip().lower() != "meeting":
+        fv = str(d.get("fpq") or "").strip().lower()
+        if fv in ("sim", "yes", "true", "1"):
+            fpq["sim"] += 1
+        elif fv in ("não", "nao", "no", "false", "0"):
+            fpq["nao"] += 1
+
+        if not c1 and not c2:
             continue
-        dia = parse_date_to_day(t.get("data"))
-        if not dia:
-            continue
-        concluida = str(t.get("concluida") or "").strip().lower() in ("true", "1", "sim", "yes")
-        status = (t.get("status") or "").strip().lower()
-        realizada = concluida or status == "completed"
-        if realizada:
-            classe = "realizada"
-        elif dia >= today:
-            classe = "agendada"
-        else:
-            classe = "nao_realizada"
 
-        resp = t.get("responsavel") or "sem responsável"
-        meetings_daily.append({
-            "data": dia,
-            "hora": t.get("hora") or "",
-            "classe": classe,
-            "deal_nome": t.get("deal_nome") or "—",
-            "responsavel": resp,
+        detail.append({
+            "data": parse_date_to_day(d.get("criado_em")),
+            "deal_nome": d.get("nome") or "—",
+            "responsavel": d.get("responsavel") or "sem responsável",
+            "r1": d.get("reuniao_1") or "",
+            "r2": d.get("reuniao_2") or "",
+            "justificativa": d.get("justificativa_no_show") or "",
         })
-        by_resp[resp]["total"] += 1
-        by_resp[resp][classe] += 1
-        mes = dia[:7]
-        monthly[mes]["total"] += 1
-        monthly[mes][classe] += 1
 
-    realizada     = sum(1 for m in meetings_daily if m["classe"] == "realizada")
-    agendada      = sum(1 for m in meetings_daily if m["classe"] == "agendada")
-    nao_realizada = sum(1 for m in meetings_daily if m["classe"] == "nao_realizada")
-    base = realizada + nao_realizada
+    # Totais all-time (o front recalcula filtrado a partir de `detail`)
+    def tot(field):
+        comp = sum(1 for x in detail if _classify_reuniao(x[field]) == "compareceu")
+        ns   = sum(1 for x in detail if _classify_reuniao(x[field]) == "noshow")
+        base = comp + ns
+        return {"compareceu": comp, "noshow": ns, "total": base,
+                "taxa_noshow": round(ns / base * 100, 1) if base else 0}
 
     return {
-        "total": len(meetings_daily),
-        "realizada": realizada,
-        "agendada": agendada,
-        "nao_realizada": nao_realizada,
-        "taxa_comparecimento": round(realizada / base * 100, 1) if base else 0,
-        "meetings_daily": sorted(meetings_daily, key=lambda x: x["data"]),
-        "by_responsavel": [
-            {"responsavel": k, **v}
-            for k, v in sorted(by_resp.items(), key=lambda x: -x[1]["total"])
-        ],
-        "monthly": [
-            {"mes": k, **v} for k, v in sorted(monthly.items())
-        ],
+        "r1": tot("r1"),
+        "r2": tot("r2"),
+        "fpq": fpq,
+        "detail": sorted(detail, key=lambda x: x["data"] or ""),
     }
 
 
@@ -1715,12 +1704,6 @@ def main():
     crm_deals = read_sheet(gc, "crm_deals")
     crm_deals = dedupe_by_id(crm_deals, "crm_deals")
 
-    print("  Lendo CRM tarefas (reuniões)...")
-    crm_tarefas = []
-    try:
-        crm_tarefas = read_sheet(gc, "crm_tarefas")
-    except Exception:
-        print("    (sem aba crm_tarefas ainda)")
 
     print("  Lendo Meta Ads...")
     meta_ads = read_sheet(gc, "meta_ads")
@@ -1774,7 +1757,7 @@ def main():
     print(f"    {len(creative_quality)} criativos com qualidade atribuída")
 
     crm_agg     = aggregate_crm(crm_deals, leads)
-    meetings_agg = aggregate_meetings(crm_tarefas)
+    meetings_agg = aggregate_meetings(crm_deals)
     meta_agg    = meta_aggregated
     google_agg  = aggregate_google_ads(google_ads)
     utm_agg     = aggregate_utm(leads)
