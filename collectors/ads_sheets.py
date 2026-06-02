@@ -11,11 +11,11 @@ ADS_SHEET_ID = "1GC9-gtQM--sgpEejMGh2_pfibIt9w_511cJ7Ct3ACYA"
 ADS_TAB_NAME = "[CDC -B2B Franquadora] Criativos Facebook/Google"
 
 # Planilha Google Ads com dados diários (inclui campanhas Performance Max)
-GOOGLE_ADS_SHEET_ID = "12OM_jqCFPvG2QoU6Eh4vlcDE-ue2zlmeekAb4O3MClE"
+GOOGLE_ADS_SHEET_ID = "1A2SFRw3jwdMxKtBTZZIlOLVsXa3KKX1uB__eWdFnspg"
 GOOGLE_ADS_TAB_NAME = "Atualizado -"
 
 # Planilha Google Ads no nível de ANÚNCIO (criativos) — texto + métricas
-GOOGLE_ADS_CREATIVES_SHEET_ID = "1dPl_DtpQcXR4-t_iqp6y6sb8ea1yiUDgSojxfTyQs50"
+GOOGLE_ADS_CREATIVES_SHEET_ID = "1XgXplh1cZxxMhqG4mSFlDPr0zubyhFTjiZeAOuLQdqg"
 
 
 def _get_client():
