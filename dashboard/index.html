@@ -1184,7 +1184,10 @@
 
     <!-- RELATÓRIO RESUMIDO -->
     <div id="sec-relatorio" class="section">
-      <div class="section-title">📝 Relatório Resumido</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px;border-bottom:2px solid var(--secondary);padding-bottom:10px;">
+        <div class="section-title" style="margin:0;border:none;padding:0;">📝 Relatório Resumido</div>
+        <button class="rep-pdf-btn" onclick="downloadRelatorioResumidoPDF()">⬇️ Baixar PDF</button>
+      </div>
       <div id="relatorio-content">
         <p style="color:#999;font-size:13px;">Carregando relatório...</p>
       </div>
@@ -1990,6 +1993,24 @@ function renderRelatorio() {
   const num   = v => v != null ? Number(v).toLocaleString('pt-BR') : '—';
   const pct   = v => v != null ? v.toFixed(1) + '%' : '—';
 
+  // ── Reuniões & No-Show (RD CRM) — dados reais 1ª/2ª Reunião ─────────────────
+  const meetings = (DATA.meetings && DATA.meetings.detail) || [];
+  const clsR = v => {
+    const s = (v || '').trim().toLowerCase();
+    if (s === 'sim') return 'compareceu';
+    if (s === 'não' || s === 'nao') return 'noshow';
+    return null;
+  };
+  const cR = (f, k) => meetings.filter(r => clsR(r[f]) === k).length;
+  const r1c = cR('r1','compareceu'), r1n = cR('r1','noshow');
+  const r2c = cR('r2','compareceu'), r2n = cR('r2','noshow');
+  const taxa1 = (r1c+r1n) ? (r1n/(r1c+r1n)*100).toFixed(1)+'%' : '—';
+  const taxa2 = (r2c+r2n) ? (r2n/(r2c+r2n)*100).toFixed(1)+'%' : '—';
+
+  // ── Análise Real × Meta (Previsibilidade) ───────────────────────────────────
+  const A = (typeof _prevAnalyze === 'function') ? _prevAnalyze() : null;
+  const liGood = it => `<li><span class="rep-metric">${it.label}</span> — Real ${it.cmp.realStr} vs Meta ${it.cmp.metaStr} <span class="rep-sub">(${it.cmp.gapTxt})</span></li>`;
+
   // Taxa de perda por canal (histórico)
   const perdasCanal = {};
   (R.perdas_por_canal || []).forEach(r => { perdasCanal[r.utm] = r.total; });
@@ -2273,7 +2294,224 @@ function renderRelatorio() {
       </table>
     </div>` : ''}
 
+    <!-- 🤝 REUNIÕES & NO-SHOW (RD CRM) -->
+    ${meetings.length ? `
+    <div class="rel-section">
+      <h3>🤝 Reuniões & No-Show (RD CRM)</h3>
+      <p style="font-size:11px;color:#888;margin:-8px 0 12px;">
+        Dados reais dos campos <strong>1ª Reunião</strong> e <strong>2ª Reunião</strong> do CRM.
+        <strong style="color:#16A34A;">Sim = compareceu</strong> · <strong style="color:#DC2626;">Não = No-Show</strong>.
+      </p>
+      <table class="rel-table">
+        <thead><tr><th>Reunião</th><th style="text-align:right">Compareceu</th><th style="text-align:right">No-Show</th><th style="text-align:right">Total</th><th style="text-align:right">Taxa No-Show</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>1ª Reunião</strong></td>
+            <td class="green">${num(r1c)}</td>
+            <td class="red">${num(r1n)}</td>
+            <td class="num">${num(r1c+r1n)}</td>
+            <td class="red">${taxa1}</td>
+          </tr>
+          <tr>
+            <td><strong>2ª Reunião</strong></td>
+            <td class="green">${num(r2c)}</td>
+            <td class="red">${num(r2n)}</td>
+            <td class="num">${num(r2c+r2n)}</td>
+            <td class="red">${taxa2}</td>
+          </tr>
+          <tr style="background:var(--bg2)">
+            <td><strong>Total</strong></td>
+            <td class="green"><strong>${num(r1c+r2c)}</strong></td>
+            <td class="red"><strong>${num(r1n+r2n)}</strong></td>
+            <td class="num"><strong>${num(r1c+r1n+r2c+r2n)}</strong></td>
+            <td class="red"><strong>${(r1c+r1n+r2c+r2n) ? ((r1n+r2n)/(r1c+r1n+r2c+r2n)*100).toFixed(1)+'%' : '—'}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>` : ''}
+
+    <!-- 📊 PLANO DE AÇÃO (Real × Meta) -->
+    ${A && A.mesNome ? `
+    <div class="rel-section">
+      <h3>📊 Plano de Ação — ${A.mesNome} (Real × Meta)</h3>
+      <p style="font-size:11px;color:#888;margin:-8px 0 14px;">
+        Análise referente a <strong>${A.mesNome}</strong> — último mês com resultado preenchido na Previsibilidade.
+      </p>
+      <div class="prev-report" style="gap:14px;">
+        <div class="rep-card good">
+          <h4>✅ O que melhoramos / batemos a meta (${A.bons.length})</h4>
+          ${A.bons.length ? `<ul>${A.bons.map(liGood).join('')}</ul>` : '<p class="rep-empty">Nenhum KPI superou a meta neste mês.</p>'}
+        </div>
+        <div class="rep-card bad">
+          <h4>⚠️ O que ficou abaixo da meta (${A.ruins.length})</h4>
+          ${A.ruins.length ? `<ul>${A.ruins.map(liGood).join('')}</ul>` : '<p class="rep-empty">Nenhum KPI ficou abaixo da meta — excelente mês! 🎉</p>'}
+        </div>
+        <div class="rep-card next">
+          <h4>🎯 Próximos passos</h4>
+          ${A.passos.length ? `<ul>${A.passos.map(s => `<li>${s}</li>`).join('')}</ul>` : '<p class="rep-empty">Sem pontos críticos. Manter a estratégia atual e monitorar.</p>'}
+        </div>
+      </div>
+    </div>` : ''}
+
   `;
+}
+
+// ─── Botão "Baixar PDF" do Relatório Resumido (PDF nativo via jsPDF) ─────────
+function downloadRelatorioResumidoPDF() {
+  const R = DATA.relatorio;
+  if (!R) { alert('Dados do relatório ainda não carregados.'); return; }
+  const jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
+  if (!jsPDFCtor) { alert('Biblioteca de PDF não carregou. Recarregue a página.'); return; }
+
+  const doc = new jsPDFCtor({ unit: 'mm', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const mL = 15, mR = 15, contentW = pageW - mL - mR;
+  let y = 0;
+  const NAVY=[13,59,102], BLUE=[63,169,245], GREEN=[34,197,94], RED=[239,68,68],
+        ORANGE=[245,158,11], GRAY=[107,114,128], DARK=[31,41,55], LIGHT=[234,242,251];
+
+  const fNum = v => v != null ? Number(v).toLocaleString('pt-BR') : '—';
+  const fM   = v => v != null ? 'R$ ' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+  const fP   = v => v != null ? Number(v).toFixed(1)+'%' : '—';
+
+  const ensure = h => { if (y + h > pageH - 15) { doc.addPage(); y = 18; drawHeader(false); } };
+
+  function drawHeader(first) {
+    if (first) {
+      doc.setFillColor(...NAVY); doc.rect(0,0,pageW,28,'F');
+      doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(15);
+      doc.text('Clínica da Cidade — Expansão CDC', mL, 12);
+      doc.setFont('helvetica','normal'); doc.setFontSize(10);
+      doc.text(`Relatório Resumido — ${R.mes_label || ''}`, mL, 19);
+      doc.setFontSize(8); doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`, mL, 24);
+      y = 38;
+    }
+  }
+  drawHeader(true);
+
+  function sectionTitle(title, color) {
+    ensure(11);
+    doc.setFillColor(...(color||BLUE)); doc.rect(mL, y-4.5, 2.5, 7, 'F');
+    doc.setTextColor(...DARK); doc.setFont('helvetica','bold'); doc.setFontSize(12);
+    doc.text(title, mL+5, y); y += 8;
+  }
+
+  function table(headers, rows, widths, headerColor) {
+    const rowH = 7;
+    ensure(rowH * 2);
+    // header
+    doc.setFillColor(...(headerColor||NAVY));
+    doc.rect(mL, y-5, contentW, rowH, 'F');
+    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(9);
+    let x = mL + 2;
+    headers.forEach((h,i) => { doc.text(h, x, y); x += widths[i]; });
+    y += rowH;
+    // body
+    doc.setFont('helvetica','normal'); doc.setFontSize(9);
+    rows.forEach((row, idx) => {
+      ensure(rowH);
+      if (idx % 2 === 0) { doc.setFillColor(245,247,250); doc.rect(mL, y-5, contentW, rowH, 'F'); }
+      doc.setTextColor(...DARK);
+      let xx = mL + 2;
+      row.forEach((cell, i) => {
+        const txt = String(cell);
+        const w = widths[i] - 3;
+        const lines = doc.splitTextToSize(txt, w);
+        doc.text(lines[0] || '', xx, y);
+        xx += widths[i];
+      });
+      y += rowH;
+    });
+    y += 4;
+  }
+
+  function bulletList(items, color, isText) {
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor(...DARK);
+    if (!items.length) {
+      ensure(6); doc.setTextColor(...GRAY); doc.text('—', mL+5, y); y += 7; return;
+    }
+    items.forEach(it => {
+      const line = isText ? `•  ${it}` : `•  ${it.label}: Real ${it.cmp.realStr} vs Meta ${it.cmp.metaStr}  (${it.cmp.gapTxt})`;
+      const wrapped = doc.splitTextToSize(line, contentW - 4);
+      ensure(wrapped.length * 5 + 2);
+      doc.text(wrapped, mL + 5, y); y += wrapped.length * 5 + 2;
+    });
+    y += 4;
+  }
+
+  // === Dados do relatório ===
+  const c=R.custos_mes||{}, l=R.leads_mes||{}, crm=R.crm_resumo||{}, hist=R.leads_historico||{};
+
+  // 1) Leads do Mês
+  sectionTitle(`📥 Leads — ${R.mes_label || ''}`, BLUE);
+  table(['Canal','Leads','% do Total'],
+    [
+      ['Google CPC', fNum(l.googlecpc), l.total ? fP(l.googlecpc/l.total*100) : '—'],
+      ['Meta Ads',   fNum(l.metaads),   l.total ? fP(l.metaads/l.total*100)   : '—'],
+      ['Total Pago', fNum(l.pago),      l.total ? fP(l.pago/l.total*100)      : '—'],
+      ['Orgânico / Direto', fNum(l.organico), l.total ? fP(l.organico/l.total*100) : '—'],
+      ['Total Geral', fNum(l.total),    '100%'],
+    ], [70, 50, 40], NAVY);
+
+  // 2) Custo por Lead
+  sectionTitle(`💰 Custo por Lead — ${R.mes_label || ''}`, ORANGE);
+  table(['Canal','Investimento','Leads','CPL'],
+    [
+      ['Meta Ads',   fM(c.meta_gasto),   fNum(l.metaads),   fM(c.cpl_meta)],
+      ['Google CPC', fM(c.google_gasto), fNum(l.googlecpc), fM(c.cpl_google)],
+      ['Total Pago', fM(c.total_gasto),  fNum(l.pago),      fM(c.cpl_pago)],
+    ], [40, 50, 30, 40], NAVY);
+
+  // 3) Funil CRM
+  sectionTitle('🔄 Funil CRM — Visão Geral', NAVY);
+  table(['Indicador','Qtd','%'],
+    [
+      ['Total de negócios (histórico)', fNum(crm.total_deals), '100%'],
+      ['Negócios ativos', fNum(crm.total_active), crm.total_deals ? fP(crm.total_active/crm.total_deals*100):'—'],
+      ['Atualmente em Reunião PDF', fNum(crm.reuniao_pdf_total), fP(crm.reuniao_pdf_pct)],
+      ['Chegaram em Reunião PDF — '+(R.mes_label||''), fNum(crm.reuniao_pdf_mes), crm.reuniao_pdf_mes_pct != null ? fP(crm.reuniao_pdf_mes_pct):'—'],
+      ['Ganhos (fechados)', fNum(crm.total_won), crm.total_deals ? fP(crm.total_won/crm.total_deals*100):'—'],
+      ['Perdidos', fNum(crm.total_lost), crm.total_deals ? fP(crm.total_lost/crm.total_deals*100):'—'],
+    ], [90, 35, 35], NAVY);
+
+  // 4) Reuniões & No-Show
+  if (meetings.length) {
+    sectionTitle('🤝 Reuniões & No-Show (RD CRM)', GREEN);
+    table(['Reunião','Compareceu','No-Show','Total','Taxa No-Show'],
+      [
+        ['1ª Reunião', fNum(r1c), fNum(r1n), fNum(r1c+r1n), taxa1],
+        ['2ª Reunião', fNum(r2c), fNum(r2n), fNum(r2c+r2n), taxa2],
+        ['Total', fNum(r1c+r2c), fNum(r1n+r2n), fNum(r1c+r1n+r2c+r2n),
+         (r1c+r1n+r2c+r2n)?((r1n+r2n)/(r1c+r1n+r2c+r2n)*100).toFixed(1)+'%':'—'],
+      ], [35, 35, 30, 30, 30], NAVY);
+  }
+
+  // 5) Plano de Ação
+  if (A && A.mesNome) {
+    sectionTitle(`📊 Plano de Ação — ${A.mesNome} (Real × Meta)`, BLUE);
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...GREEN);
+    ensure(8); doc.text(`✅ O que melhoramos / batemos a meta (${A.bons.length})`, mL, y); y += 6;
+    bulletList(A.bons, GREEN, false);
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...RED);
+    ensure(8); doc.text(`⚠️ O que ficou abaixo da meta (${A.ruins.length})`, mL, y); y += 6;
+    bulletList(A.ruins, RED, false);
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...BLUE);
+    ensure(8); doc.text(`🎯 Próximos passos`, mL, y); y += 6;
+    bulletList(A.passos, BLUE, true);
+  }
+
+  // Rodapé em todas as páginas
+  const pages = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= pages; p++) {
+    doc.setPage(p); doc.setFontSize(8); doc.setTextColor(...GRAY);
+    doc.text('Dashboard Marketing — Clínica da Cidade Franchising', mL, pageH - 8);
+    doc.text(`Página ${p}/${pages}`, pageW - mR, pageH - 8, { align: 'right' });
+  }
+
+  doc.save(`Relatorio_Resumido_${(R.mes_label||'').replace(/[\\\/:*?"<>|]/g,'_')}.pdf`);
 }
 
 // ─── SECTION: EXECUTIVO ───────────────────────────────────────────────────────
