@@ -1123,7 +1123,13 @@ def aggregate_ga4(rows):
     pages = defaultdict(int)
     sources = defaultdict(int)
 
+    # Detecta linhas com flag _kind (coleta nova). Ignora 'demo' pra não duplicar.
+    has_kind_flag = any("_kind" in r for r in (rows or []))
+
     for row in rows:
+        if has_kind_flag and row.get("_kind") == "demo":
+            continue  # demografia: já foi agregada pelo aggregate_ga4_lps
+
         mes = parse_date_to_month(row.get("date"))
         if not mes:
             continue
@@ -1241,14 +1247,38 @@ def aggregate_ga4_lps(rows):
 
     has_age = has_gender = False
 
+    # Detecta se a coleta nova (com _kind) está sendo usada — se sim, filtra:
+    # principais → métricas + breakdowns; demo → SÓ idade/sexo (evita duplicação).
+    has_kind_flag = any("_kind" in r for r in (rows or []))
+
     for row in (rows or []):
         page = (row.get("pagePath") or "").strip()
         k = LP_PATH_LOOKUP.get(page)
         if not k:
             continue
         b = by_lp[k]
+        kind = row.get("_kind")  # "main", "demo" ou None (coleta antiga sem flag)
 
-        sessions    = int(parse_num(row.get("sessions")))
+        sessions = int(parse_num(row.get("sessions")))
+        if not sessions:
+            continue
+
+        # ── Demografia (idade/sexo) — separada porque pode vir de request próprio ─
+        age = row.get("userAgeBracket")
+        gen = row.get("userGender")
+        # Idade: ignora valores vazios / "unknown" / etc.
+        if age and age.lower() not in ("", "unknown", "(not set)", "not set"):
+            has_age = True
+            b["ages"][age] += sessions
+        if gen and gen.lower() not in ("", "unknown", "(not set)", "not set"):
+            has_gender = True
+            b["genders"][gen] += sessions
+
+        # Se a linha veio do request DE DEMOGRAFIA, NÃO conta as métricas (evita duplicação)
+        if has_kind_flag and kind == "demo":
+            continue
+
+        # ── Linhas "main" (ou coleta antiga sem flag) — conta métricas e breakdowns ─
         users       = int(parse_num(row.get("totalUsers")))
         new_users   = int(parse_num(row.get("newUsers")))
         pageviews   = int(parse_num(row.get("screenPageViews")))
@@ -1283,16 +1313,6 @@ def aggregate_ga4_lps(rows):
             m["users"]       += users
             m["conversions"] += conversions
             m["bounce_w"]    += bounce * sessions
-
-        # demografia (só preenche se vier do coletor)
-        age = row.get("userAgeBracket")
-        if age:
-            has_age = True
-            b["ages"][age] += sessions
-        gen = row.get("userGender")
-        if gen:
-            has_gender = True
-            b["genders"][gen] += sessions
 
     # Serialização final
     result = {"by_lp": {}, "has_demographics": has_age or has_gender,
