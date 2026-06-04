@@ -4311,6 +4311,28 @@ function _ga4BarList(items, key, valKey, color, total, max) {
 function renderGA4() {
   const lps = (DATA.ga4_lps && DATA.ga4_lps.by_lp) || {};
 
+  // Se o summary.json ainda não tem ga4_lps (cache do Supabase desatualizado),
+  // mostra mensagem clara pro user em vez de tela em branco.
+  if (!DATA.ga4_lps || !Object.keys(lps).length) {
+    const html = `
+      <div style="background:#FEF3C7;border:1px solid #FBBF24;border-radius:12px;padding:24px;margin:8px 0;">
+        <h3 style="color:#92400E;font-size:15px;margin:0 0 10px;">⏳ Dados aguardando próxima coleta</h3>
+        <p style="font-size:13px;color:#78350F;margin:0 0 8px;line-height:1.6;">
+          A estrutura nova dos dados (LPs de expansão) ainda não foi gerada no servidor.
+          Rode o workflow manual no GitHub Actions pra atualizar:
+        </p>
+        <ol style="font-size:13px;color:#78350F;margin:8px 0 8px 18px;line-height:1.7;">
+          <li>Abra <a href="https://github.com/geovane-Maze/dashboard-marketing/actions" target="_blank" style="color:#0D3B66;font-weight:600;">github.com/geovane-Maze/dashboard-marketing/actions</a></li>
+          <li>Clique em <strong>"Coletar Dados Dashboard Marketing"</strong></li>
+          <li>Clique em <strong>"Run workflow"</strong> (canto direito)</li>
+          <li>Espere ~10-15 minutos e recarregue esta página com Ctrl+F5</li>
+        </ol>
+      </div>`;
+    document.getElementById('ga4-lp-overview').innerHTML = html;
+    document.getElementById('ga4-lp-details').innerHTML = '';
+    return;
+  }
+
   // Aviso sobre demografia ainda não coletada
   const warn = document.getElementById('ga4-demo-warn');
   if (warn) warn.style.display = (DATA.ga4_lps && DATA.ga4_lps.has_demographics) ? 'none' : 'inline';
