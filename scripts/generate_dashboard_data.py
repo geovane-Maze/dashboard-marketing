@@ -1194,6 +1194,123 @@ def aggregate_ga4(rows):
     }
 
 
+LP_EXPANSAO = {
+    "/sejaumfranqueado/": {"label": "Seja Um Franqueado", "key": "franqueado", "url": "https://franquiaclinicadacidade.com.br/sejaumfranqueado/"},
+    "/":                  {"label": "Home",               "key": "home",       "url": "https://franquiaclinicadacidade.com.br/"},
+    "/pablo-spyer/":      {"label": "Pablo Spyer",        "key": "pablo",      "url": "https://franquiaclinicadacidade.com.br/pablo-spyer/"},
+}
+
+
+def aggregate_ga4_lps(rows):
+    """
+    Agrega o GA4 raw pelas 3 LPs de expansão (Franqueado, Home, Pablo Spyer).
+    Para cada LP gera: totais (sessions, users, conversions, bounce, duration),
+    breakdowns por cidade, fonte, canal, dispositivo, e evolução mensal.
+
+    Estrutura: {by_lp: {key: {meta, totals, top_cities, top_sources, channels,
+                              devices, monthly}}, has_demographics: bool}
+    """
+    by_lp = {}
+    for path, meta in LP_EXPANSAO.items():
+        by_lp[meta["key"]] = {
+            "meta": meta,
+            "sessions": 0, "users": 0, "new_users": 0, "pageviews": 0,
+            "conversions": 0,
+            "bounce_weighted": 0.0, "duration_weighted": 0.0,
+            "cities": defaultdict(int), "sources": defaultdict(int),
+            "channels": defaultdict(int), "devices": defaultdict(int),
+            "monthly": defaultdict(lambda: {"sessions": 0, "users": 0, "conversions": 0,
+                                            "bounce_w": 0.0}),
+            "ages": defaultdict(int), "genders": defaultdict(int),
+        }
+
+    has_age = has_gender = False
+
+    for row in (rows or []):
+        page = (row.get("pagePath") or "").strip()
+        if page not in LP_EXPANSAO:
+            continue
+        k = LP_EXPANSAO[page]["key"]
+        b = by_lp[k]
+
+        sessions    = int(parse_num(row.get("sessions")))
+        users       = int(parse_num(row.get("totalUsers")))
+        new_users   = int(parse_num(row.get("newUsers")))
+        pageviews   = int(parse_num(row.get("screenPageViews")))
+        conversions = int(parse_num(row.get("conversions")))
+        bounce      = parse_num(row.get("bounceRate"))
+        duration    = parse_num(row.get("averageSessionDuration"))
+
+        b["sessions"]    += sessions
+        b["users"]       += users
+        b["new_users"]   += new_users
+        b["pageviews"]   += pageviews
+        b["conversions"] += conversions
+        b["bounce_weighted"]   += bounce * sessions
+        b["duration_weighted"] += duration * sessions
+
+        # breakdowns
+        city = (row.get("city") or "(não definido)").strip() or "(não definido)"
+        if city.lower() not in ("(not set)", "not set"):
+            b["cities"][city] += sessions
+        src = (row.get("sessionSource") or "direto").strip()
+        b["sources"][src] += sessions
+        ch  = (row.get("sessionDefaultChannelGroup") or "Outros").strip()
+        b["channels"][ch] += sessions
+        dev = (row.get("deviceCategory") or "outros").strip()
+        b["devices"][dev] += sessions
+
+        # mensal
+        mes = parse_date_to_month(row.get("date"))
+        if mes:
+            m = b["monthly"][mes]
+            m["sessions"]    += sessions
+            m["users"]       += users
+            m["conversions"] += conversions
+            m["bounce_w"]    += bounce * sessions
+
+        # demografia (só preenche se vier do coletor)
+        age = row.get("userAgeBracket")
+        if age:
+            has_age = True
+            b["ages"][age] += sessions
+        gen = row.get("userGender")
+        if gen:
+            has_gender = True
+            b["genders"][gen] += sessions
+
+    # Serialização final
+    result = {"by_lp": {}, "has_demographics": has_age or has_gender,
+              "has_age": has_age, "has_gender": has_gender}
+    for k, b in by_lp.items():
+        s = b["sessions"]
+        result["by_lp"][k] = {
+            "meta": b["meta"],
+            "totals": {
+                "sessions":    s,
+                "users":       b["users"],
+                "new_users":   b["new_users"],
+                "pageviews":   b["pageviews"],
+                "conversions": b["conversions"],
+                "conv_rate":   round(b["conversions"] / s * 100, 2) if s else 0,
+                "bounce_rate": round(b["bounce_weighted"] / s * 100, 1) if s else 0,
+                "avg_duration": round(b["duration_weighted"] / s, 1) if s else 0,
+            },
+            "top_cities":  [{"city": c, "sessions": v} for c, v in sorted(b["cities"].items(),  key=lambda x: -x[1])[:15]],
+            "top_sources": [{"source": c, "sessions": v} for c, v in sorted(b["sources"].items(), key=lambda x: -x[1])[:10]],
+            "channels":    [{"channel": c, "sessions": v} for c, v in sorted(b["channels"].items(), key=lambda x: -x[1])],
+            "devices":     [{"device": c, "sessions": v} for c, v in sorted(b["devices"].items(),  key=lambda x: -x[1])],
+            "monthly":     [
+                {"mes": m, "sessions": d["sessions"], "users": d["users"], "conversions": d["conversions"],
+                 "bounce_rate": round(d["bounce_w"] / d["sessions"] * 100, 1) if d["sessions"] else 0}
+                for m, d in sorted(b["monthly"].items())
+            ],
+            "ages":    [{"age": a, "sessions": v} for a, v in sorted(b["ages"].items(),    key=lambda x: -x[1])],
+            "genders": [{"gender": g, "sessions": v} for g, v in sorted(b["genders"].items(), key=lambda x: -x[1])],
+        }
+    return result
+
+
 def aggregate_utm(leads):
     sources = defaultdict(int)
     mediums = defaultdict(int)
@@ -1809,6 +1926,7 @@ def main():
         "meta_ads": meta_agg,
         "google_ads": google_agg,
         "ga4": aggregate_ga4(ga4),
+        "ga4_lps": aggregate_ga4_lps(ga4),
         "utm": utm_agg,
         "google_ads_creatives": aggregate_google_ads_creatives(google_ads_creatives_rows, leads_daily_map=google_leads_daily),
         "creative_quality": creative_quality,

@@ -49,8 +49,11 @@ def get_ga4_data(start_date="2024-01-01", end_date="today"):
             Dimension(name="pagePath"),
             Dimension(name="deviceCategory"),
             Dimension(name="country"),
+            Dimension(name="region"),            # estado/UF
             Dimension(name="city"),
             Dimension(name="sessionDefaultChannelGroup"),
+            Dimension(name="userAgeBracket"),    # faixa etária (precisa Sinais do Google)
+            Dimension(name="userGender"),        # gênero
         ],
         metrics=[
             Metric(name="sessions"),

@@ -441,6 +441,82 @@
   .tt-val   { font-weight: 700; font-size: 12px; }
   .tt-pct   { color: #9CA3AF; font-weight: 400; font-size: 11px; }
 
+  /* ═══ GA4 — PÁGINAS DE EXPANSÃO ═══ */
+  .ga4-lp-overview {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px;
+  }
+  @media (max-width: 900px) { .ga4-lp-overview { grid-template-columns: 1fr; } }
+  .ga4-lp-card {
+    background: var(--card); border-radius: 12px; padding: 18px 18px 14px;
+    border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    border-top: 4px solid var(--secondary);
+  }
+  .ga4-lp-card.franqueado { border-top-color: #22C55E; }
+  .ga4-lp-card.home       { border-top-color: #3FA9F5; }
+  .ga4-lp-card.pablo      { border-top-color: #F59E0B; }
+  .ga4-lp-card h4 {
+    font-size: 15px; font-weight: 700; color: var(--heading);
+    margin: 0 0 4px; display: flex; align-items: center; gap: 8px;
+  }
+  .ga4-lp-card .ga4-lp-url {
+    font-size: 11px; color: #888; word-break: break-all; margin-bottom: 12px;
+    text-decoration: none;
+  }
+  .ga4-lp-card .ga4-lp-url:hover { color: var(--secondary); text-decoration: underline; }
+  .ga4-lp-metrics {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+    border-top: 1px solid var(--border); padding-top: 12px;
+  }
+  .ga4-lp-metric { padding: 4px 0; }
+  .ga4-lp-metric .lbl {
+    font-size: 10px; color: #888; text-transform: uppercase;
+    letter-spacing: .4px; font-weight: 600;
+  }
+  .ga4-lp-metric .val {
+    font-size: 18px; font-weight: 700; color: var(--heading); line-height: 1.2;
+  }
+  .ga4-lp-metric .val.good  { color: #16A34A; }
+  .ga4-lp-metric .val.warn  { color: #D97706; }
+  .ga4-lp-metric .val.bad   { color: #DC2626; }
+  .ga4-lp-metric .sub { font-size: 10px; color: #999; }
+
+  /* Detalhamento por LP */
+  .ga4-lp-section {
+    background: var(--card); border-radius: 12px; padding: 18px 20px;
+    border: 1px solid var(--border); margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .ga4-lp-section > .ga4-lp-head {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+    border-bottom: 2px solid var(--border); padding-bottom: 10px;
+  }
+  .ga4-lp-section > .ga4-lp-head h3 { font-size: 15px; font-weight: 700; color: var(--heading); margin: 0; }
+  .ga4-lp-section > .ga4-lp-head .ga4-lp-tag {
+    background: var(--bg2); padding: 3px 10px; border-radius: 12px;
+    font-size: 11px; color: var(--text); font-weight: 600;
+  }
+  .ga4-lp-grid {
+    display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr; gap: 16px;
+  }
+  @media (max-width: 1100px) {
+    .ga4-lp-grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 600px) {
+    .ga4-lp-grid { grid-template-columns: 1fr; }
+  }
+  .ga4-sub { font-size: 12px; font-weight: 600; color: #888; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .3px; }
+  .ga4-bar-list { display: flex; flex-direction: column; gap: 5px; }
+  .ga4-bar-item { font-size: 12px; }
+  .ga4-bar-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
+  .ga4-bar-row .nm { color: var(--text); }
+  .ga4-bar-row .vl { color: #888; font-weight: 600; }
+  .ga4-bar-track { background: var(--bg2); border-radius: 3px; height: 6px; overflow: hidden; }
+  .ga4-bar-fill { height: 100%; background: var(--secondary); border-radius: 3px; }
+  .ga4-bar-fill.franqueado { background: #22C55E; }
+  .ga4-bar-fill.home       { background: #3FA9F5; }
+  .ga4-bar-fill.pablo      { background: #F59E0B; }
+  .ga4-mini-chart { position: relative; height: 160px; }
+
   /* ═══ PREVISIBILIDADE 2026 ═══ */
   .prev-tabs {
     display: flex; gap: 8px; margin-bottom: 16px;
@@ -1580,32 +1656,32 @@
 
     <!-- GOOGLE ANALYTICS -->
     <div id="sec-ga4" class="section">
-      <div class="section-title">Google Analytics 4</div>
-      <div class="kpi-grid" id="kpi-ga4"></div>
+      <div class="section-title">🌐 Google Analytics — Páginas de Expansão</div>
+      <p style="font-size:12px;color:#888;margin:-12px 0 16px;">
+        Dados filtrados nas <strong>3 LPs de expansão</strong> da Clínica da Cidade Franchising.
+        Demais páginas (centros médicos, agendamento etc.) <strong>não entram</strong> no relatório.
+        <span id="ga4-demo-warn" style="display:none;color:#D97706;">
+          ⚠️ Faixa etária e sexo ainda não foram coletadas — recoletar GA4 após renovar o token.
+        </span>
+      </p>
+
+      <!-- Cards de overview por LP (3 lado a lado) -->
+      <div class="ga4-lp-overview" id="ga4-lp-overview"></div>
+
+      <!-- Comparativos visuais -->
       <div class="charts-row">
         <div class="chart-card">
-          <h3>Sessões por Canal</h3>
-          <div class="chart-wrap tall"><canvas id="chart-ga4-channels"></canvas></div>
+          <h3>Evolução Mensal de Sessões (3 LPs)</h3>
+          <div class="chart-wrap tall"><canvas id="chart-ga4-monthly-lps"></canvas></div>
         </div>
         <div class="chart-card">
-          <h3>Dispositivos</h3>
-          <div class="chart-wrap tall"><canvas id="chart-ga4-devices"></canvas></div>
+          <h3>Taxa de Conversão × Rejeição por LP</h3>
+          <div class="chart-wrap tall"><canvas id="chart-ga4-convrej"></canvas></div>
         </div>
       </div>
-      <div class="table-card">
-        <h3>Top Páginas por Visualizações</h3>
-        <table>
-          <thead><tr><th>#</th><th>Página</th><th>Visualizações</th></tr></thead>
-          <tbody id="table-ga4-pages"></tbody>
-        </table>
-      </div>
-      <div class="table-card">
-        <h3>Top Fontes de Tráfego</h3>
-        <table>
-          <thead><tr><th>#</th><th>Fonte</th><th>Sessões</th><th>%</th></tr></thead>
-          <tbody id="table-ga4-sources"></tbody>
-        </table>
-      </div>
+
+      <!-- Detalhamento por LP (3 blocos stacked) -->
+      <div id="ga4-lp-details"></div>
     </div>
 
     <!-- PREVISIBILIDADE 2026 -->
@@ -4206,53 +4282,139 @@ function renderUTM() {
   ).join('') || '<tr><td colspan="4" class="empty">Sem dados UTM</td></tr>';
 }
 
-// ─── SECTION: GA4 ─────────────────────────────────────────────────────────────
+// ─── SECTION: GA4 — Páginas de Expansão ──────────────────────────────────────
+const GA4_LP_ORDER = ['franqueado', 'home', 'pablo'];
+const GA4_LP_ICON  = { franqueado: '🎯', home: '🏠', pablo: '🎤' };
+const GA4_LP_COLOR = { franqueado: '#22C55E', home: '#3FA9F5', pablo: '#F59E0B' };
+
+function _ga4Class(metric, value) {
+  // taxa de conversão: maior é melhor; taxa de rejeição: menor é melhor
+  if (metric === 'conv') return value >= 5 ? 'good' : (value >= 1 ? '' : 'warn');
+  if (metric === 'rej')  return value <= 40 ? 'good' : (value <= 60 ? 'warn' : 'bad');
+  return '';
+}
+
+function _ga4BarList(items, key, valKey, color, total, max) {
+  const list = items.slice(0, max || 10);
+  if (!list.length) return '<p style="font-size:11px;color:#999;font-style:italic;">Sem dados.</p>';
+  const top = list[0][valKey] || 1;
+  return '<div class="ga4-bar-list">' + list.map(r => {
+    const v = r[valKey] || 0;
+    const w = Math.max(2, v / top * 100);
+    return `<div class="ga4-bar-item">
+      <div class="ga4-bar-row"><span class="nm">${r[key]}</span><span class="vl">${fmt.num(v)}</span></div>
+      <div class="ga4-bar-track"><div class="ga4-bar-fill ${color || ''}" style="width:${w}%"></div></div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
 function renderGA4() {
-  const pred    = getFilteredMonths();
-  const monthly = filterMonthly(DATA.ga4.monthly, pred);
+  const lps = (DATA.ga4_lps && DATA.ga4_lps.by_lp) || {};
 
-  const totalSessions = monthly.reduce((s, r) => s + r.sessions, 0);
-  const totalUsers = monthly.reduce((s, r) => s + r.users, 0);
-  const totalNew = monthly.reduce((s, r) => s + r.new_users, 0);
-  const totalConv = monthly.reduce((s, r) => s + r.conversions, 0);
-  const avgBounce = monthly.length > 0
-    ? monthly.reduce((s, r) => s + r.bounce_rate * r.sessions, 0) / (totalSessions || 1)
-    : 0;
+  // Aviso sobre demografia ainda não coletada
+  const warn = document.getElementById('ga4-demo-warn');
+  if (warn) warn.style.display = (DATA.ga4_lps && DATA.ga4_lps.has_demographics) ? 'none' : 'inline';
 
-  document.getElementById('kpi-ga4').innerHTML = [
-    { label: 'Sessões', value: fmt.k(totalSessions), sub: 'período', cls: '' },
-    { label: 'Usuários', value: fmt.k(totalUsers), sub: 'período', cls: 'blue' },
-    { label: 'Novos Usuários', value: fmt.k(totalNew), sub: 'período', cls: '' },
-    { label: 'Conversões GA4', value: fmt.num(totalConv), sub: 'período', cls: 'green' },
-    { label: 'Taxa de Rejeição', value: fmt.pct(avgBounce), sub: 'média ponderada', cls: avgBounce > 70 ? 'red' : 'orange' },
-  ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
+  // ── 1) Cards de overview (3 lado a lado) ──────────────────────────────────
+  const overview = GA4_LP_ORDER.map(k => {
+    const lp = lps[k]; if (!lp) return '';
+    const t = lp.totals;
+    return `
+      <div class="ga4-lp-card ${k}">
+        <h4>${GA4_LP_ICON[k]} ${lp.meta.label}</h4>
+        <a class="ga4-lp-url" href="${lp.meta.url}" target="_blank" rel="noopener">${lp.meta.url}</a>
+        <div class="ga4-lp-metrics">
+          <div class="ga4-lp-metric"><div class="lbl">Sessões</div><div class="val">${fmt.num(t.sessions)}</div></div>
+          <div class="ga4-lp-metric"><div class="lbl">Usuários</div><div class="val">${fmt.num(t.users)}</div></div>
+          <div class="ga4-lp-metric"><div class="lbl">Conversões</div><div class="val">${fmt.num(t.conversions)}</div></div>
+          <div class="ga4-lp-metric"><div class="lbl">Taxa Conversão</div><div class="val ${_ga4Class('conv', t.conv_rate)}">${t.conv_rate.toFixed(2)}%</div></div>
+          <div class="ga4-lp-metric"><div class="lbl">Taxa Rejeição</div><div class="val ${_ga4Class('rej', t.bounce_rate)}">${t.bounce_rate.toFixed(1)}%</div></div>
+          <div class="ga4-lp-metric"><div class="lbl">Duração Média</div><div class="val">${Math.round(t.avg_duration)}s</div></div>
+        </div>
+      </div>`;
+  }).join('');
+  document.getElementById('ga4-lp-overview').innerHTML = overview;
 
-  const channels = DATA.ga4.channels.slice(0, 10);
-  makeChart('chart-ga4-channels', {
+  // ── 2) Gráfico de evolução mensal (1 linha por LP) ─────────────────────────
+  const allMonths = new Set();
+  GA4_LP_ORDER.forEach(k => (lps[k]?.monthly || []).forEach(m => allMonths.add(m.mes)));
+  const months = [...allMonths].sort();
+  const lookupMonthly = (k, mes) => (lps[k]?.monthly || []).find(m => m.mes === mes);
+
+  makeChart('chart-ga4-monthly-lps', {
+    type: 'line',
+    data: {
+      labels: months.map(mesLabel),
+      datasets: GA4_LP_ORDER.filter(k => lps[k]).map(k => ({
+        label: lps[k].meta.label,
+        data: months.map(m => (lookupMonthly(k, m)?.sessions) || 0),
+        borderColor: GA4_LP_COLOR[k],
+        backgroundColor: GA4_LP_COLOR[k] + '22',
+        borderWidth: 2,
+        pointRadius: 3,
+        tension: 0.3,
+        fill: false,
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
+
+  // ── 3) Comparativo Taxa Conversão × Rejeição ───────────────────────────────
+  const lpsArr = GA4_LP_ORDER.filter(k => lps[k]);
+  makeChart('chart-ga4-convrej', {
     type: 'bar',
     data: {
-      labels: channels.map(r => r.channel),
-      datasets: [{ label: 'Sessões', data: channels.map(r => r.sessions), backgroundColor: COLORS.teal + 'CC', borderRadius: 4 }]
+      labels: lpsArr.map(k => lps[k].meta.label),
+      datasets: [
+        { label: 'Conversão %', data: lpsArr.map(k => lps[k].totals.conv_rate),   backgroundColor: COLORS.green + 'CC', borderRadius: 4 },
+        { label: 'Rejeição %',  data: lpsArr.map(k => lps[k].totals.bounce_rate), backgroundColor: COLORS.red + 'CC',   borderRadius: 4 },
+      ]
     },
-    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } } }
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { y: { beginAtZero: true, ticks: { callback: v => v + '%' } } }
+    }
   });
 
-  const devices = DATA.ga4.devices;
-  makeChart('chart-ga4-devices', {
-    type: 'doughnut',
-    data: { labels: devices.map(r => r.device), datasets: [{ data: devices.map(r => r.sessions), backgroundColor: [COLORS.primary, COLORS.secondary, COLORS.teal] }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
-  });
-
-  const totalViews = DATA.ga4.top_pages.reduce((s, r) => s + r.views, 0) || 1;
-  document.getElementById('table-ga4-pages').innerHTML = DATA.ga4.top_pages.map((r, i) =>
-    `<tr><td>${i+1}</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.page}</td><td>${fmt.num(r.views)}</td></tr>`
-  ).join('') || '<tr><td colspan="3" class="empty">Sem dados</td></tr>';
-
-  const totalSrc = DATA.ga4.sources.reduce((s, r) => s + r.sessions, 0) || 1;
-  document.getElementById('table-ga4-sources').innerHTML = DATA.ga4.sources.map((r, i) =>
-    `<tr><td>${i+1}</td><td>${r.source}</td><td>${fmt.num(r.sessions)}</td><td>${(r.sessions/totalSrc*100).toFixed(1)}%</td></tr>`
-  ).join('') || '<tr><td colspan="4" class="empty">Sem dados</td></tr>';
+  // ── 4) Detalhamento por LP (cidades, fontes, canais, dispositivos) ─────────
+  const details = GA4_LP_ORDER.map(k => {
+    const lp = lps[k]; if (!lp) return '';
+    const ages    = lp.ages    && lp.ages.length    ? _ga4BarList(lp.ages,    'age', 'sessions', k, 0, 8)    : '<p style="font-size:11px;color:#999;font-style:italic;">Aguardando recoleta GA4 (Sinais ativos).</p>';
+    const genders = lp.genders && lp.genders.length ? _ga4BarList(lp.genders, 'gender', 'sessions', k, 0, 4) : '<p style="font-size:11px;color:#999;font-style:italic;">Aguardando recoleta GA4 (Sinais ativos).</p>';
+    return `
+      <div class="ga4-lp-section">
+        <div class="ga4-lp-head">
+          <h3>${GA4_LP_ICON[k]} ${lp.meta.label}</h3>
+          <span class="ga4-lp-tag">${fmt.num(lp.totals.sessions)} sessões · ${lp.totals.conversions} conversões</span>
+        </div>
+        <div class="ga4-lp-grid">
+          <div>
+            <div class="ga4-sub">📍 Top Cidades</div>
+            ${_ga4BarList(lp.top_cities, 'city', 'sessions', k, 0, 10)}
+          </div>
+          <div>
+            <div class="ga4-sub">📡 Canais</div>
+            ${_ga4BarList(lp.channels, 'channel', 'sessions', k, 0, 7)}
+          </div>
+          <div>
+            <div class="ga4-sub">📱 Dispositivos</div>
+            ${_ga4BarList(lp.devices, 'device', 'sessions', k, 0, 4)}
+          </div>
+          <div>
+            <div class="ga4-sub">👤 Sexo (em breve)</div>
+            ${genders}
+            <div class="ga4-sub" style="margin-top:12px;">🎂 Idade (em breve)</div>
+            ${ages}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+  document.getElementById('ga4-lp-details').innerHTML = details;
 }
 
 // ─── PREVISIBILIDADE 2026 ────────────────────────────────────────────────────
