@@ -3136,22 +3136,46 @@ function renderCRM() {
   const totalInvest   = metaMonthly.reduce((s, r) => s + r.gasto, 0)
                       + googleMonthly.reduce((s, r) => s + r.gasto, 0);
 
-  // Custo por lead em Reunião PDF = investimento total / qtde Reunião PDF
-  const custoReuniaoPDF = reuniaoPDFCount > 0 ? totalInvest / reuniaoPDFCount : 0;
+  // ── Reuniões: dados reais do CRM (1ª/2ª Reunião) respeitando filtro de data ─
+  const datePredCRM = getDateFilter();
+  const mAllCRM = (DATA.meetings && DATA.meetings.detail) || [];
+  const mFiltCRM = mAllCRM.filter(r => !datePredCRM || !r.data || datePredCRM(r.data));
+  const clsRCRM = v => {
+    const s = (v || '').trim().toLowerCase();
+    if (s === 'sim') return 'compareceu';
+    if (s === 'não' || s === 'nao') return 'noshow';
+    return null;
+  };
+  const cntCRM = (f, k) => mFiltCRM.filter(r => clsRCRM(r[f]) === k).length;
+  const r1Comp = cntCRM('r1', 'compareceu'), r1NS = cntCRM('r1', 'noshow');
+  const r2Comp = cntCRM('r2', 'compareceu'), r2NS = cntCRM('r2', 'noshow');
+  const r1Agendadas = r1Comp + r1NS;
+  const r2Agendadas = r2Comp + r2NS;
+  const totAgendadas = r1Agendadas + r2Agendadas;
+  const totNoShow = r1NS + r2NS;
 
-  // Taxa de Reunião PDF = Reunião PDF / total de negócios ativos
-  const totalAtivos  = crm.total_active || crm.total_open || 1;
-  const taxaReuniao  = reuniaoPDFCount / totalAtivos * 100;
+  // Custo por Reunião Agendada = investimento total ÷ reuniões agendadas (1ª + 2ª)
+  const custoReuniaoAgendada = totAgendadas > 0 ? totalInvest / totAgendadas : 0;
+
+  // Taxa de No-Show = no-show total ÷ total de reuniões agendadas
+  const taxaNoShow = totAgendadas > 0 ? (totNoShow / totAgendadas * 100) : 0;
 
   document.getElementById('kpi-crm').innerHTML = [
-    { label: 'Total de Negócios',             value: fmt.num(crm.total_deals),      sub: 'no CRM',                       cls: ''       },
-    { label: 'Negócios Abertos',              value: fmt.num(crm.total_open),       sub: 'em andamento',                  cls: 'blue'   },
-    { label: 'Reunião PDF',                   value: fmt.num(reuniaoPDFCount),      sub: 'leads nesta etapa',             cls: 'blue'   },
-    { label: 'Apresentação do Business Plan', value: fmt.num(apresentacaoBP),       sub: 'leads nesta etapa',             cls: 'teal'   },
-    { label: 'Workshop',                      value: fmt.num(workshopCount),         sub: 'leads nesta etapa',             cls: 'purple' },
-    { label: 'Custo por Lead — Reunião PDF',  value: fmt.currency(custoReuniaoPDF), sub: 'investimento ÷ leads Reun. PDF', cls: 'orange' },
-    { label: 'Taxa de Reunião PDF',           value: fmt.pct(taxaReuniao),          sub: 'Reun. PDF ÷ total ativos',      cls: 'orange' },
-    { label: 'Negócios Perdidos',             value: fmt.num(crm.total_lost),       sub: 'com motivo registrado',         cls: 'red'    },
+    // ── Linha 1: Visão geral do funil ─────────────────────────────────────────
+    { label: 'Total de Negócios',             value: fmt.num(crm.total_deals),         sub: 'no CRM',                          cls: ''       },
+    { label: 'Negócios Abertos',              value: fmt.num(crm.total_open),          sub: 'em andamento',                    cls: 'blue'   },
+    { label: 'Reunião PDF',                   value: fmt.num(reuniaoPDFCount),         sub: 'leads nesta etapa',               cls: 'blue'   },
+    { label: 'Apresentação do Business Plan', value: fmt.num(apresentacaoBP),          sub: 'leads nesta etapa',               cls: 'teal'   },
+    // ── Linha 2: Eficiência e perdas ──────────────────────────────────────────
+    { label: 'Workshop',                          value: fmt.num(workshopCount),       sub: 'leads nesta etapa',               cls: 'purple' },
+    { label: 'Custo por Lead — Reun. Agendada',   value: fmt.currency(custoReuniaoAgendada), sub: 'invest. ÷ reun. agendadas',  cls: 'orange' },
+    { label: 'Taxa de No-Show',                   value: fmt.pct(taxaNoShow),          sub: 'no-show ÷ reun. agendadas',       cls: 'orange' },
+    { label: 'Negócios Perdidos',                 value: fmt.num(crm.total_lost),      sub: 'com motivo registrado',           cls: 'red'    },
+    // ── Linha 3: Reuniões (detalhamento 1ª e 2ª) ──────────────────────────────
+    { label: '1ª Reunião Agendada',           value: fmt.num(r1Agendadas),             sub: 'compareceu + no-show',            cls: 'blue'   },
+    { label: '2ª Reunião Agendada',           value: fmt.num(r2Agendadas),             sub: 'compareceu + no-show',            cls: 'teal'   },
+    { label: 'No-Show 1ª Reunião',            value: fmt.num(r1NS),                    sub: 'campo 1ª Reunião = Não',          cls: 'red'    },
+    { label: 'No-Show 2ª Reunião',            value: fmt.num(r2NS),                    sub: 'campo 2ª Reunião = Não',          cls: 'red'    },
   ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
 
   // Funnel bars — usa active_funnel (ordem do pipeline, sem Etapa Descarte)
@@ -3209,34 +3233,16 @@ function renderCRM() {
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
   });
 
-  // ── Reuniões & No-Show (RD CRM) — dados reais 1ª/2ª Reunião ─────────────────
-  const datePredM = getDateFilter();
-  const mAll  = (DATA.meetings && DATA.meetings.detail) || [];
-  // filtra por data (criação do negócio); inclui linhas sem data
-  const mFilt = mAll.filter(r => !datePredM || !r.data || datePredM(r.data));
+  // ── Reuniões & No-Show — gráficos e tabela detalhada ────────────────────────
+  // (KPIs principais agora estão no grid superior #kpi-crm — sem duplicação)
+  // Variáveis renomeadas pra evitar shadowing com as do grid principal.
+  const mFilt = mFiltCRM;
+  const clsR = clsRCRM;
+  const r1c = r1Comp, r1n = r1NS, r2c = r2Comp, r2n = r2NS;
 
-  // Sim → compareceu · Não → noshow
-  const clsR = v => {
-    const s = (v || '').trim().toLowerCase();
-    if (s === 'sim') return 'compareceu';
-    if (s === 'não' || s === 'nao') return 'noshow';
-    return null;
-  };
-  const countR = (field, klass) => mFilt.filter(r => clsR(r[field]) === klass).length;
-  const r1c = countR('r1', 'compareceu'), r1n = countR('r1', 'noshow');
-  const r2c = countR('r2', 'compareceu'), r2n = countR('r2', 'noshow');
-  const r1base = r1c + r1n, r2base = r2c + r2n;
-  const r1taxa = r1base ? (r1n / r1base * 100) : 0;
-  const r2taxa = r2base ? (r2n / r2base * 100) : 0;
-
+  // Limpa o container antigo dos 5 KPIs duplicados (seção foi simplificada)
   const kpiM = document.getElementById('kpi-meetings');
-  if (kpiM) kpiM.innerHTML = [
-    { label: '1ª Reunião — Compareceu', value: fmt.num(r1c),     sub: 'campo 1ª Reunião = Sim',  cls: 'green' },
-    { label: '1ª Reunião — No-Show',    value: fmt.num(r1n),     sub: 'campo 1ª Reunião = Não',  cls: 'red'   },
-    { label: 'Taxa de No-Show (1ª)',    value: fmt.pct(r1taxa),  sub: 'No-Show ÷ total 1ª reun.', cls: 'orange' },
-    { label: '2ª Reunião — Compareceu', value: fmt.num(r2c),     sub: 'campo 2ª Reunião = Sim',  cls: 'green' },
-    { label: '2ª Reunião — No-Show',    value: fmt.num(r2n),     sub: 'campo 2ª Reunião = Não',  cls: 'red'   },
-  ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
+  if (kpiM) kpiM.innerHTML = '';
 
   // Comparecimento × No-Show por mês (mês de criação do negócio)
   const mByMonth = {};
