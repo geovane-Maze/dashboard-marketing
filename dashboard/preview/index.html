@@ -1660,6 +1660,9 @@
       <p style="font-size:12px;color:#888;margin:-12px 0 16px;">
         Dados filtrados nas <strong>3 LPs de expansão</strong> da Clínica da Cidade Franchising.
         Demais páginas (centros médicos, agendamento etc.) <strong>não entram</strong> no relatório.
+        <br>
+        🗓️ <strong>O filtro de período aqui tem granularidade mensal</strong> — se você selecionar "15/05 → 20/05",
+        mostra o mês de Maio inteiro.
         <span id="ga4-demo-warn" style="display:none;color:#D97706;">
           ⚠️ Faixa etária e sexo ainda não foram coletadas — recoletar GA4 após renovar o token.
         </span>
@@ -4308,12 +4311,47 @@ function _ga4BarList(items, key, valKey, color, total, max) {
   }).join('') + '</div>';
 }
 
-function renderGA4() {
-  const lps = (DATA.ga4_lps && DATA.ga4_lps.by_lp) || {};
+// Agrega meses de monthly_data dentro do período selecionado.
+// monthPred = função (mes => bool) ou null (sem filtro).
+function _ga4AggregateMonths(monthlyData, monthPred) {
+  const inPeriod = m => !monthPred || monthPred(m.mes);
+  const months = (monthlyData || []).filter(inPeriod);
+  const sum = key => months.reduce((s, m) => s + (m[key] || 0), 0);
+  const mergeDict = key => {
+    const out = {};
+    months.forEach(m => {
+      Object.entries(m[key] || {}).forEach(([k, v]) => out[k] = (out[k] || 0) + v);
+    });
+    return Object.entries(out).map(([k, v]) => [k, v]).sort((a, b) => b[1] - a[1]);
+  };
+  const s = sum('sessions');
+  return {
+    months,                                  // pra desenhar a série temporal
+    totals: {
+      sessions:     s,
+      users:        sum('users'),
+      new_users:    sum('new_users'),
+      pageviews:    sum('pageviews'),
+      conversions:  sum('conversions'),
+      conv_rate:    s ? (sum('conversions') / s * 100) : 0,
+      bounce_rate:  s ? (sum('bounce_w') / s * 100) : 0,    // já vem em fração
+      avg_duration: s ? (sum('duration_w') / s) : 0,
+    },
+    top_cities:  mergeDict('cities').slice(0, 15).map(([city, sessions]) => ({ city, sessions })),
+    top_sources: mergeDict('sources').slice(0, 10).map(([source, sessions]) => ({ source, sessions })),
+    channels:    mergeDict('channels').map(([channel, sessions]) => ({ channel, sessions })),
+    devices:     mergeDict('devices').map(([device, sessions]) => ({ device, sessions })),
+    ages:        mergeDict('ages').map(([age, sessions]) => ({ age, sessions })),
+    genders:     mergeDict('genders').map(([gender, sessions]) => ({ gender, sessions })),
+  };
+}
 
-  // Se o summary.json ainda não tem ga4_lps (cache do Supabase desatualizado),
+function renderGA4() {
+  const rawLPs = (DATA.ga4_lps && DATA.ga4_lps.by_lp) || {};
+
+  // Se o summary.json ainda não tem ga4_lps (cache Supabase desatualizado),
   // mostra mensagem clara pro user em vez de tela em branco.
-  if (!DATA.ga4_lps || !Object.keys(lps).length) {
+  if (!DATA.ga4_lps || !Object.keys(rawLPs).length) {
     const html = `
       <div style="background:#FEF3C7;border:1px solid #FBBF24;border-radius:12px;padding:24px;margin:8px 0;">
         <h3 style="color:#92400E;font-size:15px;margin:0 0 10px;">⏳ Dados aguardando próxima coleta</h3>
@@ -4336,6 +4374,26 @@ function renderGA4() {
   // Aviso sobre demografia ainda não coletada
   const warn = document.getElementById('ga4-demo-warn');
   if (warn) warn.style.display = (DATA.ga4_lps && DATA.ga4_lps.has_demographics) ? 'none' : 'inline';
+
+  // ── Aplica o filtro de período (granularidade mensal) ─────────────────────
+  // getFilteredMonths() retorna função (mes => bool) ou null se nenhum filtro.
+  const monthPred = (typeof getFilteredMonths === 'function') ? getFilteredMonths() : null;
+  // lps = mesma estrutura de antes (totals/top_cities/etc), mas FILTRADA pelo período
+  const lps = {};
+  Object.entries(rawLPs).forEach(([k, lp]) => {
+    const agg = _ga4AggregateMonths(lp.monthly_data, monthPred);
+    lps[k] = {
+      meta: lp.meta,
+      totals: agg.totals,
+      top_cities: agg.top_cities,
+      top_sources: agg.top_sources,
+      channels: agg.channels,
+      devices: agg.devices,
+      ages: agg.ages,
+      genders: agg.genders,
+      monthly: agg.months.map(m => ({ mes: m.mes, sessions: m.sessions, users: m.users, conversions: m.conversions })),
+    };
+  });
 
   // ── 1) Cards de overview (3 lado a lado) ──────────────────────────────────
   const overview = GA4_LP_ORDER.map(k => {

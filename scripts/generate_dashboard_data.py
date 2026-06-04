@@ -1231,18 +1231,21 @@ def aggregate_ga4_lps(rows):
     Estrutura: {by_lp: {key: {meta, totals, top_cities, top_sources, channels,
                               devices, monthly}}, has_demographics: bool}
     """
+    # Estrutura: por LP, agrega POR MÊS com breakdowns
+    # Permite filtragem mensal no front
     by_lp = {}
+    def _new_month():
+        return {
+            "sessions": 0, "users": 0, "new_users": 0, "pageviews": 0,
+            "conversions": 0, "bounce_w": 0.0, "duration_w": 0.0,
+            "cities": defaultdict(int), "sources": defaultdict(int),
+            "channels": defaultdict(int), "devices": defaultdict(int),
+            "ages": defaultdict(int), "genders": defaultdict(int),
+        }
     for k, meta in LP_EXPANSAO.items():
         by_lp[k] = {
             "meta": {"label": meta["label"], "url": meta["url"], "key": k},
-            "sessions": 0, "users": 0, "new_users": 0, "pageviews": 0,
-            "conversions": 0,
-            "bounce_weighted": 0.0, "duration_weighted": 0.0,
-            "cities": defaultdict(int), "sources": defaultdict(int),
-            "channels": defaultdict(int), "devices": defaultdict(int),
-            "monthly": defaultdict(lambda: {"sessions": 0, "users": 0, "conversions": 0,
-                                            "bounce_w": 0.0}),
-            "ages": defaultdict(int), "genders": defaultdict(int),
+            "monthly": defaultdict(_new_month),
         }
 
     has_age = has_gender = False
@@ -1257,28 +1260,32 @@ def aggregate_ga4_lps(rows):
         if not k:
             continue
         b = by_lp[k]
-        kind = row.get("_kind")  # "main", "demo" ou None (coleta antiga sem flag)
+        kind = row.get("_kind")  # "main", "demo" ou None (coleta antiga)
 
         sessions = int(parse_num(row.get("sessions")))
         if not sessions:
             continue
 
-        # ── Demografia (idade/sexo) — separada porque pode vir de request próprio ─
+        mes = parse_date_to_month(row.get("date"))
+        if not mes:
+            continue
+        m = b["monthly"][mes]
+
+        # ── Demografia (vem de request DEMO ou MAIN antigo) ────────────────────
         age = row.get("userAgeBracket")
         gen = row.get("userGender")
-        # Idade: ignora valores vazios / "unknown" / etc.
         if age and age.lower() not in ("", "unknown", "(not set)", "not set"):
             has_age = True
-            b["ages"][age] += sessions
+            m["ages"][age] += sessions
         if gen and gen.lower() not in ("", "unknown", "(not set)", "not set"):
             has_gender = True
-            b["genders"][gen] += sessions
+            m["genders"][gen] += sessions
 
-        # Se a linha veio do request DE DEMOGRAFIA, NÃO conta as métricas (evita duplicação)
+        # Se a linha é do request DEMO, não conta métricas/breakdowns (evita duplicação)
         if has_kind_flag and kind == "demo":
             continue
 
-        # ── Linhas "main" (ou coleta antiga sem flag) — conta métricas e breakdowns ─
+        # ── Linhas MAIN (ou coleta antiga) — métricas + breakdowns por mês ────
         users       = int(parse_num(row.get("totalUsers")))
         new_users   = int(parse_num(row.get("newUsers")))
         pageviews   = int(parse_num(row.get("screenPageViews")))
@@ -1286,62 +1293,51 @@ def aggregate_ga4_lps(rows):
         bounce      = parse_num(row.get("bounceRate"))
         duration    = parse_num(row.get("averageSessionDuration"))
 
-        b["sessions"]    += sessions
-        b["users"]       += users
-        b["new_users"]   += new_users
-        b["pageviews"]   += pageviews
-        b["conversions"] += conversions
-        b["bounce_weighted"]   += bounce * sessions
-        b["duration_weighted"] += duration * sessions
+        m["sessions"]    += sessions
+        m["users"]       += users
+        m["new_users"]   += new_users
+        m["pageviews"]   += pageviews
+        m["conversions"] += conversions
+        m["bounce_w"]    += bounce * sessions
+        m["duration_w"]  += duration * sessions
 
-        # breakdowns
+        # breakdowns POR MÊS
         city = (row.get("city") or "(não definido)").strip() or "(não definido)"
         if city.lower() not in ("(not set)", "not set"):
-            b["cities"][city] += sessions
+            m["cities"][city] += sessions
         src = (row.get("sessionSource") or "direto").strip()
-        b["sources"][src] += sessions
+        m["sources"][src] += sessions
         ch  = (row.get("sessionDefaultChannelGroup") or "Outros").strip()
-        b["channels"][ch] += sessions
+        m["channels"][ch] += sessions
         dev = (row.get("deviceCategory") or "outros").strip()
-        b["devices"][dev] += sessions
+        m["devices"][dev] += sessions
 
-        # mensal
-        mes = parse_date_to_month(row.get("date"))
-        if mes:
-            m = b["monthly"][mes]
-            m["sessions"]    += sessions
-            m["users"]       += users
-            m["conversions"] += conversions
-            m["bounce_w"]    += bounce * sessions
-
-    # Serialização final
+    # Serialização final: por LP, lista de meses com totais + breakdowns
+    # Front filtra os meses dentro do período selecionado e agrega no cliente.
     result = {"by_lp": {}, "has_demographics": has_age or has_gender,
               "has_age": has_age, "has_gender": has_gender}
     for k, b in by_lp.items():
-        s = b["sessions"]
+        monthly_data = []
+        for mes, m in sorted(b["monthly"].items()):
+            monthly_data.append({
+                "mes": mes,
+                "sessions":    m["sessions"],
+                "users":       m["users"],
+                "new_users":   m["new_users"],
+                "pageviews":   m["pageviews"],
+                "conversions": m["conversions"],
+                "bounce_w":    round(m["bounce_w"], 2),
+                "duration_w":  round(m["duration_w"], 2),
+                "cities":   dict(m["cities"]),
+                "sources":  dict(m["sources"]),
+                "channels": dict(m["channels"]),
+                "devices":  dict(m["devices"]),
+                "ages":     dict(m["ages"]),
+                "genders":  dict(m["genders"]),
+            })
         result["by_lp"][k] = {
             "meta": b["meta"],
-            "totals": {
-                "sessions":    s,
-                "users":       b["users"],
-                "new_users":   b["new_users"],
-                "pageviews":   b["pageviews"],
-                "conversions": b["conversions"],
-                "conv_rate":   round(b["conversions"] / s * 100, 2) if s else 0,
-                "bounce_rate": round(b["bounce_weighted"] / s * 100, 1) if s else 0,
-                "avg_duration": round(b["duration_weighted"] / s, 1) if s else 0,
-            },
-            "top_cities":  [{"city": c, "sessions": v} for c, v in sorted(b["cities"].items(),  key=lambda x: -x[1])[:15]],
-            "top_sources": [{"source": c, "sessions": v} for c, v in sorted(b["sources"].items(), key=lambda x: -x[1])[:10]],
-            "channels":    [{"channel": c, "sessions": v} for c, v in sorted(b["channels"].items(), key=lambda x: -x[1])],
-            "devices":     [{"device": c, "sessions": v} for c, v in sorted(b["devices"].items(),  key=lambda x: -x[1])],
-            "monthly":     [
-                {"mes": m, "sessions": d["sessions"], "users": d["users"], "conversions": d["conversions"],
-                 "bounce_rate": round(d["bounce_w"] / d["sessions"] * 100, 1) if d["sessions"] else 0}
-                for m, d in sorted(b["monthly"].items())
-            ],
-            "ages":    [{"age": a, "sessions": v} for a, v in sorted(b["ages"].items(),    key=lambda x: -x[1])],
-            "genders": [{"gender": g, "sessions": v} for g, v in sorted(b["genders"].items(), key=lambda x: -x[1])],
+            "monthly_data": monthly_data,
         }
     return result
 
