@@ -1385,7 +1385,7 @@ def aggregate_google_ads_creatives(rows, leads_daily_map=None):
     }
 
 
-def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
+def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None, meetings_agg=None):
     """
     Pré-calcula as métricas do Relatório Resumido para o mês atual.
     Retorna um dict pronto para ser renderizado no dashboard sem lógica extra no front.
@@ -1489,6 +1489,34 @@ def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
     ant_reuniao = next((r.get("reuniao_pdf", 0) for r in crm.get("monthly_stages", [])
                         if r["mes"] == mes_anterior), 0)
 
+    # ── Reuniões REAIS (campos 1ª/2ª Reunião do CRM) — agregadas por mês ──────
+    # Fonte: meetings_agg["detail"]. 1 linha = 1 negócio com reunião registrada.
+    # Conta TODAS as agendadas (1ª + 2ª) = compareceu + no-show no mês de referência.
+    def _classe(v):
+        s = str(v or "").strip().lower()
+        if s == "sim": return "compareceu"
+        if s in ("não", "nao"): return "noshow"
+        return None
+
+    def _meet_mes(mes_alvo):
+        agend = noshow = 0
+        for r in ((meetings_agg or {}).get("detail") or []):
+            data = r.get("data") or ""
+            if data[:7] != mes_alvo:
+                continue
+            for f in ("r1", "r2"):
+                cls = _classe(r.get(f))
+                if cls == "compareceu":
+                    agend += 1
+                elif cls == "noshow":
+                    agend += 1
+                    noshow += 1
+        return agend, noshow
+
+    reun_agendadas_mes, no_show_mes = _meet_mes(mes_atual)
+    ant_reun_agendadas, ant_no_show = _meet_mes(mes_anterior)
+    taxa_no_show_mes = round(no_show_mes / reun_agendadas_mes * 100, 1) if reun_agendadas_mes else None
+
     def variacao(atual, anterior):
         # Se qualquer um dos lados for None ou 0, não há base de comparação confiável
         if atual is None or anterior is None or not anterior:
@@ -1505,8 +1533,10 @@ def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
         "cpl_meta":     {"atual": cpl_meta,          "anterior": ant_cpl_meta,   "delta": variacao(cpl_meta,   ant_cpl_meta)},
         "cpl_google":   {"atual": cpl_google,        "anterior": ant_cpl_google, "delta": variacao(cpl_google, ant_cpl_google)},
         "cpl_pago":     {"atual": cpl_pago,          "anterior": ant_cpl_pago,   "delta": variacao(cpl_pago,   ant_cpl_pago)},
-        # Reunião PDF: comparação MENSAL (deals criados no mês cuja etapa virou Reunião PDF)
+        # Reunião PDF: comparação MENSAL (deals criados no mês cuja etapa virou Reunião PDF) — mantido por compat.
         "reuniao_pdf":  {"atual": reuniao_pdf_mes,   "anterior": ant_reuniao,    "delta": variacao(reuniao_pdf_mes, ant_reuniao)},
+        # Reuniões Agendadas: dado real do CRM (1ª + 2ª Reunião marcadas no mês)
+        "reunioes_agendadas": {"atual": reun_agendadas_mes, "anterior": ant_reun_agendadas, "delta": variacao(reun_agendadas_mes, ant_reun_agendadas)},
     }
 
     # ── Semáforo de saúde ─────────────────────────────────────────────────────
@@ -1519,9 +1549,10 @@ def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
     def semaforo_cpl_pago(v):
         if v is None: return "gray"
         return "green" if v < 200 else ("yellow" if v <= 300 else "red")
-    def semaforo_taxa_reuniao(v):
+    def semaforo_no_show(v):
+        # Taxa de No-Show: QUANTO MENOR, MELHOR (< 20% OK, 20-35% atenção, > 35% alerta)
         if v is None: return "gray"
-        return "green" if v >= 12 else ("yellow" if v >= 8 else "red")
+        return "green" if v < 20 else ("yellow" if v <= 35 else "red")
 
     semaforo = [
         {"label": "CPL Meta Ads",    "valor": cpl_meta,    "status": semaforo_cpl_meta(cpl_meta),
@@ -1530,9 +1561,9 @@ def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None):
          "ref": "< R$150 🟢  R$150-250 🟡  > R$250 🔴"},
         {"label": "CPL Médio Pago",  "valor": cpl_pago,    "status": semaforo_cpl_pago(cpl_pago),
          "ref": "< R$200 🟢  R$200-300 🟡  > R$300 🔴"},
-        # Taxa do mês: % de leads do mês atual que chegaram em Reunião PDF
-        {"label": "Taxa Reunião PDF (mês)","valor": taxa_reuniao_mes, "status": semaforo_taxa_reuniao(taxa_reuniao_mes),
-         "ref": "> 12% 🟢  8-12% 🟡  < 8% 🔴", "tipo": "pct"},
+        # Taxa de No-Show do mês: campo "1ª Reunião = Não" / total agendadas
+        {"label": "Taxa de No-Show (mês)", "valor": taxa_no_show_mes, "status": semaforo_no_show(taxa_no_show_mes),
+         "ref": "< 20% 🟢  20-35% 🟡  > 35% 🔴", "tipo": "pct"},
     ]
 
     # ── Top criativos do mês ──────────────────────────────────────────────────
@@ -1782,7 +1813,7 @@ def main():
         "google_ads_creatives": aggregate_google_ads_creatives(google_ads_creatives_rows, leads_daily_map=google_leads_daily),
         "creative_quality": creative_quality,
         "previsibilidade": previsibilidade_data,
-        "relatorio": build_relatorio(leads, crm_agg, meta_agg, google_agg, utm_agg, meta_rows=meta_ads),
+        "relatorio": build_relatorio(leads, crm_agg, meta_agg, google_agg, utm_agg, meta_rows=meta_ads, meetings_agg=meetings_agg),
     }
 
     output_file = os.path.join(OUTPUT_DIR, "summary.json")
