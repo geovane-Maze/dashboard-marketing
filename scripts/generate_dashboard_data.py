@@ -1195,10 +1195,25 @@ def aggregate_ga4(rows):
 
 
 LP_EXPANSAO = {
-    "/sejaumfranqueado/": {"label": "Seja Um Franqueado", "key": "franqueado", "url": "https://franquiaclinicadacidade.com.br/sejaumfranqueado/"},
-    "/":                  {"label": "Home",               "key": "home",       "url": "https://franquiaclinicadacidade.com.br/"},
-    "/pablo-spyer/":      {"label": "Pablo Spyer",        "key": "pablo",      "url": "https://franquiaclinicadacidade.com.br/pablo-spyer/"},
+    "franqueado": {
+        "label": "Franqueado",
+        "url":   "https://franquiaclinicadacidade.com.br/Franqueado",
+        # Aceita variações: case + com/sem barra final (GA4 preserva o case original)
+        "paths": ["/Franqueado", "/Franqueado/", "/franqueado", "/franqueado/"],
+    },
+    "home": {
+        "label": "Home",
+        "url":   "https://franquiaclinicadacidade.com.br/",
+        "paths": ["/"],
+    },
+    "pablo": {
+        "label": "Pablo Spyer",
+        "url":   "https://franquiaclinicadacidade.com.br/pablo-spyer/",
+        "paths": ["/pablo-spyer", "/pablo-spyer/", "/Pablo-Spyer", "/Pablo-Spyer/", "/pablo.spyer/", "/pablo.spyer"],
+    },
 }
+# Lookup reverso: path → key da LP
+LP_PATH_LOOKUP = {p: k for k, v in LP_EXPANSAO.items() for p in v["paths"]}
 
 
 def aggregate_ga4_lps(rows):
@@ -1211,9 +1226,9 @@ def aggregate_ga4_lps(rows):
                               devices, monthly}}, has_demographics: bool}
     """
     by_lp = {}
-    for path, meta in LP_EXPANSAO.items():
-        by_lp[meta["key"]] = {
-            "meta": meta,
+    for k, meta in LP_EXPANSAO.items():
+        by_lp[k] = {
+            "meta": {"label": meta["label"], "url": meta["url"], "key": k},
             "sessions": 0, "users": 0, "new_users": 0, "pageviews": 0,
             "conversions": 0,
             "bounce_weighted": 0.0, "duration_weighted": 0.0,
@@ -1228,9 +1243,9 @@ def aggregate_ga4_lps(rows):
 
     for row in (rows or []):
         page = (row.get("pagePath") or "").strip()
-        if page not in LP_EXPANSAO:
+        k = LP_PATH_LOOKUP.get(page)
+        if not k:
             continue
-        k = LP_EXPANSAO[page]["key"]
         b = by_lp[k]
 
         sessions    = int(parse_num(row.get("sessions")))

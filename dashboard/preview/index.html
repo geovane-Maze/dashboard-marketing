@@ -4284,7 +4284,7 @@ function renderUTM() {
 
 // ─── SECTION: GA4 — Páginas de Expansão ──────────────────────────────────────
 const GA4_LP_ORDER = ['franqueado', 'home', 'pablo'];
-const GA4_LP_ICON  = { franqueado: '🎯', home: '🏠', pablo: '🎤' };
+const GA4_LP_ICON  = { franqueado: '🎯', home: '🏠', pablo: '🐂' };
 const GA4_LP_COLOR = { franqueado: '#22C55E', home: '#3FA9F5', pablo: '#F59E0B' };
 
 function _ga4Class(metric, value) {
@@ -4341,6 +4341,22 @@ function renderGA4() {
   const overview = GA4_LP_ORDER.map(k => {
     const lp = lps[k]; if (!lp) return '';
     const t = lp.totals;
+    // Se ainda não tem dados (página nova ou coleta GA4 desatualizada)
+    if (!t.sessions) {
+      return `
+        <div class="ga4-lp-card ${k}">
+          <h4>${GA4_LP_ICON[k]} ${lp.meta.label}</h4>
+          <a class="ga4-lp-url" href="${lp.meta.url}" target="_blank" rel="noopener">${lp.meta.url}</a>
+          <div style="padding:24px 4px;text-align:center;color:#888;">
+            <div style="font-size:24px;margin-bottom:6px;">⏳</div>
+            <div style="font-size:12px;font-weight:600;color:var(--text);">Sem dados ainda</div>
+            <div style="font-size:11px;color:#999;margin-top:6px;line-height:1.5;">
+              Aguardando próxima coleta GA4 (token expirado).
+              Os dados aparecem aqui automaticamente após recoletar.
+            </div>
+          </div>
+        </div>`;
+    }
     return `
       <div class="ga4-lp-card ${k}">
         <h4>${GA4_LP_ICON[k]} ${lp.meta.label}</h4>
@@ -4406,6 +4422,7 @@ function renderGA4() {
   // ── 4) Detalhamento por LP (cidades, fontes, canais, dispositivos) ─────────
   const details = GA4_LP_ORDER.map(k => {
     const lp = lps[k]; if (!lp) return '';
+    if (!lp.totals.sessions) return ''; // pula LPs sem dados — já mostrou aviso no card de overview
     const ages    = lp.ages    && lp.ages.length    ? _ga4BarList(lp.ages,    'age', 'sessions', k, 0, 8)    : '<p style="font-size:11px;color:#999;font-style:italic;">Aguardando recoleta GA4 (Sinais ativos).</p>';
     const genders = lp.genders && lp.genders.length ? _ga4BarList(lp.genders, 'gender', 'sessions', k, 0, 4) : '<p style="font-size:11px;color:#999;font-style:italic;">Aguardando recoleta GA4 (Sinais ativos).</p>';
     return `
