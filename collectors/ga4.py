@@ -7,7 +7,36 @@ from google.analytics.data_v1beta.types import (
     DateRange,
     Dimension,
     Metric,
+    Filter,
+    FilterExpression,
 )
+
+
+# Filtro de páginas de interesse — descarta páginas de pacientes/centros médicos
+# que inflam o volume sem agregar valor pra análise de EXPANSÃO de franquia.
+# Mantém: home, LPs de expansão (Franqueado/Pablo Spyer), agradecimentos e variações.
+RELEVANT_PAGE_REGEX = (
+    r"^/$"
+    r"|^/[Ff]ranqueado/?$"
+    r"|^/sejaumfranqueado.*$"
+    r"|^/seja-?franqueado.*$"
+    r"|^/[Pp]ablo[-.][Ss]pyer/?$"
+    r"|^/agradecimento.*$"
+    r"|^/obrigado.*$"
+)
+
+
+def _page_filter():
+    """Restringe a coleta apenas às páginas relevantes pra expansão."""
+    return FilterExpression(
+        filter=Filter(
+            field_name="pagePath",
+            string_filter=Filter.StringFilter(
+                match_type=Filter.StringFilter.MatchType.FULL_REGEXP,
+                value=RELEVANT_PAGE_REGEX,
+            ),
+        )
+    )
 
 PROPERTY_ID = "404771405"
 TOKEN_FILE = "credentials/ga4_token.json"
@@ -26,43 +55,85 @@ def _get_client():
         scopes=token_data.get("scopes"),
     )
 
-    if not creds.valid and creds.refresh_token:
-        creds.refresh(Request())
-        token_data["token"] = creds.token
-        with open(TOKEN_FILE, "w") as f:
-            json.dump(token_data, f, indent=2)
+    # Sempre tenta renovar — access_token expira em ~1h.
+    # Se já está válido, não faz nada; se expirou, usa o refresh_token.
+    if creds.refresh_token:
+        try:
+            creds.refresh(Request())
+            token_data["token"] = creds.token
+            with open(TOKEN_FILE, "w") as f:
+                json.dump(token_data, f, indent=2)
+        except Exception as e:
+            print(f"  AVISO: falha ao renovar token GA4: {e}")
 
     return BetaAnalyticsDataClient(credentials=creds)
 
 
 def _run_report(client, dimensions, metrics, start_date, end_date):
-    """Roda um relatório e retorna lista de dicts (dim+met)."""
-    request = RunReportRequest(
-        property=f"properties/{PROPERTY_ID}",
-        dimensions=[Dimension(name=d) for d in dimensions],
-        metrics=[Metric(name=m) for m in metrics],
-        date_ranges=[DateRange(start_date=start_date, end_date=end_date)],
-        limit=100000,
-    )
-    response = client.run_report(request)
-    dim_headers = [h.name for h in response.dimension_headers]
-    met_headers = [h.name for h in response.metric_headers]
-    rows = []
-    for row in response.rows:
-        record = {}
-        for i, dim in enumerate(row.dimension_values):
-            record[dim_headers[i]] = dim.value
-        for i, met in enumerate(row.metric_values):
-            try:
-                val = float(met.value)
-                record[met_headers[i]] = round(val, 4) if "." in met.value else int(val)
-            except Exception:
-                record[met_headers[i]] = met.value
-        rows.append(record)
-    return rows
+    """Roda um relatório com PAGINAÇÃO automática (offset incremental).
+
+    GA4 retorna no máximo 250.000 linhas por chamada. Se a query tem mais que
+    isso, o resultado é truncado silenciosamente (não dá erro!). A paginação
+    resolve isso fazendo várias chamadas com offset crescente até pegar tudo.
+
+    Sintoma do bug que isso resolve: dimensões com muitas combinações
+    (date × source × pagePath × city × ...) ficavam com dados parciais
+    quando o total ultrapassava o limit, levando a métricas SUBESTIMADAS.
+    """
+    PAGE_SIZE = 250000  # máximo permitido por chamada
+    all_rows = []
+    offset = 0
+    dim_headers = met_headers = None
+
+    while True:
+        request = RunReportRequest(
+            property=f"properties/{PROPERTY_ID}",
+            dimensions=[Dimension(name=d) for d in dimensions],
+            metrics=[Metric(name=m) for m in metrics],
+            date_ranges=[DateRange(start_date=start_date, end_date=end_date)],
+            dimension_filter=_page_filter(),     # ← filtra páginas relevantes
+            offset=offset,
+            limit=PAGE_SIZE,
+        )
+        response = client.run_report(request)
+        if dim_headers is None:
+            dim_headers = [h.name for h in response.dimension_headers]
+            met_headers = [h.name for h in response.metric_headers]
+
+        page_rows = []
+        for row in response.rows:
+            record = {}
+            for i, dim in enumerate(row.dimension_values):
+                record[dim_headers[i]] = dim.value
+            for i, met in enumerate(row.metric_values):
+                try:
+                    val = float(met.value)
+                    record[met_headers[i]] = round(val, 4) if "." in met.value else int(val)
+                except Exception:
+                    record[met_headers[i]] = met.value
+            page_rows.append(record)
+
+        all_rows.extend(page_rows)
+        total_rows = response.row_count  # total real (sem truncar)
+
+        # Se já pegamos tudo OU a página voltou vazia, encerra
+        if len(all_rows) >= total_rows or not page_rows:
+            break
+        offset += PAGE_SIZE
+        print(f"      ... página com offset={offset} (já temos {len(all_rows)}/{total_rows} linhas)")
+
+    return all_rows
 
 
-def get_ga4_data(start_date="2024-01-01", end_date="today"):
+def _default_start_date():
+    """Retorna a data 6 meses atrás no formato YYYY-MM-DD."""
+    from datetime import datetime, timedelta
+    return (datetime.today() - timedelta(days=180)).strftime("%Y-%m-%d")
+
+
+def get_ga4_data(start_date=None, end_date="today"):
+    if start_date is None:
+        start_date = _default_start_date()
     """
     Coleta GA4 em UM dataset combinado (ga4_sessions).
 
