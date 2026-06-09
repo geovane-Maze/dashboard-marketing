@@ -11,11 +11,18 @@ ADS_SHEET_ID = "1GC9-gtQM--sgpEejMGh2_pfibIt9w_511cJ7Ct3ACYA"
 ADS_TAB_NAME = "[CDC -B2B Franquadora] Criativos Facebook/Google"
 
 # Planilha Google Ads com dados diários (inclui campanhas Performance Max)
+# DEPRECATED: substituído pela Cronograma (export automático via Adveronix).
+# Mantido aqui só para compatibilidade caso alguém queira voltar ao fluxo manual.
 GOOGLE_ADS_SHEET_ID = "159NJH6tuiBQhg9PsnTuy7MNx3msEGqUh7f8TNXAEt54"
 GOOGLE_ADS_TAB_NAME = "Atualizado -"
 
 # Planilha Google Ads no nível de ANÚNCIO (criativos) — texto + métricas
 GOOGLE_ADS_CREATIVES_SHEET_ID = "1dbK3qov09Q1vO43U4JThuIp_YVyaTAXTkiuAcE3XL8I"
+
+# Planilha "Cronograma - Clínica da Cidade" — export automático via Adveronix.
+# Substituiu o fluxo manual de copiar/colar planilha do Google Ads.
+CRONOGRAMA_SHEET_ID = "19rDFjMX7y7L1_-1BMSBUNlyKOsduX8S3RY5C5BqVxKI"
+CRONOGRAMA_GOOGLE_TAB = "B2B - Google Banco de Dados"
 
 
 def _get_client():
@@ -93,71 +100,88 @@ def get_ads_data():
 
 def get_google_ads_sheet_data():
     """
-    Lê dados do Google Ads da planilha exportada pelo Google Ads.
-    Suporta dois formatos:
-      - Formato DIÁRIO: [0]=Dia [2]=Campanha [12]=Conversões [14]=Custo [19]=Cliques [21]=Impr.
-      - Formato AGREGADO: [0]=Status [1]=Campanha [11]=Conversões [13]=Custo [18]=Cliques [20]=Impr.
+    Coleta dados do Google Ads da planilha "Cronograma - Clínica da Cidade",
+    aba "B2B - Google Banco de Dados" — alimentada automaticamente pelo Adveronix.
+
+    Estrutura da planilha origem:
+      Col 0: Day            (data ex: '2026-06-09')
+      Col 1: Month          (1º do mês, não usado)
+      Col 2: Campaign Name
+      Col 3: Ad Name        (não usado — agregamos por campanha+data)
+      Col 4: Cost (Spend)   (formato pt-BR com vírgula)
+      Col 5: Clicks
+      Col 6: Impressions
+      Col 7: Conversions
+
+    Como cada (data, campanha) pode ter várias linhas (1 por anúncio), agregamos
+    somando todas as métricas por (data, campanha) pra manter compatibilidade
+    com o formato da aba google_ads do nosso banco.
     """
-    from datetime import date as _date
-    print("Coletando Google Ads da planilha (inclui PMax)...")
+    from collections import defaultdict
+    print(f"Coletando Google Ads da Cronograma (Adveronix)...")
     gc = _get_client()
-    spreadsheet = gc.open_by_key(GOOGLE_ADS_SHEET_ID)
+    spreadsheet = gc.open_by_key(CRONOGRAMA_SHEET_ID)
 
-    # O nome da aba muda a cada atualização (ex.: "Google ads - 19.05").
-    # Tenta o nome configurado; se não achar, usa a primeira aba da planilha.
     try:
-        ws = spreadsheet.worksheet(GOOGLE_ADS_TAB_NAME)
+        ws = spreadsheet.worksheet(CRONOGRAMA_GOOGLE_TAB)
     except Exception:
-        ws = spreadsheet.worksheets()[0]
-        print(f"  [aba '{GOOGLE_ADS_TAB_NAME}' não encontrada — usando '{ws.title}']")
+        print(f"  ERRO: aba '{CRONOGRAMA_GOOGLE_TAB}' não encontrada na planilha Cronograma.")
+        return []
+
     rows = ws.get_all_values()
-
-    if len(rows) < 4:
-        print("  Google Ads: planilha vazia ou sem dados suficientes.")
+    if len(rows) < 2:
+        print("  Cronograma Google Ads: planilha vazia.")
         return []
 
-    # Detecta o formato pela linha de cabeçalho (linha 3, índice 2)
-    header = [h.strip().lower() for h in rows[2]]
-    is_daily = any("dia" in h or "day" in h for h in header[:3])
-    is_aggregate = any("status" in h or "campanha" in h for h in header[:3]) and not is_daily
+    # Header check — confirma que estamos lendo a aba certa
+    header = [h.strip().lower() for h in rows[0]]
+    if not (header and header[0] == "day" and "campaign name" in header):
+        print(f"  AVISO: header inesperado. Encontrado: {rows[0][:8]}")
+        return []
 
+    # Agrega por (data, campanha) — uma campanha pode ter várias ads no mesmo dia
+    agg = defaultdict(lambda: {"gasto": 0.0, "cliques": 0, "impressoes": 0, "conversoes": 0.0})
+    for row in rows[1:]:
+        if len(row) < 8:
+            continue
+        day      = row[0].strip()
+        campanha = row[2].strip()
+        if not day or not campanha:
+            continue
+        # Pula totais/footers
+        if day.lower() in ("day", "total"):
+            continue
+
+        gasto      = _parse_number(row[4]) or 0
+        cliques    = _parse_number(row[5]) or 0
+        impressoes = _parse_number(row[6]) or 0
+        conversoes = _parse_number(row[7]) or 0
+
+        key = (day, campanha)
+        agg[key]["gasto"]      += gasto
+        agg[key]["cliques"]    += cliques
+        agg[key]["impressoes"] += impressoes
+        agg[key]["conversoes"] += conversoes
+
+    # Converte pra lista no formato esperado pelo nosso writer
     google_ads = []
+    for (data, campanha), m in agg.items():
+        google_ads.append({
+            "data":       data,
+            "campanha":   campanha,
+            "gasto":      round(m["gasto"], 2),
+            "cliques":    int(m["cliques"]),
+            "impressoes": int(m["impressoes"]),
+            "conversoes": round(m["conversoes"], 2),
+        })
 
-    if is_daily:
-        # Formato antigo: dados diários com coluna Dia
-        for row in rows[3:]:
-            while len(row) < 22:
-                row.append("")
-            dia = row[0].strip()
-            campanha = row[2].strip()
-            if not dia or not campanha or dia.lower() in ("dia", "total", "day") or campanha == "--":
-                continue
-            gasto = _parse_number(row[14])
-            if not gasto:
-                continue
-            google_ads.append({
-                "data": dia,
-                "campanha": campanha,
-                "gasto": gasto,
-                "cliques": _parse_number(row[19]) or 0,
-                "impressoes": _parse_number(row[21]) or 0,
-                "conversoes": _parse_number(row[12]) or 0,
-            })
-        print(f"  Google Ads (diário): {len(google_ads)} linhas")
-
-    elif is_aggregate:
-        # Formato agregado: totais por campanha sem breakdown diário.
-        # NÃO sobrescrevemos o histórico diário (para não corromper os gráficos mensais).
-        # Os dados históricos existentes na aba google_ads são mantidos.
-        print(f"  AVISO: planilha no formato agregado (sem coluna de data por dia).")
-        print(f"  Os dados históricos existentes serão mantidos. Para atualização completa,")
-        print(f"  forneça uma planilha com breakdown diário (coluna 'Dia').")
-        # Retorna vazio para que o writer NÃO sobrescreva a aba histórica
-        return []
-
+    # Ordena por data crescente
+    google_ads.sort(key=lambda r: r["data"])
+    if google_ads:
+        print(f"  Google Ads (Cronograma): {len(google_ads)} linhas | "
+              f"de {google_ads[0]['data']} até {google_ads[-1]['data']}")
     else:
-        print("  Google Ads: formato de planilha não reconhecido.")
-
+        print("  Google Ads (Cronograma): sem dados.")
     return google_ads
 
 
