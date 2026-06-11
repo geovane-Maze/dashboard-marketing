@@ -2716,16 +2716,28 @@ function renderExecutivo() {
   const metaCPL = metaLeads > 0 ? metaGasto / metaLeads : 0;
 
   // ── Bloco 1: KPI leads ───────────────────────────────────────────────────────
-  const lostPago = crm.total_lost_pago || 0;
-  const lostOrg  = crm.total_lost_organico || 0;
+  // Perdas filtradas pelo período selecionado (losses_daily = 1 linha por perda).
+  // Fallback: se losses_daily não existir (summary antigo), usa os totais globais.
+  const PAID_LOSS_SRCS = ['googlecpc', 'metaads'];
+  let lostTotal, lostPago, lostOrg;
+  if (Array.isArray(crm.losses_daily)) {
+    const lossesPeriodo = crm.losses_daily.filter(r => !datePred || datePred(r.data));
+    lostTotal = lossesPeriodo.length;
+    lostPago  = lossesPeriodo.filter(r => PAID_LOSS_SRCS.includes(r.utm_source)).length;
+    lostOrg   = lostTotal - lostPago;
+  } else {
+    lostTotal = crm.total_lost || 0;
+    lostPago  = crm.total_lost_pago || 0;
+    lostOrg   = crm.total_lost_organico || 0;
+  }
   document.getElementById('kpi-leads-exec').innerHTML = [
     { label: 'Total de Leads Gerados', value: fmt.num(totalLeadsPeriodo), sub: 'período selecionado', cls: '' },
     { label: 'Leads Pagos', value: fmt.num(pagos), sub: pct(pagos, totalLeadsPeriodo) + ' do total', cls: 'blue' },
     { label: 'Leads Orgânicos', value: fmt.num(organicos), sub: pct(organicos, totalLeadsPeriodo) + ' do total', cls: 'green' },
     { label: 'Leads Abertos (Ativos)', value: fmt.num(crm.total_open), sub: pct(crm.total_open, crm.total_deals) + ' dos negócios', cls: 'orange' },
-    { label: 'Leads Perdidos (Total)', value: fmt.num(crm.total_lost), sub: pct(crm.total_lost, crm.total_deals) + ' dos negócios', cls: 'red' },
-    { label: 'Leads Perdidos Pagos', value: fmt.num(lostPago), sub: pct(lostPago, crm.total_lost) + ' das perdas', cls: 'red' },
-    { label: 'Leads Perdidos Orgânicos', value: fmt.num(lostOrg), sub: pct(lostOrg, crm.total_lost) + ' das perdas', cls: 'red' },
+    { label: 'Leads Perdidos (Total)', value: fmt.num(lostTotal), sub: 'no período selecionado', cls: 'red' },
+    { label: 'Leads Perdidos Pagos', value: fmt.num(lostPago), sub: pct(lostPago, lostTotal) + ' das perdas', cls: 'red' },
+    { label: 'Leads Perdidos Orgânicos', value: fmt.num(lostOrg), sub: pct(lostOrg, lostTotal) + ' das perdas', cls: 'red' },
   ].map(k => `<div class="kpi-card ${k.cls}">
     <div class="kpi-label">${k.label}</div>
     <div class="kpi-value">${k.value}</div>
