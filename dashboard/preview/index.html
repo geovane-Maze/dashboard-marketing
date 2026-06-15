@@ -1241,13 +1241,16 @@
       </style>
 
       <!-- Bloco 1: KPIs simplificados -->
-      <div class="kpi-grid-7" id="kpi-leads-exec"></div>
+      <div class="kpi-grid-5" id="kpi-leads-exec"></div>
 
       <!-- Bloco 2: Google + Meta Ads -->
       <div class="ads-comparison" id="ads-comparison"></div>
 
       <!-- Bloco 3: Reuniões (Apresentação + Business Plan) -->
       <div class="ads-comparison" id="exec-meetings" style="margin-bottom:24px"></div>
+
+      <!-- Bloco 3b: CPL Médio Pago + Total Investido (cards grandes) -->
+      <div id="exec-invest-cards" style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px"></div>
 
       <!-- Bloco 4: Perdas por Etapa do Funil + Motivo (antepenúltimo) -->
       <div class="chart-card" style="margin-bottom:24px">
@@ -2706,15 +2709,23 @@ function renderExecutivo() {
   const cplPago = pagos > 0 ? totalInvestido / pagos : 0;
   document.getElementById('kpi-leads-exec').innerHTML = [
     { label: 'Total de Leads', value: fmt.num(totalLeadsPeriodo), sub: 'período selecionado', cls: '' },
-    { label: 'CPL Médio Pago', value: pagos > 0 ? fmt.currency(cplPago) : '—', sub: 'investido ÷ leads pagos', cls: 'blue' },
     { label: 'Leads Pago', value: fmt.num(pagos), sub: pct(pagos, totalLeadsPeriodo) + ' do total', cls: 'blue' },
     { label: 'Perda de Leads Pago', value: fmt.num(lostPago), sub: pct(lostPago, lostTotal) + ' das perdas', cls: 'red' },
     { label: 'Leads Orgânicos', value: fmt.num(organicos), sub: pct(organicos, totalLeadsPeriodo) + ' do total', cls: 'green' },
     { label: 'Perda de Leads Orgânicos', value: fmt.num(lostOrg), sub: pct(lostOrg, lostTotal) + ' das perdas', cls: 'red' },
-    { label: 'Total Investido', value: fmt.currency(totalInvestido), sub: 'Google + Meta Ads', cls: 'orange' },
   ].map(k => `<div class="kpi-card ${k.cls}">
     <div class="kpi-label">${k.label}</div>
     <div class="kpi-value">${k.value}</div>
+    <div class="kpi-sub">${k.sub}</div>
+  </div>`).join('');
+
+  // CPL Médio Pago + Total Investido — cards grandes abaixo das reuniões
+  document.getElementById('exec-invest-cards').innerHTML = [
+    { label: 'CPL Médio Pago', value: pagos > 0 ? fmt.currency(cplPago) : '—', sub: 'investido ÷ leads pagos', cls: 'blue' },
+    { label: 'Total Investido', value: fmt.currency(totalInvestido), sub: 'Google + Meta Ads', cls: 'orange' },
+  ].map(k => `<div class="kpi-card ${k.cls}" style="text-align:center;padding:22px 16px;">
+    <div class="kpi-label">${k.label}</div>
+    <div class="kpi-value" style="font-size:34px;">${k.value}</div>
     <div class="kpi-sub">${k.sub}</div>
   </div>`).join('');
 
