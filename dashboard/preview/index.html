@@ -2696,7 +2696,10 @@ function renderExecutivo() {
   const PAID_LOSS_SRCS = ['googlecpc', 'metaads'];
   let lostTotal, lostPago, lostOrg;
   if (Array.isArray(crm.losses_daily)) {
-    const lossesPeriodo = crm.losses_daily.filter(r => !datePred || datePred(r.data));
+    // Filtra pela data de CRIAÇÃO do lead (r.criado), mesmo eixo dos leads,
+    // pra perda ser subconjunto dos leads do período. Fallback p/ r.data
+    // (summary antigo sem o campo criado).
+    const lossesPeriodo = crm.losses_daily.filter(r => !datePred || datePred(r.criado || r.data));
     lostTotal = lossesPeriodo.length;
     lostPago  = lossesPeriodo.filter(r => PAID_LOSS_SRCS.includes(r.utm_source)).length;
     lostOrg   = lostTotal - lostPago;
@@ -2805,7 +2808,7 @@ function renderExecutivo() {
     : '<tr><td colspan="7" class="empty">Nenhuma reunião registrada no período.</td></tr>';
 
   // ── Blocos 5 e 6: Perdas por Etapa do Funil (popup por plataforma / por motivo) ──
-  const lossesPeriodo = (crm.losses_daily || []).filter(r => !datePred || datePred(r.data));
+  const lossesPeriodo = (crm.losses_daily || []).filter(r => !datePred || datePred(r.criado || r.data));
   const ORDER_FUNIL = ['entrada de lead', 'tentativa de conexão', 'lead respondente', 'pré-qualificado', 'reunião pdf', 'apresentação do business plan', 'envio de cof', 'workshop'];
   const PLAT_OF = (src) => src === 'googlecpc' ? 'Google' : (src === 'metaads' ? 'Meta' : 'Orgânico / Outro');
   const PLAT_COLOR = { 'Google': '#4285F4', 'Meta': '#1877F2', 'Orgânico / Outro': '#16a085' };

@@ -689,12 +689,16 @@ def aggregate_crm(deals, leads=None):
                 src = camp = cont = "não identificado"
 
             # Aggregação DIÁRIA para filtro por período no front-end.
-            # Usa data_fechamento (quando a perda foi marcada) com fallback
-            # para criado_em (quando o lead entrou).
+            # "data"   = data de fechamento (quando a perda foi marcada).
+            # "criado" = data de criação do lead — usada para filtrar as perdas
+            #            no MESMO eixo dos leads (perda = subconjunto dos leads
+            #            que entraram no período, evitando perdas > leads).
             dia_perda = parse_date_to_day(deal.get("data_fechamento") or deal.get("criado_em"))
+            dia_criado = parse_date_to_day(deal.get("criado_em"))
             if dia_perda:
                 losses_daily.append({
                     "data": dia_perda,
+                    "criado": dia_criado,
                     "motivo": motivo,
                     "etapa": etapa,
                     "utm_source": src,
