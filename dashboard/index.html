@@ -1105,81 +1105,65 @@
     <div id="sec-executivo" class="section active">
       <div class="section-title">Visão Executiva</div>
 
-      <!-- Bloco 1: KPIs de Leads -->
-      <div class="kpi-grid-7" id="kpi-leads-exec"></div>
+      <!-- CSS dos popups de perda por etapa -->
+      <style>
+        #sec-executivo .lossbar{position:relative;margin-bottom:14px;cursor:default;}
+        #sec-executivo .lossbar-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:4px;}
+        #sec-executivo .lossbar-name{font-weight:600;}
+        #sec-executivo .lossbar-val{color:#dc2626;font-weight:700;}
+        #sec-executivo .lossbar-track{background:#F1F5F9;border-radius:4px;height:14px;overflow:hidden;}
+        #sec-executivo .lossbar-fill{height:100%;border-radius:4px;background:linear-gradient(to right,#f87171,#dc2626);transition:width .4s;}
+        #sec-executivo .lossbar-pop{display:none;position:absolute;left:0;top:calc(100% + 4px);z-index:60;background:#fff;border:1px solid #e2e8f0;box-shadow:0 8px 28px rgba(0,0,0,.18);border-radius:10px;padding:12px 14px;min-width:260px;max-width:380px;}
+        #sec-executivo .lossbar:hover .lossbar-pop{display:block;}
+        #sec-executivo .pop-title{font-weight:700;font-size:12px;color:#111;margin-bottom:8px;border-bottom:1px solid #eee;padding-bottom:6px;}
+        #sec-executivo .pop-row{display:flex;justify-content:space-between;gap:24px;font-size:12px;padding:3px 0;color:#374151;}
+      </style>
+
+      <!-- Bloco 1: KPIs simplificados -->
+      <div class="kpi-grid-5" id="kpi-leads-exec"></div>
 
       <!-- Bloco 2: Google + Meta Ads -->
       <div class="ads-comparison" id="ads-comparison"></div>
 
-      <!-- Bloco 3: Evolução Mensal de Leads -->
-      <div class="chart-card" style="margin-bottom:24px">
-        <h3>Evolução Mensal de Leads — Últimos 4 Meses</h3>
-        <div class="chart-wrap tall"><canvas id="chart-exec-evolucao"></canvas></div>
-      </div>
+      <!-- Bloco 3: Reuniões (Apresentação + Business Plan) -->
+      <div class="ads-comparison" id="exec-meetings" style="margin-bottom:24px"></div>
 
-      <!-- Bloco 4: Funil de Conversão do Período -->
+      <!-- Bloco 3b: CPL Médio Pago + Total Investido (cards grandes) -->
+      <div id="exec-invest-cards" style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px"></div>
+
+      <!-- Bloco 3c: Funil de Conversão do Período -->
       <div class="chart-card" style="margin-bottom:24px">
         <h3>🔻 Funil de Conversão do Período — <span id="funil-periodo-label" style="font-weight:400;color:#666;font-size:13px;">selecione período</span></h3>
         <p style="font-size:11px;color:#666;margin:0 0 14px;">
-          Quantidade de deals que passaram em cada etapa entre os deals criados no período + <strong>conversão entre etapas</strong>.
-          Filtra pelo período do topbar.
+          Quantidade de deals que passaram em cada etapa entre os deals criados no período + <strong>conversão entre etapas</strong>. Filtra pelo período do topbar.
         </p>
         <div id="exec-funil-conversao" style="padding:8px 0;"></div>
       </div>
 
-      <!-- Bloco 5: Capital + Motivos de Perda -->
-      <div class="charts-row">
-        <div class="chart-card">
-          <h3>Capital Disponível dos Leads</h3>
-          <div class="chart-wrap"><canvas id="chart-exec-capital"></canvas></div>
-        </div>
-        <div class="chart-card">
-          <h3>Motivos de Perda (CRM)</h3>
-          <div class="chart-wrap tall"><canvas id="chart-exec-losses"></canvas></div>
-        </div>
+      <!-- Bloco 4: Perdas por Etapa do Funil + Motivo (antepenúltimo) -->
+      <div class="chart-card" style="margin-bottom:24px">
+        <h3>Perdas por Etapa do Funil + Motivo <span style="font-size:11px;color:#999;font-weight:400;">— passe o mouse para ver os motivos de perda</span></h3>
+        <div id="exec-loss-funnel-motivo" style="padding:8px 0;"></div>
       </div>
 
-      <!-- Bloco 6: UTM / Atribuição -->
-      <div class="charts-row triple">
-        <div class="chart-card">
-          <h3>Leads por Fonte (utm_source)</h3>
-          <div class="chart-wrap"><canvas id="chart-exec-utm-source"></canvas></div>
-        </div>
-        <div class="chart-card">
-          <h3>Leads por Mídia (utm_medium)</h3>
-          <div class="chart-wrap"><canvas id="chart-exec-utm-medium"></canvas></div>
-        </div>
-        <div class="chart-card">
-          <h3>Leads por Canal (RD Station)</h3>
-          <div class="chart-wrap"><canvas id="chart-exec-canal"></canvas></div>
-        </div>
+      <!-- Bloco 5: Perdas por Etapa do Funil (por plataforma) — penúltimo -->
+      <div class="chart-card" style="margin-bottom:24px">
+        <h3>Perdas por Etapa do Funil <span style="font-size:11px;color:#999;font-weight:400;">— passe o mouse em cada etapa para ver por plataforma</span></h3>
+        <div id="exec-loss-funnel-plat" style="padding:8px 0;"></div>
       </div>
 
-      <!-- Bloco 7: Taxa de Perda por UTM -->
-      <div class="charts-row triple">
-        <div class="chart-card">
-          <h3>Perdas por UTM Source <span style="font-size:10px;color:#999;font-weight:400;">% = perdas ÷ leads</span></h3>
-          <div class="chart-wrap"><canvas id="chart-exec-loss-source"></canvas></div>
-        </div>
-        <div class="chart-card">
-          <h3>Perdas por Campanha <span style="font-size:10px;color:#999;font-weight:400;">% = perdas ÷ leads</span></h3>
-          <div class="chart-wrap"><canvas id="chart-exec-loss-campaign"></canvas></div>
-        </div>
-        <div class="chart-card">
-          <h3>Perdas por Anúncio <span style="font-size:10px;color:#999;font-weight:400;">utm_content</span></h3>
-          <div class="chart-wrap"><canvas id="chart-exec-loss-content"></canvas></div>
-        </div>
-      </div>
-
-      <div class="table-card">
-        <h3>Top Campanhas UTM</h3>
+      <!-- Bloco 6: Detalhe das Reuniões no Período (último) -->
+      <div class="table-card" style="margin-bottom:24px">
+        <h3>Detalhe das Reuniões no Período <span id="exec-meetings-count" style="font-size:12px;font-weight:400;color:#666;"></span></h3>
         <table>
-          <thead><tr><th>#</th><th>Campanha (utm_campaign)</th><th>Fonte</th><th>Leads</th><th>%</th><th>Valor Investido</th></tr></thead>
-          <tbody id="exec-table-utm"></tbody>
+          <thead><tr>
+            <th>Data (criação)</th><th>Cliente</th><th>Responsável</th>
+            <th>1ª Reunião (Apresentação)</th><th>Justificativa No-Show</th>
+            <th>2ª Reunião (Business Plan)</th><th>Justificativa No-Show</th>
+          </tr></thead>
+          <tbody id="exec-meetings-table"></tbody>
         </table>
       </div>
-
-      <div id="exec-alerts"></div>
     </div>
 
     <!-- RELATÓRIO RESUMIDO -->
@@ -2597,7 +2581,10 @@ function renderExecutivo() {
   const PAID_LOSS_SRCS = ['googlecpc', 'metaads'];
   let lostTotal, lostPago, lostOrg;
   if (Array.isArray(crm.losses_daily)) {
-    const lossesPeriodo = crm.losses_daily.filter(r => !datePred || datePred(r.data));
+    // Filtra pela data de CRIAÇÃO do lead (r.criado), mesmo eixo dos leads,
+    // pra perda ser subconjunto dos leads do período. Fallback p/ r.data
+    // (summary antigo sem o campo criado).
+    const lossesPeriodo = crm.losses_daily.filter(r => !datePred || datePred(r.criado || r.data));
     lostTotal = lossesPeriodo.length;
     lostPago  = lossesPeriodo.filter(r => PAID_LOSS_SRCS.includes(r.utm_source)).length;
     lostOrg   = lostTotal - lostPago;
@@ -2606,17 +2593,27 @@ function renderExecutivo() {
     lostPago  = crm.total_lost_pago || 0;
     lostOrg   = crm.total_lost_organico || 0;
   }
+  const totalInvestido = googleGasto + metaGasto;
+  const cplPago = pagos > 0 ? totalInvestido / pagos : 0;
   document.getElementById('kpi-leads-exec').innerHTML = [
-    { label: 'Total de Leads Gerados', value: fmt.num(totalLeadsPeriodo), sub: 'período selecionado', cls: '' },
-    { label: 'Leads Pagos', value: fmt.num(pagos), sub: pct(pagos, totalLeadsPeriodo) + ' do total', cls: 'blue' },
+    { label: 'Total de Leads', value: fmt.num(totalLeadsPeriodo), sub: 'período selecionado', cls: '' },
+    { label: 'Leads Pago', value: fmt.num(pagos), sub: pct(pagos, totalLeadsPeriodo) + ' do total', cls: 'blue' },
+    { label: 'Perda de Leads Pago', value: fmt.num(lostPago), sub: pct(lostPago, lostTotal) + ' das perdas', cls: 'red' },
     { label: 'Leads Orgânicos', value: fmt.num(organicos), sub: pct(organicos, totalLeadsPeriodo) + ' do total', cls: 'green' },
-    { label: 'Leads Abertos (Ativos)', value: fmt.num(crm.total_open), sub: pct(crm.total_open, crm.total_deals) + ' dos negócios', cls: 'orange' },
-    { label: 'Leads Perdidos (Total)', value: fmt.num(lostTotal), sub: 'no período selecionado', cls: 'red' },
-    { label: 'Leads Perdidos Pagos', value: fmt.num(lostPago), sub: pct(lostPago, lostTotal) + ' das perdas', cls: 'red' },
-    { label: 'Leads Perdidos Orgânicos', value: fmt.num(lostOrg), sub: pct(lostOrg, lostTotal) + ' das perdas', cls: 'red' },
+    { label: 'Perda de Leads Orgânicos', value: fmt.num(lostOrg), sub: pct(lostOrg, lostTotal) + ' das perdas', cls: 'red' },
   ].map(k => `<div class="kpi-card ${k.cls}">
     <div class="kpi-label">${k.label}</div>
     <div class="kpi-value">${k.value}</div>
+    <div class="kpi-sub">${k.sub}</div>
+  </div>`).join('');
+
+  // CPL Médio Pago + Total Investido — cards grandes abaixo das reuniões
+  document.getElementById('exec-invest-cards').innerHTML = [
+    { label: 'CPL Médio Pago', value: pagos > 0 ? fmt.currency(cplPago) : '—', sub: 'investido ÷ leads pagos', cls: 'blue' },
+    { label: 'Total Investido', value: fmt.currency(totalInvestido), sub: 'Google + Meta Ads', cls: 'orange' },
+  ].map(k => `<div class="kpi-card ${k.cls}" style="text-align:center;padding:22px 16px;">
+    <div class="kpi-label">${k.label}</div>
+    <div class="kpi-value" style="font-size:34px;">${k.value}</div>
     <div class="kpi-sub">${k.sub}</div>
   </div>`).join('');
 
@@ -2639,365 +2636,151 @@ function renderExecutivo() {
       </div>
     </div>`;
 
-  // ── Bloco 3: Evolução Mensal — sempre últimos 4 meses (independe do filtro) ──
-  // Monta índices por mês de cada fonte
-  const leadsByMes = {};
-  (DATA.leads.monthly || []).forEach(r => { leadsByMes[r.mes] = r; });
-  const stageByMes = {};
-  (crm.monthly_stages || []).forEach(r => { stageByMes[r.mes] = r; });
-  const metaByMes = {};
-  (DATA.meta_ads.monthly || []).forEach(r => { metaByMes[r.mes] = r.gasto || 0; });
-  const googleByMes = {};
-  (DATA.google_ads.monthly || []).forEach(r => { googleByMes[r.mes] = r.gasto || 0; });
-
-  // União de todos os meses disponíveis (ads têm histórico mais longo que leads)
-  const allMeses = [...new Set([
-    ...(DATA.google_ads.monthly || []).map(r => r.mes),
-    ...(DATA.meta_ads.monthly || []).map(r => r.mes),
-    ...(DATA.leads.monthly || []).map(r => r.mes),
-  ])].sort();
-  const last4 = allMeses.slice(-4).map(mes => ({ mes }));
-
-  makeChart('chart-exec-evolucao', {
-    type: 'bar',
-    data: {
-      labels: last4.map(r => mesLabel(r.mes)),
-      datasets: [
-        {
-          label: 'Total de Leads',
-          data: last4.map(r => {
-            // CRM disponível → usa; senão usa conversões Google + leads Meta como proxy
-            if (leadsByMes[r.mes]?.total) return leadsByMes[r.mes].total;
-            const googleConv = (DATA.google_ads.monthly || []).find(g => g.mes === r.mes)?.conversoes || 0;
-            const metaLeads = (DATA.meta_ads.monthly || []).find(m => m.mes === r.mes)?.leads || 0;
-            return googleConv + metaLeads;
-          }),
-          backgroundColor: COLORS.secondary + 'CC', borderRadius: 4, yAxisID: 'y',
-        },
-        // Fev/Mar → etapas antigas
-        {
-          label: 'Reunião Agendada',
-          data: last4.map(r => r.mes <= '2026-03' ? (stageByMes[r.mes]?.reuniao_agendada ?? 0) : null),
-          backgroundColor: '#27ae60CC', borderRadius: 4, yAxisID: 'y',
-        },
-        {
-          label: 'Reunião Realizada',
-          data: last4.map(r => r.mes <= '2026-03' ? (stageByMes[r.mes]?.reuniao_realizada ?? 0) : null),
-          backgroundColor: '#16a085CC', borderRadius: 4, yAxisID: 'y',
-        },
-        // Abr/Mai → etapas novas
-        {
-          label: 'Reunião PDF',
-          data: last4.map(r => r.mes > '2026-03' ? (stageByMes[r.mes]?.reuniao_pdf ?? 0) : null),
-          backgroundColor: COLORS.green + 'CC', borderRadius: 4, yAxisID: 'y',
-        },
-        {
-          label: 'Apresentação BP',
-          data: last4.map(r => r.mes > '2026-03' ? (stageByMes[r.mes]?.apresentacao_bp ?? 0) : null),
-          backgroundColor: COLORS.orange + 'CC', borderRadius: 4, yAxisID: 'y',
-        },
-        {
-          label: 'Perdidos',
-          data: last4.map(r => stageByMes[r.mes]?.perdidos || 0),
-          backgroundColor: COLORS.red + 'CC', borderRadius: 4, yAxisID: 'y',
-        },
-        {
-          label: 'Investimento Total (R$)',
-          data: last4.map(r => Math.round((metaByMes[r.mes] || 0) + (googleByMes[r.mes] || 0))),
-          type: 'line',
-          borderColor: '#8e44ad',
-          backgroundColor: '#8e44ad33',
-          borderWidth: 2,
-          pointRadius: 5,
-          pointBackgroundColor: '#8e44ad',
-          fill: false,
-          yAxisID: 'y2',
-        },
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { position: 'bottom' },
-        tooltip: {
-          callbacks: {
-            label: ctx => {
-              if (ctx.dataset.yAxisID === 'y2')
-                return ' ' + ctx.dataset.label + ': R$ ' + ctx.parsed.y.toLocaleString('pt-BR');
-              return ' ' + ctx.dataset.label + ': ' + ctx.parsed.y;
-            }
-          }
-        }
-      },
-      scales: {
-        y: {
-          beginAtZero: true, position: 'left',
-          title: { display: true, text: 'Leads / Negócios' },
-          grid: { color: '#e5e7eb' },
-        },
-        y2: {
-          beginAtZero: true, position: 'right',
-          grid: { drawOnChartArea: false },
-          title: { display: true, text: 'Investimento (R$)' },
-          ticks: { callback: v => 'R$' + (v / 1000).toFixed(0) + 'k' },
-        }
-      }
-    }
-  });
-
-  // ── Bloco 4: Funil de Conversão do Período (passed-through + % stage-to-stage) ──
-  // Conta quantos deals (criados no período) passaram em cada etapa.
-  // Um deal passa por uma etapa se sua etapa atual >= aquela etapa no pipeline.
-  const FUNIL_STAGES = [
-    'Entrada de Lead',
-    'Tentativa de Conexão',
-    'Lead Respondente',
-    'Pré-qualificado',
-    'Reunião PDF',
-    'Apresentação do Business Plan',
-    'Envio de COF',
-    'Workshop',
-  ];
+  // ── Bloco 3: Reuniões (Apresentação = r1 · Business Plan = r2) — filtrado por período ──
+  const classM = (v) => {
+    const sx = (v || '').toString().trim().toLowerCase();
+    if (['sim', 'compareceu', 'yes', 'true', '1'].includes(sx)) return 'realizada';
+    if (['não', 'nao', 'no-show', 'noshow', 'no', 'false', '0'].includes(sx)) return 'noshow';
+    return null;
+  };
+  // Funil do período — deals que passaram em cada etapa (filtra por data de CRIAÇÃO)
+  const FUNIL_STAGES = ['Entrada de Lead', 'Tentativa de Conexão', 'Lead Respondente', 'Pré-qualificado', 'Reunião PDF', 'Apresentação do Business Plan', 'Envio de COF', 'Workshop'];
   const stageIdxOf = (etapa) => {
     const el = (etapa || '').toLowerCase().trim();
     for (let i = 0; i < FUNIL_STAGES.length; i++) {
       const s = FUNIL_STAGES[i].toLowerCase();
       if (el === s || el.includes(s) || s.includes(el)) return i;
     }
-    return -1;  // etapa não reconhecida (ex: Etapa Descarte)
+    return -1;
+  };
+  const dealsPeriodo = (crm.deals_minimal || []).filter(d => !datePred || datePred(d.criado_em));
+  const passedCounts = FUNIL_STAGES.map((stage, i) =>
+    ({ etapa: stage, total: dealsPeriodo.filter(d => i === 0 ? true : stageIdxOf(d.etapa) >= i).length }));
+  const passedOf = (name) => {
+    const i = FUNIL_STAGES.findIndex(s => s.toLowerCase() === name.toLowerCase());
+    return i >= 0 ? passedCounts[i].total : 0;
   };
 
-  // Filtra deals pelo período do topbar (criado_em)
-  const dealsAll = crm.deals_minimal || [];
-  const dealsPeriodo = datePred
-    ? dealsAll.filter(d => datePred(d.criado_em))
-    : dealsAll;
+  // Reuniões: "Agendadas" vem do funil (Reunião PDF / Apresentação BP) no período;
+  // Realizadas e No-Show seguem dos campos r1/r2 do CRM.
+  const meetDet = (DATA.meetings && DATA.meetings.detail ? DATA.meetings.detail : [])
+    .filter(r => !datePred || datePred(r.data));
+  const meetTot = (field) => {
+    let real = 0, ns = 0;
+    meetDet.forEach(r => { const c = classM(r[field]); if (c === 'realizada') real++; else if (c === 'noshow') ns++; });
+    return { realizada: real, noshow: ns };
+  };
+  const mApres = meetTot('r1'); mApres.agendada = passedOf('Reunião PDF');
+  const mBP = meetTot('r2'); mBP.agendada = passedOf('Apresentação do Business Plan');
+  const meetBlock = (titulo, icon, bg, m) => `
+    <div class="ads-group">
+      <div class="ads-group-header" style="background:${bg}">${icon} ${titulo}</div>
+      <div class="ads-group-kpis">
+        <div class="ads-kpi"><div class="ads-kpi-label">Agendadas</div><div class="ads-kpi-value">${fmt.num(m.agendada)}</div><div class="ads-kpi-sub">no período</div></div>
+        <div class="ads-kpi"><div class="ads-kpi-label">Realizadas</div><div class="ads-kpi-value">${fmt.num(m.realizada)}</div><div class="ads-kpi-sub">compareceram</div></div>
+        <div class="ads-kpi"><div class="ads-kpi-label">No-Show</div><div class="ads-kpi-value">${fmt.num(m.noshow)}</div><div class="ads-kpi-sub">faltaram</div></div>
+      </div>
+    </div>`;
+  document.getElementById('exec-meetings').innerHTML =
+    meetBlock('Reunião de Apresentação', '📅', '#0E8A8F', mApres) +
+    meetBlock('Reunião de Business Plan', '📈', '#8e44ad', mBP);
 
-  // Label do período
-  const fmtBR = (s) => s ? s.split('-').reverse().join('/') : '';
-  const startVal = document.getElementById('filter-date-start').value;
-  const endVal   = document.getElementById('filter-date-end').value;
-  const labelEl = document.getElementById('funil-periodo-label');
-  if (labelEl) {
-    labelEl.textContent = (startVal || endVal)
+  // Funil de Conversão do Período (passed-through + conversão entre etapas)
+  (function () {
+    const fmtBR = (s) => s ? s.split('-').reverse().join('/') : '';
+    const startVal = document.getElementById('filter-date-start').value;
+    const endVal = document.getElementById('filter-date-end').value;
+    const labelEl = document.getElementById('funil-periodo-label');
+    if (labelEl) labelEl.textContent = (startVal || endVal)
       ? `${fmtBR(startVal) || 'início'} → ${fmtBR(endVal) || 'hoje'}  (${dealsPeriodo.length} deals)`
       : `todo o histórico  (${dealsPeriodo.length} deals)`;
-  }
-
-  // Conta passed-through por etapa
-  const passedCounts = FUNIL_STAGES.map((stage, i) => {
-    const count = dealsPeriodo.filter(d => {
-      const idx = stageIdxOf(d.etapa);
-      // Entrada de Lead: TODOS os deals passaram (inclusive "Etapa Descarte" que tem idx=-1)
-      if (i === 0) return true;
-      return idx >= i;
-    }).length;
-    return { etapa: stage, total: count };
-  });
-
-  // Renderiza barras com conversão entre etapas
-  const maxFunil = Math.max(...passedCounts.map(c => c.total), 1);
-  document.getElementById('exec-funil-conversao').innerHTML = passedCounts.map((s, i) => {
-    const prevCount = i > 0 ? passedCounts[i-1].total : s.total;
-    let convPct = '—';
-    let convClass = 'stage-count';
-    let convColor = '#666';
-    if (prevCount > 0) {
-      const pct = (s.total / prevCount * 100);
-      convPct = pct.toFixed(1) + '%';
-      if (i === 0) convPct = '100%';
-      // Cor: < 30% vermelho (alerta), 30-60% laranja, >60% verde
-      if (i > 0) {
-        if (pct < 30) convColor = '#dc2626';
-        else if (pct < 60) convColor = '#ea580c';
-        else convColor = '#16a34a';
+    const maxFunil = Math.max(...passedCounts.map(c => c.total), 1);
+    document.getElementById('exec-funil-conversao').innerHTML = passedCounts.map((s, i) => {
+      const prev = i > 0 ? passedCounts[i - 1].total : s.total;
+      let convPct = '—', convColor = '#666';
+      if (prev > 0) {
+        const p = s.total / prev * 100;
+        convPct = i === 0 ? '100%' : p.toFixed(1) + '%';
+        if (i > 0) convColor = p < 30 ? '#dc2626' : (p < 60 ? '#ea580c' : '#16a34a');
       }
-    }
-    const barWidth = (s.total / maxFunil * 100).toFixed(1);
-    return `
-      <div class="funnel-bar-container" style="margin-bottom:12px;">
-        <div class="funnel-bar-label" style="display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:4px;">
-          <span class="stage-name" style="font-weight:600;flex:1;">${s.etapa}</span>
+      const bw = (s.total / maxFunil * 100).toFixed(1);
+      return `<div style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:4px;">
+          <span style="font-weight:600;flex:1;">${s.etapa}</span>
           <span style="color:${convColor};font-weight:700;margin-right:12px;font-size:11px;">${convPct}</span>
           <span style="color:#666;min-width:90px;text-align:right;">${fmt.num(s.total)} deals</span>
         </div>
-        <div class="funnel-bar-track" style="background:#F1F5F9;border-radius:4px;height:12px;overflow:hidden;">
-          <div class="funnel-bar-fill" style="width:${barWidth}%;background:linear-gradient(to right, var(--primary), var(--secondary));height:100%;border-radius:4px;transition:width .4s;"></div>
+        <div style="background:#F1F5F9;border-radius:4px;height:12px;overflow:hidden;">
+          <div style="width:${bw}%;background:linear-gradient(to right,var(--primary),var(--secondary));height:100%;border-radius:4px;transition:width .4s;"></div>
         </div>
       </div>`;
-  }).join('') + `
-    <p style="font-size:10px;color:#999;margin-top:12px;font-style:italic;">
-      <strong>%</strong> = conversão da etapa anterior para esta · <strong>verde</strong> &gt; 60% · <strong>laranja</strong> 30-60% · <strong>vermelho</strong> &lt; 30%
-    </p>`;
+    }).join('') + `<p style="font-size:10px;color:#999;margin-top:12px;font-style:italic;"><strong>%</strong> = conversão da etapa anterior para esta · <strong>verde</strong> &gt; 60% · <strong>laranja</strong> 30-60% · <strong>vermelho</strong> &lt; 30%</p>`;
+  })();
 
-  // ── Bloco 5: Capital + Motivos de Perda ──────────────────────────────────────
-  const cap = DATA.leads.by_capital.slice(0, 8);
-  makeChart('chart-exec-capital', {
-    type: 'doughnut',
-    data: { labels: cap.map(r => r.capital), datasets: [{ data: cap.map(r => r.total), backgroundColor: PALETTE }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
-  });
+  // ── Bloco 4: Detalhe das Reuniões no Período ──
+  const SEM_MOTIVO = 'Não foi definido motivo para esse lead';
+  const statusCell = (v) => {
+    const c = classM(v);
+    if (c === 'realizada') return '<span style="color:#16a34a;font-weight:600;">✅ Realizada</span>';
+    if (c === 'noshow') return '<span style="color:#dc2626;font-weight:600;">❌ No-Show</span>';
+    return '<span style="color:#999;">— Não agendada</span>';
+  };
+  const justCell = (statusVal, motivo) => {
+    if (classM(statusVal) !== 'noshow') return '<span style="color:#cbd5e1;">—</span>';
+    const m = (motivo || '').trim();
+    return m ? m : `<span style="color:#b45309;font-style:italic;">${SEM_MOTIVO}</span>`;
+  };
+  const fmtDataBR = (s) => s ? s.split('-').reverse().join('/') : '—';
+  document.getElementById('exec-meetings-count').textContent = `(${meetDet.length} reuniões)`;
+  document.getElementById('exec-meetings-table').innerHTML = meetDet.length
+    ? meetDet.map(r => `<tr>
+        <td>${fmtDataBR(r.data)}</td>
+        <td>${r.deal_nome || '—'}</td>
+        <td>${r.responsavel || '—'}</td>
+        <td>${statusCell(r.r1)}</td>
+        <td>${justCell(r.r1, r.justificativa)}</td>
+        <td>${statusCell(r.r2)}</td>
+        <td>${justCell(r.r2, r.justificativa_2)}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="7" class="empty">Nenhuma reunião registrada no período.</td></tr>';
 
-  const losses = crm.losses || [];
-  const lossByReasonStage = crm.losses_by_reason_stage || {};
-  makeChart('chart-exec-losses', {
-    type: 'bar',
-    data: {
-      labels: losses.slice(0, 10).map(r => r.motivo),
-      datasets: [{ data: losses.slice(0, 10).map(r => r.total), backgroundColor: COLORS.red + 'CC', borderRadius: 4 }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: ctx => ` ${ctx.parsed.x} leads perdidos`,
-            afterBody: ctx => {
-              const motivo = ctx[0]?.label;
-              const stages = lossByReasonStage[motivo];
-              if (!stages || !stages.length) return [];
-              return ['', '📍 Por etapa do funil:', ...stages.map(s => `  • ${s.etapa}: ${s.total}`)];
-            }
-          }
-        }
-      },
-      scales: { x: { beginAtZero: true } }
-    }
-  });
-
-  // ── Bloco 6: UTM / Atribuição ────────────────────────────────────────────────
-  const srcEntries = Object.entries(filtSources).sort((a, b) => b[1] - a[1]).slice(0, 10);
-  makeChart('chart-exec-utm-source', {
-    type: 'doughnut',
-    data: { labels: srcEntries.map(r => r[0]), datasets: [{ data: srcEntries.map(r => r[1]), backgroundColor: PALETTE }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
-  });
-
-  const medEntries = Object.entries(filtMediums).sort((a, b) => b[1] - a[1]).slice(0, 8);
-  makeChart('chart-exec-utm-medium', {
-    type: 'doughnut',
-    data: { labels: medEntries.map(r => r[0]), datasets: [{ data: medEntries.map(r => r[1]), backgroundColor: PALETTE }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
-  });
-
-  const canalEntries = Object.entries(filtCanal).sort((a, b) => b[1] - a[1]).slice(0, 8);
-  makeChart('chart-exec-canal', {
-    type: 'doughnut',
-    data: { labels: canalEntries.map(r => r[0]), datasets: [{ data: canalEntries.map(r => r[1]), backgroundColor: PALETTE }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 } } } } }
-  });
-
-  // Índice de gasto por campanha (Meta + Google) para lookup na tabela
-  const metaCampSpend = {};
-  (DATA.meta_ads.campaigns || []).forEach(c => { metaCampSpend[c.campanha.toLowerCase()] = c.gasto; });
-  const googleCampSpend = {};
-  (DATA.google_ads.campaigns || []).forEach(c => { googleCampSpend[c.campanha.toLowerCase()] = c.gasto; });
-
-  function findCampSpend(campName, source) {
-    const key = campName.toLowerCase();
-    // Tentativa de match exato
-    if (source === 'metaads' && metaCampSpend[key]) return metaCampSpend[key];
-    if (source === 'googlecpc' && googleCampSpend[key]) return googleCampSpend[key];
-    // Tentativa de match parcial (UTM campaign contém parte do nome da campanha)
-    const pool = source === 'metaads' ? metaCampSpend : source === 'googlecpc' ? googleCampSpend : {};
-    for (const [k, v] of Object.entries(pool)) {
-      if (k.includes(key) || key.includes(k)) return v;
-    }
-    return null;
-  }
-
-  const FONTE_LABEL = { metaads: '📘 Meta', googlecpc: '🔍 Google', direto: '—' };
-
-  const campEntries = Object.entries(filtCamps).sort((a, b) => b[1] - a[1]);
-  const totalCamp = campEntries.reduce((s, r) => s + r[1], 0) || 1;
-  document.getElementById('exec-table-utm').innerHTML = campEntries.map((r, i) => {
-    const src = filtCampsSource[r[0]] || 'direto';
-    const spend = findCampSpend(r[0], src);
-    return `<tr>
-      <td>${i+1}</td>
-      <td>${r[0]}</td>
-      <td><span style="font-size:12px">${FONTE_LABEL[src] || src}</span></td>
-      <td><strong>${r[1]}</strong></td>
-      <td>${(r[1]/totalCamp*100).toFixed(1)}%</td>
-      <td>${spend !== null ? fmt.currency(spend) : '<span style="color:#999">—</span>'}</td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="6" class="empty">Sem dados UTM</td></tr>';
-
-  // Alertas
-  const alerts = [];
-  if (metaCPL > 300) alerts.push({ type: 'warn', msg: `CPL Meta Ads elevado: ${fmt.currency(metaCPL)}. Revisar segmentações e criativos.` });
-  if (googleCPL > 500) alerts.push({ type: 'warn', msg: `CPL Google Ads elevado: ${fmt.currency(googleCPL)}. Verificar palavras-chave e conversões.` });
-  if (crm.total_lost > crm.total_won * 5) alerts.push({ type: 'danger', msg: `Muitos negócios perdidos (${crm.total_lost}) vs ganhos (${crm.total_won}). Analisar motivos de perda.` });
-  if (alerts.length === 0) alerts.push({ type: 'ok', msg: 'Nenhum alerta crítico identificado no período selecionado.' });
-  document.getElementById('exec-alerts').innerHTML = alerts.map(a =>
-    `<div class="alert-card ${a.type}"><strong>${a.type === 'ok' ? '✅' : a.type === 'danger' ? '🚨' : '⚠️'}</strong> ${a.msg}</div>`
-  ).join('');
-
-  // ── Bloco 7: Taxa de Perda por UTM ────────────────────────────────────────────
-  // Lookups: total de leads por source / campaign / content
-  const leadsBySource   = {};
-  (DATA.utm.sources   || []).forEach(r => { leadsBySource[r.source]     = r.total; });
-  const leadsByCampaign = {};
-  (DATA.utm.campaigns || []).forEach(r => { leadsByCampaign[r.campaign] = r.total; });
-  const leadsByContent  = {};
-  (DATA.utm.contents  || []).forEach(r => { leadsByContent[r.content]   = r.total; });
-
-  // Paleta diversificada para gráficos de perda (cores bem distintas entre si)
-  const RED_PALETTE = [
-    '#EF4444', // vermelho
-    '#3B82F6', // azul
-    '#10B981', // verde
-    '#F59E0B', // âmbar
-    '#8B5CF6', // violeta
-    '#06B6D4', // ciano
-    '#EC4899', // rosa
-    '#F97316', // laranja
-    '#84CC16', // lima
-    '#6366F1', // índigo
-  ];
-
-  function makeLossDoughnut(canvasId, lossData, leadsLookup, keyField) {
-    const items = (lossData || []).slice(0, 8);
-    if (!items.length) {
-      const el = document.getElementById(canvasId);
-      if (el) el.parentElement.innerHTML = '<p style="font-size:12px;color:#999;text-align:center;padding:24px;">Sem dados de UTM identificadas.</p>';
-      return;
-    }
-    makeChart(canvasId, {
-      type: 'doughnut',
-      data: {
-        labels: items.map(r => {
-          const totalLeads = leadsLookup[r[keyField]] || 0;
-          const taxa = totalLeads ? (r.total / totalLeads * 100).toFixed(1) : '—';
-          return `${r[keyField]} (${taxa}%)`;
-        }),
-        datasets: [{ data: items.map(r => r.total), backgroundColor: RED_PALETTE }]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'right', labels: { font: { size: 10 }, boxWidth: 12 } },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => {
-                const r = items[ctx.dataIndex];
-                const totalLeads = leadsLookup[r[keyField]] || 0;
-                const taxa = totalLeads ? (r.total / totalLeads * 100).toFixed(1) + '%' : 'n/a';
-                return ` ${r.total} perdas de ${totalLeads || '?'} leads (${taxa})`;
-              }
-            }
-          }
-        }
-      }
+  // ── Blocos 5 e 6: Perdas por Etapa do Funil (popup por plataforma / por motivo) ──
+  const lossesPeriodo = (crm.losses_daily || []).filter(r => !datePred || datePred(r.criado || r.data));
+  const ORDER_FUNIL = ['entrada de lead', 'tentativa de conexão', 'lead respondente', 'pré-qualificado', 'reunião pdf', 'apresentação do business plan', 'envio de cof', 'workshop'];
+  const PLAT_OF = (src) => src === 'googlecpc' ? 'Google' : (src === 'metaads' ? 'Meta' : 'Orgânico / Outro');
+  const PLAT_COLOR = { 'Google': '#4285F4', 'Meta': '#1877F2', 'Orgânico / Outro': '#16a085' };
+  function buildLossFunnel(containerId, mode) {
+    const agg = {};
+    lossesPeriodo.forEach(x => {
+      const et = x.etapa || 'Sem etapa';
+      if (!agg[et]) agg[et] = { total: 0, plat: {}, mot: {} };
+      agg[et].total++;
+      const p = PLAT_OF(x.utm_source); agg[et].plat[p] = (agg[et].plat[p] || 0) + 1;
+      const mo = x.motivo || 'Sem motivo'; agg[et].mot[mo] = (agg[et].mot[mo] || 0) + 1;
     });
+    const stages = Object.keys(agg).sort((a, b) => {
+      const ia = ORDER_FUNIL.findIndex(o => a.toLowerCase().includes(o));
+      const ib = ORDER_FUNIL.findIndex(o => b.toLowerCase().includes(o));
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+    const max = Math.max(1, ...stages.map(st => agg[st].total));
+    const html = stages.map(st => {
+      const d = agg[st];
+      const w = (d.total / max * 100).toFixed(1);
+      const rows = Object.entries(mode === 'plat' ? d.plat : d.mot).sort((a, b) => b[1] - a[1]);
+      const pop = rows.map(([k, v]) => mode === 'plat'
+        ? `<div class="pop-row"><span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${PLAT_COLOR[k] || '#999'};margin-right:6px;"></i>${k}</span><strong>${v}</strong></div>`
+        : `<div class="pop-row"><span>${k}</span><strong>${v}</strong></div>`).join('');
+      return `<div class="lossbar">
+        <div class="lossbar-head"><span class="lossbar-name">${st}</span><span class="lossbar-val">${fmt.num(d.total)} perdas</span></div>
+        <div class="lossbar-track"><div class="lossbar-fill" style="width:${w}%"></div></div>
+        <div class="lossbar-pop"><div class="pop-title">${st} — ${fmt.num(d.total)} perdas</div>${pop}</div>
+      </div>`;
+    }).join('');
+    document.getElementById(containerId).innerHTML = html || '<p style="color:#999;font-size:12px;padding:16px;">Sem perdas no período selecionado.</p>';
   }
-
-  makeLossDoughnut('chart-exec-loss-source',   DATA.crm.losses_by_utm_source,   leadsBySource,   'utm');
-  makeLossDoughnut('chart-exec-loss-campaign', DATA.crm.losses_by_utm_campaign, leadsByCampaign, 'utm');
-  makeLossDoughnut('chart-exec-loss-content',  DATA.crm.losses_by_utm_content,  leadsByContent,  'utm');
+  buildLossFunnel('exec-loss-funnel-plat', 'plat');
+  buildLossFunnel('exec-loss-funnel-motivo', 'motivo');
 }
 
 // ─── SECTION: EVOLUÇÃO ────────────────────────────────────────────────────────
