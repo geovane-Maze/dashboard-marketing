@@ -1115,17 +1115,17 @@
     <a href="#" class="active" data-section="executivo">
       <i class="icon">📊</i><span class="nav-label">Visão Executiva</span>
     </a>
-    <a href="#" data-section="relatorio">
-      <i class="icon">📝</i><span class="nav-label">Relatório Resumido</span>
-    </a>
-    <a href="#" data-section="evolucao">
-      <i class="icon">📈</i><span class="nav-label">Evolução Mensal</span>
-    </a>
     <a href="#" data-section="crm">
       <i class="icon">🔄</i><span class="nav-label">Funil CRM</span>
     </a>
     <a href="#" data-section="perdas">
       <i class="icon">⚠️</i><span class="nav-label">Gargalos & Perdas</span>
+    </a>
+    <a href="#" data-section="previsibilidade">
+      <i class="icon">📈</i><span class="nav-label">Previsibilidade 2026</span>
+    </a>
+    <a href="#" data-section="criativos">
+      <i class="icon">🎨</i><span class="nav-label">Criativos</span>
     </a>
     <a href="#" data-section="meta">
       <i class="icon">📘</i><span class="nav-label">Meta Ads</span>
@@ -1133,17 +1133,17 @@
     <a href="#" data-section="google">
       <i class="icon">🔍</i><span class="nav-label">Google Ads</span>
     </a>
-    <a href="#" data-section="criativos">
-      <i class="icon">🎨</i><span class="nav-label">Criativos</span>
+    <a href="#" data-section="relatorio">
+      <i class="icon">📝</i><span class="nav-label">Relatório Resumido</span>
+    </a>
+    <a href="#" data-section="evolucao">
+      <i class="icon">📈</i><span class="nav-label">Evolução Mensal</span>
     </a>
     <a href="#" data-section="utm">
       <i class="icon">🔗</i><span class="nav-label">UTM / Atribuição</span>
     </a>
     <a href="#" data-section="ga4">
       <i class="icon">🌐</i><span class="nav-label">Google Analytics</span>
-    </a>
-    <a href="#" data-section="previsibilidade">
-      <i class="icon">📈</i><span class="nav-label">Previsibilidade 2026</span>
     </a>
   </nav>
   <div class="update-info" id="sidebar-update">Carregando...</div>
@@ -1261,16 +1261,16 @@
         <div id="exec-funil-conversao" style="padding:8px 0;"></div>
       </div>
 
-      <!-- Bloco 4: Perdas por Etapa do Funil + Motivo (antepenúltimo) -->
-      <div class="chart-card" style="margin-bottom:24px">
-        <h3>Perdas por Etapa do Funil + Motivo <span style="font-size:11px;color:#999;font-weight:400;">— passe o mouse para ver os motivos de perda</span></h3>
-        <div id="exec-loss-funnel-motivo" style="padding:8px 0;"></div>
-      </div>
-
-      <!-- Bloco 5: Perdas por Etapa do Funil (por plataforma) — penúltimo -->
-      <div class="chart-card" style="margin-bottom:24px">
-        <h3>Perdas por Etapa do Funil <span style="font-size:11px;color:#999;font-weight:400;">— passe o mouse em cada etapa para ver por plataforma</span></h3>
-        <div id="exec-loss-funnel-plat" style="padding:8px 0;"></div>
+      <!-- Blocos 4 e 5: Perdas por Etapa (Motivo + Plataforma) lado a lado -->
+      <div class="charts-row" style="margin-bottom:24px">
+        <div class="chart-card">
+          <h3>Perdas por Etapa + Motivo <span style="font-size:11px;color:#999;font-weight:400;">— passe o mouse</span></h3>
+          <div id="exec-loss-funnel-motivo" style="padding:8px 0;"></div>
+        </div>
+        <div class="chart-card">
+          <h3>Perdas por Etapa + Plataforma <span style="font-size:11px;color:#999;font-weight:400;">— passe o mouse</span></h3>
+          <div id="exec-loss-funnel-plat" style="padding:8px 0;"></div>
+        </div>
       </div>
 
       <!-- Bloco 6: Detalhe das Reuniões no Período (último) -->
@@ -3065,6 +3065,47 @@ function renderEvolucao() {
 }
 
 // ─── SECTION: CRM ─────────────────────────────────────────────────────────────
+// Popup grande do mega-funil — motivos de perda + anúncios da etapa
+function openCmfModal(i) {
+  const s = (window._cmfStages || [])[i];
+  if (!s) return;
+  let m = document.getElementById('cmf-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'cmf-modal';
+    m.style.cssText = 'display:none;position:fixed;inset:0;z-index:2000;background:rgba(15,23,42,.55);align-items:center;justify-content:center;padding:20px;';
+    m.addEventListener('click', e => { if (e.target === m) m.style.display = 'none'; });
+    m.innerHTML = '<div id="cmf-modal-card" style="background:#fff;border-radius:16px;max-width:680px;width:100%;max-height:86vh;overflow:auto;box-shadow:0 24px 70px rgba(0,0,0,.35);"></div>';
+    document.body.appendChild(m);
+  }
+  const card = m.querySelector('#cmf-modal-card');
+  const motRows = s.mot.length
+    ? s.mot.map(([k, v]) => `<div style="display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:13px;"><span style="color:#334155;">${k}</span><strong style="color:#dc2626;white-space:nowrap;">${v} <span style="color:#94a3b8;font-weight:400;">${s.losses ? '(' + (v / s.losses * 100).toFixed(0) + '%)' : ''}</span></strong></div>`).join('')
+    : '<p style="color:#999;font-size:13px;">Sem motivos registrados.</p>';
+  const campRows = s.camp.length
+    ? s.camp.map(([k, v]) => `<div style="display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:13px;"><span style="color:#334155;word-break:break-word;">${k}</span><strong style="color:#0b5e66;white-space:nowrap;">${v}</strong></div>`).join('')
+    : '<p style="color:#999;font-size:13px;">Sem campanha identificada.</p>';
+  card.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:22px 24px 14px;border-bottom:1px solid #e2e8f0;position:sticky;top:0;background:#fff;">
+      <div>
+        <div style="font-size:19px;font-weight:700;color:#0f172a;">${s.name}</div>
+        <div style="font-size:13px;color:#64748b;margin-top:3px;">${fmt.num(s.leads)} leads na etapa · <strong style="color:#dc2626;">${fmt.num(s.losses)} perdas</strong> (${s.perdaPct.toFixed(1)}%)</div>
+      </div>
+      <button onclick="document.getElementById('cmf-modal').style.display='none'" style="border:none;background:#f1f5f9;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:17px;color:#475569;flex-shrink:0;">✕</button>
+    </div>
+    <div style="padding:18px 24px 24px;display:grid;grid-template-columns:1fr 1fr;gap:28px;">
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.04em;color:#94a3b8;text-transform:uppercase;margin-bottom:8px;">Motivos de perda</div>
+        ${motRows}
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.04em;color:#94a3b8;text-transform:uppercase;margin-bottom:8px;">Anúncios / Campanhas</div>
+        ${campRows}
+      </div>
+    </div>`;
+  m.style.display = 'flex';
+}
+
 function renderCRM() {
   const crm = DATA.crm;
   const pred = getFilteredMonths();
@@ -3189,20 +3230,26 @@ function renderCRM() {
       <div class="cmf-center"><div class="cmf-bar" style="width:100%;background:#16243f;">${fmt.num(totalLeads)}</div></div>
       <div class="cmf-right"></div>
     </div>`;
+    const sortDesc = (o) => Object.entries(o || {}).sort((a, b) => b[1] - a[1]);
+    window._cmfStages = [];
     STAGES.forEach((st, i) => {
       const cnt = passed[i];
       const prev = i === 0 ? (totalLeads || cnt) : passed[i - 1];
-      const convRaw = prev > 0 ? (cnt / prev * 100) : 0;
-      const conv = Math.min(convRaw, 100);
+      const conv = Math.min(prev > 0 ? (cnt / prev * 100) : 0, 100);
       const convC = conv < 30 ? '#dc2626' : (conv < 60 ? '#ea580c' : '#16a34a');
       const L = lossAgg[i];
+      const perdaPct = (L && cnt > 0) ? (L.total / cnt * 100) : 0;
       const right = L
-        ? `<strong style="color:#dc2626">${fmt.num(L.total)} perdas</strong> · ${topOf(L.mot)}<span class="cmf-camp">📣 ${topOf(L.camp)}</span>`
+        ? `<strong style="color:#dc2626">${fmt.num(L.total)} perdas</strong> · ${perdaPct.toFixed(1)}% da etapa`
         : '<span style="color:#cbd5e1">sem perdas</span>';
+      // guarda detalhe pra popup
+      window._cmfStages[i] = { name: st, leads: cnt, losses: L ? L.total : 0, perdaPct,
+        mot: L ? sortDesc(L.mot) : [], camp: L ? sortDesc(L.camp) : [] };
+      const clickable = (L && L.total) ? `onclick="openCmfModal(${i})" style="width:${barW(cnt)}%;background:${COL[i]};cursor:pointer;" title="Ver motivos e anúncios — clique"` : `style="width:${barW(cnt)}%;background:${COL[i]};"`;
       rows += `<div class="cmf-row">
         <div class="cmf-conv" style="color:${convC}">${conv.toFixed(0)}%</div>
         <div class="cmf-name" title="${st}">${st}</div>
-        <div class="cmf-center"><div class="cmf-bar" style="width:${barW(cnt)}%;background:${COL[i]};">${fmt.num(cnt)}</div></div>
+        <div class="cmf-center"><div class="cmf-bar" ${clickable}>${fmt.num(cnt)}</div></div>
         <div class="cmf-right">${right}</div>
       </div>`;
     });
@@ -4942,17 +4989,17 @@ loadData();
     <a href="#" data-section="executivo" class="active">
       <i class="icon">📊</i><span>Visão Executiva</span>
     </a>
-    <a href="#" data-section="relatorio">
-      <i class="icon">📝</i><span>Relatório Resumido</span>
-    </a>
-    <a href="#" data-section="evolucao">
-      <i class="icon">📈</i><span>Evolução Mensal</span>
-    </a>
     <a href="#" data-section="crm">
       <i class="icon">🔄</i><span>Funil CRM</span>
     </a>
     <a href="#" data-section="perdas">
       <i class="icon">⚠️</i><span>Gargalos & Perdas</span>
+    </a>
+    <a href="#" data-section="previsibilidade">
+      <i class="icon">📈</i><span>Previsibilidade 2026</span>
+    </a>
+    <a href="#" data-section="criativos">
+      <i class="icon">🎨</i><span>Criativos</span>
     </a>
     <a href="#" data-section="meta">
       <i class="icon">📘</i><span>Meta Ads</span>
@@ -4960,17 +5007,17 @@ loadData();
     <a href="#" data-section="google">
       <i class="icon">🔍</i><span>Google Ads</span>
     </a>
-    <a href="#" data-section="criativos">
-      <i class="icon">🎨</i><span>Criativos</span>
+    <a href="#" data-section="relatorio">
+      <i class="icon">📝</i><span>Relatório Resumido</span>
+    </a>
+    <a href="#" data-section="evolucao">
+      <i class="icon">📈</i><span>Evolução Mensal</span>
     </a>
     <a href="#" data-section="utm">
       <i class="icon">🔗</i><span>UTM / Atribuição</span>
     </a>
     <a href="#" data-section="ga4">
       <i class="icon">🌐</i><span>Google Analytics</span>
-    </a>
-    <a href="#" data-section="previsibilidade">
-      <i class="icon">📈</i><span>Previsibilidade 2026</span>
     </a>
   </nav>
   <div class="mob-drawer-footer" id="mob-drawer-update">Carregando...</div>
