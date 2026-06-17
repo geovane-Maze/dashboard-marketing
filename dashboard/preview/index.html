@@ -1249,8 +1249,8 @@
       <!-- Bloco 3: Reuniões (Apresentação + Business Plan) -->
       <div class="ads-comparison" id="exec-meetings" style="margin-bottom:24px"></div>
 
-      <!-- Bloco 3b: CPL Médio Pago + Total Investido (cards grandes) -->
-      <div id="exec-invest-cards" style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px"></div>
+      <!-- Bloco 3b: CPL Médio Pago + CPQ + Total Investido (cards grandes) -->
+      <div id="exec-invest-cards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px"></div>
 
       <!-- Bloco 3c: Funil de Conversão do Período -->
       <div class="chart-card" style="margin-bottom:24px">
@@ -1271,6 +1271,30 @@
           <h3>Perdas por Etapa + Plataforma <span style="font-size:11px;color:#999;font-weight:400;">— passe o mouse</span></h3>
           <div id="exec-loss-funnel-plat" style="padding:8px 0;"></div>
         </div>
+      </div>
+
+      <!-- Bloco 5b: Motivos de Perda + Perdas por Anúncio (lado a lado) -->
+      <div class="charts-row" style="margin-bottom:24px">
+        <div class="chart-card">
+          <h3>Motivos de Perda (CRM)</h3>
+          <div class="chart-wrap tall"><canvas id="chart-exec-motivos"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Perdas por Anúncio <span style="font-size:11px;color:#999;font-weight:400;">(utm_campaign)</span></h3>
+          <div class="chart-wrap tall"><canvas id="chart-exec-anuncio"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Bloco 5c: Entrada de Leads por Dia -->
+      <div class="chart-card" style="margin-bottom:24px">
+        <h3>Entrada de Leads por Dia <span style="font-size:11px;color:#999;font-weight:400;">— fluxo diário no período</span></h3>
+        <div class="chart-wrap tall"><canvas id="chart-exec-leads-dia"></canvas></div>
+      </div>
+
+      <!-- Bloco 5d: Histórico Mensal — Leads, CPL e Investido -->
+      <div class="chart-card" style="margin-bottom:24px">
+        <h3>Histórico Mensal — Leads, CPL e Investido</h3>
+        <div class="chart-wrap tall"><canvas id="chart-exec-hist-mensal"></canvas></div>
       </div>
 
       <!-- Bloco 6: Detalhe das Reuniões no Período (último) -->
@@ -2761,9 +2785,16 @@ function renderExecutivo() {
     <div class="kpi-sub">${k.sub}</div>
   </div>`).join('');
 
-  // CPL Médio Pago + Total Investido — cards grandes abaixo das reuniões
+  // CPQ — Custo por Lead Qualificado (chegaram em "1ª Reunião Agendada")
+  const _ORDQ = ['entrada de lead', 'tentativa de conexão', 'lead respondente', 'prospect', '1ª reunião agendada', '1ª reunião realizada', 'apresentação do business plan', 'envio de cof', 'workshop', 'análise financeira', 'comitê final'];
+  const _idxQ = (e) => { const el = (e || '').toLowerCase().trim(); for (let i = 0; i < _ORDQ.length; i++) { const s = _ORDQ[i]; if (el === s || el.includes(s) || s.includes(el)) return i; } return -1; };
+  const qualificados = (DATA.crm.deals_minimal || []).filter(d => (!datePred || datePred(d.criado_em)) && _idxQ(d.etapa) >= 4).length;
+  const cpq = qualificados > 0 ? totalInvestido / qualificados : 0;
+
+  // CPL Médio Pago + CPQ + Total Investido — cards grandes abaixo das reuniões
   document.getElementById('exec-invest-cards').innerHTML = [
     { label: 'CPL Médio Pago', value: pagos > 0 ? fmt.currency(cplPago) : '—', sub: 'investido ÷ leads pagos', cls: 'blue' },
+    { label: 'Custo por Lead Qualificado (CPQ)', value: qualificados > 0 ? fmt.currency(cpq) : '—', sub: 'investido ÷ leads em 1ª Reunião Agendada', cls: 'teal' },
     { label: 'Total Investido', value: fmt.currency(totalInvestido), sub: 'Google + Meta Ads', cls: 'orange' },
   ].map(k => `<div class="kpi-card ${k.cls}" style="text-align:center;padding:22px 16px;">
     <div class="kpi-label">${k.label}</div>
@@ -2935,6 +2966,62 @@ function renderExecutivo() {
   }
   buildLossFunnel('exec-loss-funnel-plat', 'plat');
   buildLossFunnel('exec-loss-funnel-motivo', 'motivo');
+
+  // ── Motivos de Perda (CRM) + Perdas por Anúncio (lado a lado) ───────────────
+  const _lp = (crm.losses_daily || []).filter(x => !datePred || datePred(x.criado || x.data));
+  const motAgg = {}, campAgg = {};
+  _lp.forEach(x => {
+    const m = x.motivo || '—'; motAgg[m] = (motAgg[m] || 0) + 1;
+    const c = x.utm_campaign || 'não identificado'; campAgg[c] = (campAgg[c] || 0) + 1;
+  });
+  const motTop = Object.entries(motAgg).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  makeChart('chart-exec-motivos', {
+    type: 'bar',
+    data: { labels: motTop.map(r => r[0]), datasets: [{ data: motTop.map(r => r[1]), backgroundColor: COLORS.red + 'CC', borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+  const campTop = Object.entries(campAgg).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  makeChart('chart-exec-anuncio', {
+    type: 'bar',
+    data: { labels: campTop.map(r => r[0]), datasets: [{ data: campTop.map(r => r[1]), backgroundColor: '#3B82F6CC', borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+
+  // ── Entrada de Leads por Dia (fluxo diário) ─────────────────────────────────
+  const _ld = (DATA.leads.daily || []).filter(r => !datePred || datePred(r.data)).slice().sort((a, b) => a.data < b.data ? -1 : 1);
+  makeChart('chart-exec-leads-dia', {
+    type: 'line',
+    data: { labels: _ld.map(r => r.data.split('-').reverse().slice(0, 2).join('/')), datasets: [{ label: 'Leads', data: _ld.map(r => r.total), borderColor: COLORS.secondary, backgroundColor: COLORS.secondary + '22', borderWidth: 2, pointRadius: 2, tension: .35, fill: true }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+
+  // ── Histórico Mensal — Leads, CPL e Investido ───────────────────────────────
+  const _lByM = {}; (DATA.leads.monthly || []).forEach(r => _lByM[r.mes] = r.total);
+  const _gByM = {}; (DATA.google_ads.monthly || []).forEach(r => _gByM[r.mes] = r.gasto || 0);
+  const _mByM = {}; (DATA.meta_ads.monthly || []).forEach(r => _mByM[r.mes] = r.gasto || 0);
+  const _meses = [...new Set([...Object.keys(_lByM), ...Object.keys(_gByM), ...Object.keys(_mByM)])].sort();
+  const _invM = _meses.map(m => (_gByM[m] || 0) + (_mByM[m] || 0));
+  const _ldsM = _meses.map(m => _lByM[m] || 0);
+  const _cplM = _meses.map((m, i) => _ldsM[i] > 0 ? _invM[i] / _ldsM[i] : 0);
+  makeChart('chart-exec-hist-mensal', {
+    type: 'bar',
+    data: {
+      labels: _meses.map(mesLabel),
+      datasets: [
+        { type: 'bar', label: 'Leads', data: _ldsM, backgroundColor: COLORS.secondary + 'CC', borderRadius: 4, yAxisID: 'y' },
+        { type: 'line', label: 'Total Investido (R$)', data: _invM, borderColor: '#8e44ad', backgroundColor: '#8e44ad22', borderWidth: 2, pointRadius: 3, yAxisID: 'y2', tension: .3 },
+        { type: 'line', label: 'CPL (R$)', data: _cplM, borderColor: COLORS.orange, borderWidth: 2, pointRadius: 3, yAxisID: 'y2', tension: .3, borderDash: [5, 4] },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: ctx => ctx.dataset.yAxisID === 'y2' ? ` ${ctx.dataset.label}: R$ ${Math.round(ctx.parsed.y).toLocaleString('pt-BR')}` : ` ${ctx.dataset.label}: ${ctx.parsed.y}` } } },
+      scales: {
+        y: { beginAtZero: true, position: 'left', title: { display: true, text: 'Leads' } },
+        y2: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'R$' }, ticks: { callback: v => 'R$' + (v / 1000).toFixed(0) + 'k' } }
+      }
+    }
+  });
 }
 
 // ─── SECTION: EVOLUÇÃO ────────────────────────────────────────────────────────
