@@ -7,6 +7,14 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect x='6' y='4' width='52' height='56' rx='5' fill='%23B3D4F0' stroke='%23000' stroke-width='3'/><rect x='38' y='10' width='14' height='5' rx='1.5' fill='%23FFFFFF' stroke='%23000' stroke-width='2'/><circle cx='22' cy='22' r='9' fill='%23E74C3C' stroke='%23000' stroke-width='2'/><path d='M22 22 L22 13 A9 9 0 0 1 31 22 Z' fill='%2327AE60'/><line x1='34' y1='30' x2='52' y2='30' stroke='%23000' stroke-width='2'/><line x1='34' y1='36' x2='46' y2='36' stroke='%23000' stroke-width='2'/><rect x='12' y='42' width='8' height='12' fill='%23F4D35E' stroke='%23000' stroke-width='2'/><rect x='22' y='38' width='8' height='16' fill='%23F4A24A' stroke='%23000' stroke-width='2'/><rect x='32' y='34' width='8' height='20' fill='%23E67E22' stroke='%23000' stroke-width='2'/><rect x='42' y='40' width='8' height='14' fill='%23D35400' stroke='%23000' stroke-width='2'/></svg>">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script>
+  // Registra o plugin de rótulos fixos, mas DESLIGADO por padrão (só ligamos onde queremos)
+  if (window.Chart && window.ChartDataLabels) {
+    Chart.register(window.ChartDataLabels);
+    Chart.defaults.plugins.datalabels = { display: false };
+  }
+</script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
   // Aplica o tema salvo ANTES de pintar (evita flash de tela branca no dark)
@@ -440,6 +448,82 @@
   .tt-label { flex: 1; font-size: 11px; }
   .tt-val   { font-weight: 700; font-size: 12px; }
   .tt-pct   { color: #9CA3AF; font-weight: 400; font-size: 11px; }
+
+  /* ═══ GA4 — PÁGINAS DE EXPANSÃO ═══ */
+  .ga4-lp-overview {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px;
+  }
+  @media (max-width: 900px) { .ga4-lp-overview { grid-template-columns: 1fr; } }
+  .ga4-lp-card {
+    background: var(--card); border-radius: 12px; padding: 18px 18px 14px;
+    border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    border-top: 4px solid var(--secondary);
+  }
+  .ga4-lp-card.franqueado { border-top-color: #22C55E; }
+  .ga4-lp-card.home       { border-top-color: #3FA9F5; }
+  .ga4-lp-card.pablo      { border-top-color: #F59E0B; }
+  .ga4-lp-card h4 {
+    font-size: 15px; font-weight: 700; color: var(--heading);
+    margin: 0 0 4px; display: flex; align-items: center; gap: 8px;
+  }
+  .ga4-lp-card .ga4-lp-url {
+    font-size: 11px; color: #888; word-break: break-all; margin-bottom: 12px;
+    text-decoration: none;
+  }
+  .ga4-lp-card .ga4-lp-url:hover { color: var(--secondary); text-decoration: underline; }
+  .ga4-lp-metrics {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+    border-top: 1px solid var(--border); padding-top: 12px;
+  }
+  .ga4-lp-metric { padding: 4px 0; }
+  .ga4-lp-metric .lbl {
+    font-size: 10px; color: #888; text-transform: uppercase;
+    letter-spacing: .4px; font-weight: 600;
+  }
+  .ga4-lp-metric .val {
+    font-size: 18px; font-weight: 700; color: var(--heading); line-height: 1.2;
+  }
+  .ga4-lp-metric .val.good  { color: #16A34A; }
+  .ga4-lp-metric .val.warn  { color: #D97706; }
+  .ga4-lp-metric .val.bad   { color: #DC2626; }
+  .ga4-lp-metric .sub { font-size: 10px; color: #999; }
+
+  /* Detalhamento por LP */
+  .ga4-lp-section {
+    background: var(--card); border-radius: 12px; padding: 18px 20px;
+    border: 1px solid var(--border); margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .ga4-lp-section > .ga4-lp-head {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+    border-bottom: 2px solid var(--border); padding-bottom: 10px;
+  }
+  .ga4-lp-section > .ga4-lp-head h3 { font-size: 15px; font-weight: 700; color: var(--heading); margin: 0; }
+  .ga4-lp-section > .ga4-lp-head .ga4-lp-tag {
+    background: var(--bg2); padding: 3px 10px; border-radius: 12px;
+    font-size: 11px; color: var(--text); font-weight: 600;
+  }
+  .ga4-lp-grid {
+    display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr; gap: 16px;
+  }
+  @media (max-width: 1100px) {
+    .ga4-lp-grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 600px) {
+    .ga4-lp-grid { grid-template-columns: 1fr; }
+  }
+  .ga4-sub { font-size: 12px; font-weight: 600; color: #888; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .3px; }
+  .ga4-bar-list { display: flex; flex-direction: column; gap: 5px; }
+  .ga4-bar-item { font-size: 12px; }
+  .ga4-bar-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
+  .ga4-bar-row .nm { color: var(--text); }
+  .ga4-bar-row .vl { color: #888; font-weight: 600; }
+  .ga4-bar-track { background: var(--bg2); border-radius: 3px; height: 6px; overflow: hidden; }
+  .ga4-bar-fill { height: 100%; background: var(--secondary); border-radius: 3px; }
+  .ga4-bar-fill.franqueado { background: #22C55E; }
+  .ga4-bar-fill.home       { background: #3FA9F5; }
+  .ga4-bar-fill.pablo      { background: #F59E0B; }
+  .ga4-mini-chart { position: relative; height: 160px; }
 
   /* ═══ PREVISIBILIDADE 2026 ═══ */
   .prev-tabs {
@@ -963,6 +1047,8 @@
 </head>
 <body>
 
+
+
 <!-- TELA DE LOGIN (oculta por padrão; mostrada apenas se dados estiverem criptografados) -->
 <div id="login-screen" class="hidden">
   <div class="login-box">
@@ -994,17 +1080,17 @@
     <a href="#" class="active" data-section="executivo">
       <i class="icon">📊</i><span class="nav-label">Visão Executiva</span>
     </a>
-    <a href="#" data-section="relatorio">
-      <i class="icon">📝</i><span class="nav-label">Relatório Resumido</span>
-    </a>
-    <a href="#" data-section="evolucao">
-      <i class="icon">📈</i><span class="nav-label">Evolução Mensal</span>
-    </a>
     <a href="#" data-section="crm">
       <i class="icon">🔄</i><span class="nav-label">Funil CRM</span>
     </a>
     <a href="#" data-section="perdas">
       <i class="icon">⚠️</i><span class="nav-label">Gargalos & Perdas</span>
+    </a>
+    <a href="#" data-section="previsibilidade">
+      <i class="icon">📈</i><span class="nav-label">Previsibilidade 2026</span>
+    </a>
+    <a href="#" data-section="criativos">
+      <i class="icon">🎨</i><span class="nav-label">Criativos</span>
     </a>
     <a href="#" data-section="meta">
       <i class="icon">📘</i><span class="nav-label">Meta Ads</span>
@@ -1012,17 +1098,17 @@
     <a href="#" data-section="google">
       <i class="icon">🔍</i><span class="nav-label">Google Ads</span>
     </a>
-    <a href="#" data-section="criativos">
-      <i class="icon">🎨</i><span class="nav-label">Criativos</span>
+    <a href="#" data-section="relatorio">
+      <i class="icon">📝</i><span class="nav-label">Relatório Resumido</span>
+    </a>
+    <a href="#" data-section="evolucao">
+      <i class="icon">📈</i><span class="nav-label">Evolução Mensal</span>
     </a>
     <a href="#" data-section="utm">
       <i class="icon">🔗</i><span class="nav-label">UTM / Atribuição</span>
     </a>
     <a href="#" data-section="ga4">
       <i class="icon">🌐</i><span class="nav-label">Google Analytics</span>
-    </a>
-    <a href="#" data-section="previsibilidade">
-      <i class="icon">📈</i><span class="nav-label">Previsibilidade 2026</span>
     </a>
   </nav>
   <div class="update-info" id="sidebar-update">Carregando...</div>
@@ -1128,8 +1214,8 @@
       <!-- Bloco 3: Reuniões (Apresentação + Business Plan) -->
       <div class="ads-comparison" id="exec-meetings" style="margin-bottom:24px"></div>
 
-      <!-- Bloco 3b: CPL Médio Pago + Total Investido (cards grandes) -->
-      <div id="exec-invest-cards" style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px"></div>
+      <!-- Bloco 3b: CPL Médio Pago + CPQ + Total Investido (cards grandes) -->
+      <div id="exec-invest-cards" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px"></div>
 
       <!-- Bloco 3c: Funil de Conversão do Período -->
       <div class="chart-card" style="margin-bottom:24px">
@@ -1140,16 +1226,40 @@
         <div id="exec-funil-conversao" style="padding:8px 0;"></div>
       </div>
 
-      <!-- Bloco 4: Perdas por Etapa do Funil + Motivo (antepenúltimo) -->
-      <div class="chart-card" style="margin-bottom:24px">
-        <h3>Perdas por Etapa do Funil + Motivo <span style="font-size:11px;color:#999;font-weight:400;">— passe o mouse para ver os motivos de perda</span></h3>
-        <div id="exec-loss-funnel-motivo" style="padding:8px 0;"></div>
+      <!-- Blocos 4 e 5: Perdas por Etapa (Motivo + Plataforma) lado a lado -->
+      <div class="charts-row" style="margin-bottom:24px">
+        <div class="chart-card">
+          <h3>Perdas por Etapa + Motivo <span style="font-size:11px;color:#999;font-weight:400;">— passe o mouse</span></h3>
+          <div id="exec-loss-funnel-motivo" style="padding:8px 0;"></div>
+        </div>
+        <div class="chart-card">
+          <h3>Perdas por Etapa + Plataforma <span style="font-size:11px;color:#999;font-weight:400;">— passe o mouse</span></h3>
+          <div id="exec-loss-funnel-plat" style="padding:8px 0;"></div>
+        </div>
       </div>
 
-      <!-- Bloco 5: Perdas por Etapa do Funil (por plataforma) — penúltimo -->
-      <div class="chart-card" style="margin-bottom:24px">
-        <h3>Perdas por Etapa do Funil <span style="font-size:11px;color:#999;font-weight:400;">— passe o mouse em cada etapa para ver por plataforma</span></h3>
-        <div id="exec-loss-funnel-plat" style="padding:8px 0;"></div>
+      <!-- Bloco 5b: Motivos de Perda + Perdas por Anúncio (lado a lado) -->
+      <div class="charts-row" style="margin-bottom:24px">
+        <div class="chart-card">
+          <h3>Motivos de Perda (CRM)</h3>
+          <div class="chart-wrap tall"><canvas id="chart-exec-motivos"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Perdas por Anúncio <span style="font-size:11px;color:#999;font-weight:400;">(utm_campaign)</span></h3>
+          <div class="chart-wrap tall"><canvas id="chart-exec-anuncio"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Blocos 5c e 5d: Leads por Dia + Histórico Mensal (lado a lado) -->
+      <div class="charts-row" style="margin-bottom:24px">
+        <div class="chart-card">
+          <h3>Entrada de Leads por Dia <span style="font-size:11px;color:#999;font-weight:400;">— fluxo diário</span></h3>
+          <div class="chart-wrap tall"><canvas id="chart-exec-leads-dia"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Histórico Mensal — Leads, CPL e Investido</h3>
+          <div class="chart-wrap tall"><canvas id="chart-exec-hist-mensal"></canvas></div>
+        </div>
       </div>
 
       <!-- Bloco 6: Detalhe das Reuniões no Período (último) -->
@@ -1226,13 +1336,40 @@
     <div id="sec-crm" class="section">
       <div class="section-title">Funil CRM</div>
       <div class="kpi-grid-crm" id="kpi-crm"></div>
+
+      <!-- Funil visual do CRM (mega-funil) -->
+      <style>
+        #sec-crm .cmf-row{display:flex;align-items:center;gap:12px;margin-bottom:6px;}
+        #sec-crm .cmf-conv{width:50px;text-align:right;font-size:13px;font-weight:800;flex-shrink:0;}
+        #sec-crm .cmf-name{width:188px;text-align:right;font-size:12.5px;font-weight:600;color:#334155;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        #sec-crm .cmf-center{flex:1;display:flex;justify-content:center;min-width:0;}
+        #sec-crm .cmf-bar{height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:14px;min-width:44px;box-shadow:0 2px 6px rgba(15,40,55,.18);transition:width .45s ease;}
+        #sec-crm .cmf-right{width:300px;flex-shrink:0;font-size:11px;line-height:1.35;overflow:hidden;}
+        #sec-crm .cmf-right .cmf-camp{color:#64748b;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        #sec-crm .cmf-headrow{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+        #sec-crm .cmf-headrow span{font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+      </style>
+      <div class="chart-card" style="margin-bottom:24px">
+        <h3>🔻 Funil de Conversão CRM — <span id="crm-funnel-period" style="font-weight:400;color:#666;font-size:13px;">período</span></h3>
+        <p style="font-size:11px;color:#666;margin:0 0 16px;">
+          Leads que passaram por cada etapa no período (por data de criação). <strong>Esquerda</strong>: conversão da etapa anterior · <strong>centro</strong>: leads na etapa · <strong>direita</strong>: perdas, principal motivo e campanha.
+        </p>
+        <div class="cmf-headrow">
+          <span style="width:50px;text-align:right;flex-shrink:0;">Conv.</span>
+          <span style="width:188px;text-align:right;flex-shrink:0;">Etapa</span>
+          <span style="flex:1;text-align:center;">Leads na etapa</span>
+          <span style="width:300px;flex-shrink:0;">Perdas · motivo · campanha</span>
+        </div>
+        <div id="crm-mega-funnel"></div>
+      </div>
+
       <div class="charts-row">
         <div class="chart-card">
           <h3>Negócios por Etapa</h3>
           <div id="crm-funnel-bars" style="padding: 8px 0;"></div>
         </div>
         <div class="chart-card">
-          <h3>Reunião PDF por Mês</h3>
+          <h3>1ª Reunião Agendada por Mês</h3>
           <div class="chart-wrap"><canvas id="chart-crm-won"></canvas></div>
         </div>
       </div>
@@ -1398,7 +1535,7 @@
       <div class="table-card" style="margin-bottom:24px;background:linear-gradient(135deg,#EEF2FF 0%,#F0F9FF 100%);border:1px solid #93C5FD;">
         <h3 style="margin-top:0;">🎯 Top Criativos por QUALIDADE de Lead</h3>
         <p style="font-size:11px;color:#1E3A8A;margin:0 0 12px;">
-          Ranqueado por <strong>quantos leads chegaram em etapas qualificadas</strong> (Reunião PDF, Apresentação BP, Envio COF, Workshop).
+          Ranqueado por <strong>quantos leads chegaram em etapas qualificadas</strong> (1ª Reunião Agendada, Apresentação BP, Envio COF, Workshop).
           <strong>Diferente</strong> do Top 5 acima (que vê volume) — aqui é QUALIDADE: criativos que trazem leads que realmente avançam.
         </p>
         <div style="overflow-x:auto;">
@@ -1519,32 +1656,35 @@
 
     <!-- GOOGLE ANALYTICS -->
     <div id="sec-ga4" class="section">
-      <div class="section-title">Google Analytics 4</div>
-      <div class="kpi-grid" id="kpi-ga4"></div>
+      <div class="section-title">🌐 Google Analytics — Páginas de Expansão</div>
+      <p style="font-size:12px;color:#888;margin:-12px 0 16px;">
+        Dados filtrados nas <strong>3 LPs de expansão</strong> da Clínica da Cidade Franchising.
+        Demais páginas (centros médicos, agendamento etc.) <strong>não entram</strong> no relatório.
+        <br>
+        🗓️ <strong>O filtro de período aqui tem granularidade mensal</strong> — se você selecionar "15/05 → 20/05",
+        mostra o mês de Maio inteiro.
+        <span id="ga4-demo-warn" style="display:none;color:#D97706;">
+          ⚠️ Faixa etária e sexo ainda não foram coletadas — recoletar GA4 após renovar o token.
+        </span>
+      </p>
+
+      <!-- Cards de overview por LP (3 lado a lado) -->
+      <div class="ga4-lp-overview" id="ga4-lp-overview"></div>
+
+      <!-- Comparativos visuais -->
       <div class="charts-row">
         <div class="chart-card">
-          <h3>Sessões por Canal</h3>
-          <div class="chart-wrap tall"><canvas id="chart-ga4-channels"></canvas></div>
+          <h3>Evolução Mensal de Sessões (3 LPs)</h3>
+          <div class="chart-wrap tall"><canvas id="chart-ga4-monthly-lps"></canvas></div>
         </div>
         <div class="chart-card">
-          <h3>Dispositivos</h3>
-          <div class="chart-wrap tall"><canvas id="chart-ga4-devices"></canvas></div>
+          <h3>Taxa de Conversão × Rejeição por LP</h3>
+          <div class="chart-wrap tall"><canvas id="chart-ga4-convrej"></canvas></div>
         </div>
       </div>
-      <div class="table-card">
-        <h3>Top Páginas por Visualizações</h3>
-        <table>
-          <thead><tr><th>#</th><th>Página</th><th>Visualizações</th></tr></thead>
-          <tbody id="table-ga4-pages"></tbody>
-        </table>
-      </div>
-      <div class="table-card">
-        <h3>Top Fontes de Tráfego</h3>
-        <table>
-          <thead><tr><th>#</th><th>Fonte</th><th>Sessões</th><th>%</th></tr></thead>
-          <tbody id="table-ga4-sources"></tbody>
-        </table>
-      </div>
+
+      <!-- Detalhamento por LP (3 blocos stacked) -->
+      <div id="ga4-lp-details"></div>
     </div>
 
     <!-- PREVISIBILIDADE 2026 -->
@@ -2185,17 +2325,17 @@ function renderRelatorio() {
                 <td class="pct">${crm.total_deals ? pct(crm.total_active/crm.total_deals*100) : '—'}</td>
               </tr>
               <tr>
-                <td>Atualmente em Reunião PDF</td>
+                <td>Atualmente em 1ª Reunião Agendada</td>
                 <td class="num">${num(crm.reuniao_pdf_total)}</td>
                 <td class="pct">${pct(crm.reuniao_pdf_pct)}</td>
               </tr>
               <tr>
-                <td>Ativos em Reunião PDF (hoje)</td>
+                <td>Ativos em 1ª Reunião Agendada (hoje)</td>
                 <td class="num">${num(crm.reuniao_pdf_ativo)}</td>
                 <td class="pct">${pct(crm.reuniao_pdf_ativo_pct)}</td>
               </tr>
               <tr>
-                <td>Chegaram em Reunião PDF — ${R.mes_label}</td>
+                <td>Chegaram em 1ª Reunião Agendada — ${R.mes_label}</td>
                 <td class="num">${num(crm.reuniao_pdf_mes)}</td>
                 <td class="pct">${crm.reuniao_pdf_mes_pct != null ? pct(crm.reuniao_pdf_mes_pct) : '—'}</td>
               </tr>
@@ -2453,8 +2593,8 @@ function downloadRelatorioResumidoPDF() {
     [
       ['Total de negócios (histórico)', fNum(crm.total_deals), '100%'],
       ['Negócios ativos', fNum(crm.total_active), crm.total_deals ? fP(crm.total_active/crm.total_deals*100):'—'],
-      ['Atualmente em Reunião PDF', fNum(crm.reuniao_pdf_total), fP(crm.reuniao_pdf_pct)],
-      ['Chegaram em Reunião PDF — '+(R.mes_label||''), fNum(crm.reuniao_pdf_mes), crm.reuniao_pdf_mes_pct != null ? fP(crm.reuniao_pdf_mes_pct):'—'],
+      ['Atualmente em 1ª Reunião Agendada', fNum(crm.reuniao_pdf_total), fP(crm.reuniao_pdf_pct)],
+      ['Chegaram em 1ª Reunião Agendada — '+(R.mes_label||''), fNum(crm.reuniao_pdf_mes), crm.reuniao_pdf_mes_pct != null ? fP(crm.reuniao_pdf_mes_pct):'—'],
       ['Ganhos (fechados)', fNum(crm.total_won), crm.total_deals ? fP(crm.total_won/crm.total_deals*100):'—'],
       ['Perdidos', fNum(crm.total_lost), crm.total_deals ? fP(crm.total_lost/crm.total_deals*100):'—'],
     ], [90, 35, 35], NAVY);
@@ -2500,17 +2640,20 @@ function downloadRelatorioResumidoPDF() {
 
 // ─── SECTION: EXECUTIVO ───────────────────────────────────────────────────────
 const FUNNEL_ORDER = [
-  // Funil atual
+  // Funil atual (11 etapas)
   'entrada de lead',
   'tentativa de conexão', 'tentativa de conexao',
   'lead respondente',
-  'pré-qualificado', 'pre-qualificado',
-  'reunião pdf', 'reuniao pdf', 'reunião de pdf',
+  'prospect', 'pré-qualificado', 'pre-qualificado',
+  '1ª reunião agendada', '1a reunião agendada', 'reunião pdf', 'reuniao pdf', 'reunião de pdf',
+  '1ª reunião realizada', '1a reunião realizada',
   'apresentação do business plan', 'apresentacao do business plan',
   'envio de cof',
   'workshop',
-  'aprovação final', 'aprovacao final',
+  'análise financeira/jurídica', 'analise financeira/juridica', 'análise financeira', 'analise financeira',
+  'comitê final', 'comite final',
   // Etapas legadas (dados históricos — aparecem ao final)
+  'aprovação final', 'aprovacao final',
   'contato inicial', 'nutrição 1', 'nutricao 1', 'nutrição 2', 'nutricao 2',
 ];
 
@@ -2607,9 +2750,16 @@ function renderExecutivo() {
     <div class="kpi-sub">${k.sub}</div>
   </div>`).join('');
 
-  // CPL Médio Pago + Total Investido — cards grandes abaixo das reuniões
+  // CPQ — Custo por Lead Qualificado (chegaram em "1ª Reunião Agendada")
+  const _ORDQ = ['entrada de lead', 'tentativa de conexão', 'lead respondente', 'prospect', '1ª reunião agendada', '1ª reunião realizada', 'apresentação do business plan', 'envio de cof', 'workshop', 'análise financeira', 'comitê final'];
+  const _idxQ = (e) => { const el = (e || '').toLowerCase().trim(); for (let i = 0; i < _ORDQ.length; i++) { const s = _ORDQ[i]; if (el === s || el.includes(s) || s.includes(el)) return i; } return -1; };
+  const qualificados = (DATA.crm.deals_minimal || []).filter(d => (!datePred || datePred(d.criado_em)) && _idxQ(d.etapa) >= 4).length;
+  const cpq = qualificados > 0 ? totalInvestido / qualificados : 0;
+
+  // CPL Médio Pago + CPQ + Total Investido — cards grandes abaixo das reuniões
   document.getElementById('exec-invest-cards').innerHTML = [
     { label: 'CPL Médio Pago', value: pagos > 0 ? fmt.currency(cplPago) : '—', sub: 'investido ÷ leads pagos', cls: 'blue' },
+    { label: 'Custo por Lead Qualificado (CPQ)', value: qualificados > 0 ? fmt.currency(cpq) : '—', sub: 'investido ÷ leads em 1ª Reunião Agendada', cls: 'teal' },
     { label: 'Total Investido', value: fmt.currency(totalInvestido), sub: 'Google + Meta Ads', cls: 'orange' },
   ].map(k => `<div class="kpi-card ${k.cls}" style="text-align:center;padding:22px 16px;">
     <div class="kpi-label">${k.label}</div>
@@ -2644,7 +2794,7 @@ function renderExecutivo() {
     return null;
   };
   // Funil do período — deals que passaram em cada etapa (filtra por data de CRIAÇÃO)
-  const FUNIL_STAGES = ['Entrada de Lead', 'Tentativa de Conexão', 'Lead Respondente', 'Pré-qualificado', 'Reunião PDF', 'Apresentação do Business Plan', 'Envio de COF', 'Workshop'];
+  const FUNIL_STAGES = ['Entrada de Lead', 'Tentativa de Conexão', 'Lead Respondente', 'Prospect', '1ª Reunião Agendada', '1ª Reunião Realizada', 'Apresentação do Business Plan', 'Envio de COF', 'Workshop', 'Análise Financeira/Jurídica', 'Comitê Final'];
   const stageIdxOf = (etapa) => {
     const el = (etapa || '').toLowerCase().trim();
     for (let i = 0; i < FUNIL_STAGES.length; i++) {
@@ -2654,8 +2804,15 @@ function renderExecutivo() {
     return -1;
   };
   const dealsPeriodo = (crm.deals_minimal || []).filter(d => !datePred || datePred(d.criado_em));
-  const passedCounts = FUNIL_STAGES.map((stage, i) =>
-    ({ etapa: stage, total: dealsPeriodo.filter(d => i === 0 ? true : stageIdxOf(d.etapa) >= i).length }));
+  const passedCounts = FUNIL_STAGES.map((stage, i) => {
+    const sel = dealsPeriodo.filter(d => i === 0 ? true : stageIdxOf(d.etapa) >= i);
+    return {
+      etapa: stage, total: sel.length,
+      google: sel.filter(d => d.fonte === 'googlecpc').length,
+      meta: sel.filter(d => d.fonte === 'metaads').length,
+      org: sel.filter(d => d.fonte === 'organico').length,
+    };
+  });
   const passedOf = (name) => {
     const i = FUNIL_STAGES.findIndex(s => s.toLowerCase() === name.toLowerCase());
     return i >= 0 ? passedCounts[i].total : 0;
@@ -2670,7 +2827,7 @@ function renderExecutivo() {
     meetDet.forEach(r => { const c = classM(r[field]); if (c === 'realizada') real++; else if (c === 'noshow') ns++; });
     return { realizada: real, noshow: ns };
   };
-  const mApres = meetTot('r1'); mApres.agendada = passedOf('Reunião PDF');
+  const mApres = meetTot('r1'); mApres.agendada = passedOf('1ª Reunião Agendada');
   const mBP = meetTot('r2'); mBP.agendada = passedOf('Apresentação do Business Plan');
   const meetBlock = (titulo, icon, bg, m) => `
     <div class="ads-group">
@@ -2694,8 +2851,17 @@ function renderExecutivo() {
     if (labelEl) labelEl.textContent = (startVal || endVal)
       ? `${fmtBR(startVal) || 'início'} → ${fmtBR(endVal) || 'hoje'}  (${dealsPeriodo.length} deals)`
       : `todo o histórico  (${dealsPeriodo.length} deals)`;
+    const hasFonte = dealsPeriodo.some(d => d.fonte);
     const maxFunil = Math.max(...passedCounts.map(c => c.total), 1);
-    document.getElementById('exec-funil-conversao').innerHTML = passedCounts.map((s, i) => {
+    const head = `<tr style="color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid #e2e8f0;">
+      <th style="padding:7px 6px;text-align:left;">Fase</th>
+      <th style="padding:7px 6px;text-align:center;">Conv.</th>
+      <th style="padding:7px 6px;text-align:right;">Leads</th>
+      <th style="padding:7px 6px;text-align:right;color:#4285F4;">🔍 Google</th>
+      <th style="padding:7px 6px;text-align:right;color:#1877F2;">📘 Meta</th>
+      <th style="padding:7px 6px;text-align:right;color:#16a085;">🌱 Orgânico</th>
+    </tr>`;
+    const body = passedCounts.map((s, i) => {
       const prev = i > 0 ? passedCounts[i - 1].total : s.total;
       let convPct = '—', convColor = '#666';
       if (prev > 0) {
@@ -2704,17 +2870,21 @@ function renderExecutivo() {
         if (i > 0) convColor = p < 30 ? '#dc2626' : (p < 60 ? '#ea580c' : '#16a34a');
       }
       const bw = (s.total / maxFunil * 100).toFixed(1);
-      return `<div style="margin-bottom:12px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:4px;">
-          <span style="font-weight:600;flex:1;">${s.etapa}</span>
-          <span style="color:${convColor};font-weight:700;margin-right:12px;font-size:11px;">${convPct}</span>
-          <span style="color:#666;min-width:90px;text-align:right;">${fmt.num(s.total)} deals</span>
-        </div>
-        <div style="background:#F1F5F9;border-radius:4px;height:12px;overflow:hidden;">
-          <div style="width:${bw}%;background:linear-gradient(to right,var(--primary),var(--secondary));height:100%;border-radius:4px;transition:width .4s;"></div>
-        </div>
-      </div>`;
-    }).join('') + `<p style="font-size:10px;color:#999;margin-top:12px;font-style:italic;"><strong>%</strong> = conversão da etapa anterior para esta · <strong>verde</strong> &gt; 60% · <strong>laranja</strong> 30-60% · <strong>vermelho</strong> &lt; 30%</p>`;
+      return `<tr style="border-bottom:1px solid #f1f5f9;">
+        <td style="padding:8px 6px;">
+          <div style="font-weight:600;font-size:13px;">${s.etapa}</div>
+          <div style="background:#F1F5F9;border-radius:3px;height:7px;overflow:hidden;margin-top:4px;max-width:240px;"><div style="width:${bw}%;background:linear-gradient(to right,var(--primary),var(--secondary));height:100%;"></div></div>
+        </td>
+        <td style="padding:8px 6px;text-align:center;color:${convColor};font-weight:700;font-size:12px;">${convPct}</td>
+        <td style="padding:8px 6px;text-align:right;font-weight:700;font-size:13px;">${fmt.num(s.total)}</td>
+        <td style="padding:8px 6px;text-align:right;color:#4285F4;">${hasFonte ? fmt.num(s.google) : '—'}</td>
+        <td style="padding:8px 6px;text-align:right;color:#1877F2;">${hasFonte ? fmt.num(s.meta) : '—'}</td>
+        <td style="padding:8px 6px;text-align:right;color:#16a085;">${hasFonte ? fmt.num(s.org) : '—'}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('exec-funil-conversao').innerHTML =
+      `<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead>${head}</thead><tbody>${body}</tbody></table>`
+      + `<p style="font-size:10px;color:#999;margin-top:10px;font-style:italic;">Conv. = conversão da etapa anterior · <strong>Pago</strong> = utm Google/Meta · <strong>Orgânico</strong> = demais (inclui importados sem utm)${hasFonte ? '' : ' · <span style="color:#b45309;">fonte disponível após a próxima coleta</span>'}</p>`;
   })();
 
   // ── Bloco 4: Detalhe das Reuniões no Período ──
@@ -2746,7 +2916,7 @@ function renderExecutivo() {
 
   // ── Blocos 5 e 6: Perdas por Etapa do Funil (popup por plataforma / por motivo) ──
   const lossesPeriodo = (crm.losses_daily || []).filter(r => !datePred || datePred(r.criado || r.data));
-  const ORDER_FUNIL = ['entrada de lead', 'tentativa de conexão', 'lead respondente', 'pré-qualificado', 'reunião pdf', 'apresentação do business plan', 'envio de cof', 'workshop'];
+  const ORDER_FUNIL = ['entrada de lead', 'tentativa de conexão', 'lead respondente', 'prospect', 'pré-qualificado', '1ª reunião agendada', 'reunião pdf', '1ª reunião realizada', 'apresentação do business plan', 'envio de cof', 'workshop', 'análise financeira', 'comitê final', 'comite final'];
   const PLAT_OF = (src) => src === 'googlecpc' ? 'Google' : (src === 'metaads' ? 'Meta' : 'Orgânico / Outro');
   const PLAT_COLOR = { 'Google': '#4285F4', 'Meta': '#1877F2', 'Orgânico / Outro': '#16a085' };
   function buildLossFunnel(containerId, mode) {
@@ -2781,6 +2951,74 @@ function renderExecutivo() {
   }
   buildLossFunnel('exec-loss-funnel-plat', 'plat');
   buildLossFunnel('exec-loss-funnel-motivo', 'motivo');
+
+  // ── Motivos de Perda (CRM) + Perdas por Anúncio (lado a lado) ───────────────
+  const _lp = (crm.losses_daily || []).filter(x => !datePred || datePred(x.criado || x.data));
+  const motAgg = {}, campAgg = {};
+  _lp.forEach(x => {
+    const m = x.motivo || '—'; motAgg[m] = (motAgg[m] || 0) + 1;
+    const c = x.utm_campaign || 'não identificado'; campAgg[c] = (campAgg[c] || 0) + 1;
+  });
+  const motTop = Object.entries(motAgg).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  makeChart('chart-exec-motivos', {
+    type: 'bar',
+    data: { labels: motTop.map(r => r[0]), datasets: [{ data: motTop.map(r => r[1]), backgroundColor: COLORS.red + 'CC', borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+  const campTop = Object.entries(campAgg).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  makeChart('chart-exec-anuncio', {
+    type: 'bar',
+    data: { labels: campTop.map(r => r[0]), datasets: [{ data: campTop.map(r => r[1]), backgroundColor: '#3B82F6CC', borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+
+  // ── Entrada de Leads por Dia (fluxo diário) ─────────────────────────────────
+  const _ld = (DATA.leads.daily || []).filter(r => !datePred || datePred(r.data)).slice().sort((a, b) => a.data < b.data ? -1 : 1);
+  makeChart('chart-exec-leads-dia', {
+    type: 'line',
+    data: { labels: _ld.map(r => r.data.split('-').reverse().slice(0, 2).join('/')), datasets: [{ label: 'Leads', data: _ld.map(r => r.total), borderColor: COLORS.secondary, backgroundColor: COLORS.secondary + '22', borderWidth: 2, pointRadius: 3, tension: .35, fill: true }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 18 } },
+      plugins: {
+        legend: { display: false },
+        datalabels: { display: true, align: 'top', anchor: 'end', offset: 3, color: '#185fa5', font: { size: 9, weight: 700 }, formatter: v => v > 0 ? v : '' }
+      },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
+
+  // ── Histórico Mensal — Leads, CPL e Investido ───────────────────────────────
+  const _lByM = {}; (DATA.leads.monthly || []).forEach(r => _lByM[r.mes] = r.total);
+  const _gByM = {}; (DATA.google_ads.monthly || []).forEach(r => _gByM[r.mes] = r.gasto || 0);
+  const _mByM = {}; (DATA.meta_ads.monthly || []).forEach(r => _mByM[r.mes] = r.gasto || 0);
+  const _meses = [...new Set([...Object.keys(_lByM), ...Object.keys(_gByM), ...Object.keys(_mByM)])].sort();
+  const _invM = _meses.map(m => (_gByM[m] || 0) + (_mByM[m] || 0));
+  const _ldsM = _meses.map(m => _lByM[m] || 0);
+  const _cplM = _meses.map((m, i) => _ldsM[i] > 0 ? _invM[i] / _ldsM[i] : 0);
+  makeChart('chart-exec-hist-mensal', {
+    type: 'bar',
+    data: {
+      labels: _meses.map(mesLabel),
+      datasets: [
+        { type: 'bar', label: 'Leads', data: _ldsM, backgroundColor: COLORS.secondary + 'CC', borderRadius: 4, yAxisID: 'y',
+          datalabels: { display: ctx => ctx.dataset.data[ctx.dataIndex] > 0, anchor: 'end', align: 'top', color: '#185fa5', font: { size: 9, weight: 700 }, formatter: v => v } },
+        { type: 'line', label: 'Total Investido (R$)', data: _invM, borderColor: '#8e44ad', backgroundColor: '#8e44ad22', borderWidth: 2, pointRadius: 3, yAxisID: 'y2', tension: .3,
+          datalabels: { display: ctx => ctx.dataset.data[ctx.dataIndex] > 0, align: 'top', offset: 4, color: '#8e44ad', font: { size: 8.5, weight: 700 }, formatter: v => 'R$' + (v / 1000).toFixed(1) + 'k' } },
+        { type: 'line', label: 'CPL (R$)', data: _cplM, borderColor: COLORS.orange, borderWidth: 2, pointRadius: 3, yAxisID: 'y2', tension: .3, borderDash: [5, 4],
+          datalabels: { display: ctx => ctx.dataset.data[ctx.dataIndex] > 0, align: 'bottom', offset: 4, color: '#ea580c', font: { size: 8.5, weight: 700 }, formatter: v => 'R$' + Math.round(v) } },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      layout: { padding: { top: 22 } },
+      plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: ctx => ctx.dataset.yAxisID === 'y2' ? ` ${ctx.dataset.label}: R$ ${Math.round(ctx.parsed.y).toLocaleString('pt-BR')}` : ` ${ctx.dataset.label}: ${ctx.parsed.y}` } } },
+      scales: {
+        y: { beginAtZero: true, position: 'left', title: { display: true, text: 'Leads' } },
+        y2: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'R$' }, ticks: { callback: v => 'R$' + (v / 1000).toFixed(0) + 'k' } }
+      }
+    }
+  });
 }
 
 // ─── SECTION: EVOLUÇÃO ────────────────────────────────────────────────────────
@@ -2844,8 +3082,8 @@ function renderEvolucao() {
           backgroundColor: COLORS.secondary + 'CC', borderRadius: 4
         },
         {
-          label: 'Reunião PDF',
-          data: allMesesEvo.map(m => (stagesMonthMap[m] || {}).reuniao_pdf || 0),
+          label: '1ª Reunião Agendada',
+          data: allMesesEvo.map(m => (stagesMonthMap[m] || {}).reuniao_agendada || (stagesMonthMap[m] || {}).reuniao_pdf || 0),
           backgroundColor: COLORS.orange + 'CC', borderRadius: 4
         },
         {
@@ -2911,6 +3149,47 @@ function renderEvolucao() {
 }
 
 // ─── SECTION: CRM ─────────────────────────────────────────────────────────────
+// Popup grande do mega-funil — motivos de perda + anúncios da etapa
+function openCmfModal(i) {
+  const s = (window._cmfStages || [])[i];
+  if (!s) return;
+  let m = document.getElementById('cmf-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'cmf-modal';
+    m.style.cssText = 'display:none;position:fixed;inset:0;z-index:2000;background:rgba(15,23,42,.55);align-items:center;justify-content:center;padding:20px;';
+    m.addEventListener('click', e => { if (e.target === m) m.style.display = 'none'; });
+    m.innerHTML = '<div id="cmf-modal-card" style="background:#fff;border-radius:16px;max-width:680px;width:100%;max-height:86vh;overflow:auto;box-shadow:0 24px 70px rgba(0,0,0,.35);"></div>';
+    document.body.appendChild(m);
+  }
+  const card = m.querySelector('#cmf-modal-card');
+  const motRows = s.mot.length
+    ? s.mot.map(([k, v]) => `<div style="display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:13px;"><span style="color:#334155;">${k}</span><strong style="color:#dc2626;white-space:nowrap;">${v} <span style="color:#94a3b8;font-weight:400;">${s.losses ? '(' + (v / s.losses * 100).toFixed(0) + '%)' : ''}</span></strong></div>`).join('')
+    : '<p style="color:#999;font-size:13px;">Sem motivos registrados.</p>';
+  const campRows = s.camp.length
+    ? s.camp.map(([k, v]) => `<div style="display:flex;justify-content:space-between;gap:14px;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:13px;"><span style="color:#334155;word-break:break-word;">${k}</span><strong style="color:#0b5e66;white-space:nowrap;">${v}</strong></div>`).join('')
+    : '<p style="color:#999;font-size:13px;">Sem campanha identificada.</p>';
+  card.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:22px 24px 14px;border-bottom:1px solid #e2e8f0;position:sticky;top:0;background:#fff;">
+      <div>
+        <div style="font-size:19px;font-weight:700;color:#0f172a;">${s.name}</div>
+        <div style="font-size:13px;color:#64748b;margin-top:3px;">${fmt.num(s.leads)} leads na etapa · <strong style="color:#dc2626;">${fmt.num(s.losses)} perdas</strong> (${s.perdaPct.toFixed(1)}%)</div>
+      </div>
+      <button onclick="document.getElementById('cmf-modal').style.display='none'" style="border:none;background:#f1f5f9;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:17px;color:#475569;flex-shrink:0;">✕</button>
+    </div>
+    <div style="padding:18px 24px 24px;display:grid;grid-template-columns:1fr 1fr;gap:28px;">
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.04em;color:#94a3b8;text-transform:uppercase;margin-bottom:8px;">Motivos de perda</div>
+        ${motRows}
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.04em;color:#94a3b8;text-transform:uppercase;margin-bottom:8px;">Anúncios / Campanhas</div>
+        ${campRows}
+      </div>
+    </div>`;
+  m.style.display = 'flex';
+}
+
 function renderCRM() {
   const crm = DATA.crm;
   const pred = getFilteredMonths();
@@ -2921,7 +3200,7 @@ function renderCRM() {
     const s = activeFunnel.find(r => r.etapa.toLowerCase() === name.toLowerCase());
     return s ? s.total : 0;
   }
-  const reuniaoPDFCount  = stageCount('Reunião PDF');
+  const reuniaoPDFCount  = stageCount('1ª Reunião Agendada');
   const apresentacaoBP   = stageCount('Apresentação do Business Plan');
   const workshopCount    = stageCount('Workshop');
 
@@ -2959,7 +3238,7 @@ function renderCRM() {
     // ── Linha 1: Visão geral do funil ─────────────────────────────────────────
     { label: 'Total de Negócios',             value: fmt.num(crm.total_deals),         sub: 'no CRM',                          cls: ''       },
     { label: 'Negócios Abertos',              value: fmt.num(crm.total_open),          sub: 'em andamento',                    cls: 'blue'   },
-    { label: 'Reunião PDF',                   value: fmt.num(reuniaoPDFCount),         sub: 'leads nesta etapa',               cls: 'blue'   },
+    { label: '1ª Reunião Agendada',           value: fmt.num(reuniaoPDFCount),         sub: 'leads nesta etapa',               cls: 'blue'   },
     { label: 'Apresentação do Business Plan', value: fmt.num(apresentacaoBP),          sub: 'leads nesta etapa',               cls: 'teal'   },
     // ── Linha 2: Eficiência e perdas ──────────────────────────────────────────
     { label: 'Workshop',                          value: fmt.num(workshopCount),       sub: 'leads nesta etapa',               cls: 'purple' },
@@ -2973,8 +3252,9 @@ function renderCRM() {
     { label: 'No-Show 2ª Reunião',            value: fmt.num(r2NS),                    sub: 'campo 2ª Reunião = Não',          cls: 'red'    },
   ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
 
-  // Funnel bars — usa active_funnel (ordem do pipeline, sem Etapa Descarte)
-  const crmFunnel  = crm.active_funnel || [];
+  // Funnel bars — usa active_funnel, reordenado pela ordem oficial do funil
+  const crmFunnel  = (crm.active_funnel || []).slice()
+    .sort((a, b) => funnelSortIndex(a.etapa) - funnelSortIndex(b.etapa));
   const crmMax     = Math.max(...crmFunnel.map(s => s.total), 1);
   const crmTotal   = crm.total_active || crmFunnel.reduce((a, s) => a + s.total, 0) || 1;
 
@@ -2995,13 +3275,84 @@ function renderCRM() {
       }).join('')
     : '<p style="color:#999;padding:1rem">Sem negócios ativos</p>';
 
+  // ── Mega-funil de conversão do CRM ─────────────────────────────────────────
+  (function renderCrmMegaFunnel() {
+    const dPred = getDateFilter();
+    const STAGES = ['Entrada de Lead', 'Tentativa de Conexão', 'Lead Respondente', 'Prospect', '1ª Reunião Agendada', '1ª Reunião Realizada', 'Apresentação do Business Plan', 'Envio de COF', 'Workshop', 'Análise Financeira/Jurídica', 'Comitê Final'];
+    const sIdx = (e) => {
+      const el = (e || '').toLowerCase().trim();
+      for (let i = 0; i < STAGES.length; i++) {
+        const s = STAGES[i].toLowerCase();
+        if (el === s || el.includes(s) || s.includes(el)) return i;
+      }
+      return -1;
+    };
+    const totalLeads = (DATA.leads.daily || []).filter(r => !dPred || dPred(r.data)).reduce((s, r) => s + r.total, 0);
+    const deals = (crm.deals_minimal || []).filter(d => !dPred || dPred(d.criado_em));
+    const passed = STAGES.map((st, i) => deals.filter(d => i === 0 ? true : sIdx(d.etapa) >= i).length);
+
+    // Perdas por etapa (motivo + campanha)
+    const lossesP = (crm.losses_daily || []).filter(x => !dPred || dPred(x.criado || x.data));
+    const lossAgg = {};
+    lossesP.forEach(x => {
+      const i = sIdx(x.etapa); if (i < 0) return;
+      (lossAgg[i] = lossAgg[i] || { total: 0, mot: {}, camp: {} });
+      lossAgg[i].total++;
+      const m = x.motivo || '—'; lossAgg[i].mot[m] = (lossAgg[i].mot[m] || 0) + 1;
+      const c = x.utm_campaign || 'não identificado'; lossAgg[i].camp[c] = (lossAgg[i].camp[c] || 0) + 1;
+    });
+    const topOf = (o) => { const e = Object.entries(o || {}).sort((a, b) => b[1] - a[1])[0]; return e ? e[0] : '—'; };
+
+    // Cores coesas teal → azul, afunilando
+    const COL = ['#0E7C86', '#127f93', '#1a7fa8', '#2378bd', '#2f6fce', '#3f6ee0', '#4c6ef5', '#5c7cfa', '#7088fb', '#8597fc', '#99a6fd'];
+    const mouthMax = Math.max(totalLeads, passed[0] || 0, 1);
+    const barW = (n) => Math.max(n / mouthMax * 100, 4).toFixed(2);
+
+    let rows = `<div class="cmf-row">
+      <div class="cmf-conv"></div>
+      <div class="cmf-name" style="color:#16243f;font-weight:800;">Todos os Leads</div>
+      <div class="cmf-center"><div class="cmf-bar" style="width:100%;background:#16243f;">${fmt.num(totalLeads)}</div></div>
+      <div class="cmf-right"></div>
+    </div>`;
+    const sortDesc = (o) => Object.entries(o || {}).sort((a, b) => b[1] - a[1]);
+    window._cmfStages = [];
+    STAGES.forEach((st, i) => {
+      const cnt = passed[i];
+      const prev = i === 0 ? (totalLeads || cnt) : passed[i - 1];
+      const conv = Math.min(prev > 0 ? (cnt / prev * 100) : 0, 100);
+      const convC = conv < 30 ? '#dc2626' : (conv < 60 ? '#ea580c' : '#16a34a');
+      const L = lossAgg[i];
+      const perdaPct = (L && cnt > 0) ? (L.total / cnt * 100) : 0;
+      const right = L
+        ? `<strong style="color:#dc2626">${fmt.num(L.total)} perdas</strong> · ${perdaPct.toFixed(1)}% da etapa`
+        : '<span style="color:#cbd5e1">sem perdas</span>';
+      // guarda detalhe pra popup
+      window._cmfStages[i] = { name: st, leads: cnt, losses: L ? L.total : 0, perdaPct,
+        mot: L ? sortDesc(L.mot) : [], camp: L ? sortDesc(L.camp) : [] };
+      const clickable = (L && L.total) ? `onclick="openCmfModal(${i})" style="width:${barW(cnt)}%;background:${COL[i]};cursor:pointer;" title="Ver motivos e anúncios — clique"` : `style="width:${barW(cnt)}%;background:${COL[i]};"`;
+      rows += `<div class="cmf-row">
+        <div class="cmf-conv" style="color:${convC}">${conv.toFixed(0)}%</div>
+        <div class="cmf-name" title="${st}">${st}</div>
+        <div class="cmf-center"><div class="cmf-bar" ${clickable}>${fmt.num(cnt)}</div></div>
+        <div class="cmf-right">${right}</div>
+      </div>`;
+    });
+    document.getElementById('crm-mega-funnel').innerHTML = rows;
+
+    const fmtBR = (s) => s ? s.split('-').reverse().join('/') : '';
+    const sv = document.getElementById('filter-date-start').value;
+    const ev = document.getElementById('filter-date-end').value;
+    const lbl = document.getElementById('crm-funnel-period');
+    if (lbl) lbl.textContent = (sv || ev) ? `${fmtBR(sv) || 'início'} → ${fmtBR(ev) || 'hoje'}` : 'todo o histórico';
+  })();
+
   // Won by month
   const reuniaoMensal = filterMonthly(DATA.crm.monthly_stages || [], pred);
   makeChart('chart-crm-won', {
     type: 'bar',
     data: {
       labels: reuniaoMensal.map(r => mesLabel(r.mes)),
-      datasets: [{ label: 'Reunião PDF', data: reuniaoMensal.map(r => r.reuniao_pdf || 0), backgroundColor: COLORS.orange + 'CC', borderRadius: 4 }]
+      datasets: [{ label: '1ª Reunião Agendada', data: reuniaoMensal.map(r => r.reuniao_agendada || r.reuniao_pdf || 0), backgroundColor: COLORS.orange + 'CC', borderRadius: 4 }]
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
   });
@@ -3851,10 +4202,11 @@ function renderCreatives() {
       // Ordem das etapas para mini-funil
       const STAGES_ORDER = [
         'Entrada de Lead', 'Tentativa de Conexão', 'Lead Respondente',
-        'Pré-qualificado', 'Reunião PDF', 'Apresentação do Business Plan',
-        'Envio de COF', 'Workshop'
+        'Prospect', '1ª Reunião Agendada', '1ª Reunião Realizada',
+        'Apresentação do Business Plan', 'Envio de COF', 'Workshop',
+        'Análise Financeira/Jurídica', 'Comitê Final'
       ];
-      const QUALIFIED_FROM = 4; // Reunião PDF em diante
+      const QUALIFIED_FROM = 4; // 1ª Reunião Agendada em diante
 
       qualBody.innerHTML = qualityList.slice(0, 20).map((c, i) => {
         const isMeta = c.source === 'meta';
@@ -3956,53 +4308,233 @@ function renderUTM() {
   ).join('') || '<tr><td colspan="4" class="empty">Sem dados UTM</td></tr>';
 }
 
-// ─── SECTION: GA4 ─────────────────────────────────────────────────────────────
+// ─── SECTION: GA4 — Páginas de Expansão ──────────────────────────────────────
+const GA4_LP_ORDER = ['franqueado', 'home', 'pablo'];
+const GA4_LP_ICON  = { franqueado: '🎯', home: '🏠', pablo: '🐂' };
+const GA4_LP_COLOR = { franqueado: '#22C55E', home: '#3FA9F5', pablo: '#F59E0B' };
+
+function _ga4Class(metric, value) {
+  // taxa de conversão: maior é melhor; taxa de rejeição: menor é melhor
+  if (metric === 'conv') return value >= 5 ? 'good' : (value >= 1 ? '' : 'warn');
+  if (metric === 'rej')  return value <= 40 ? 'good' : (value <= 60 ? 'warn' : 'bad');
+  return '';
+}
+
+function _ga4BarList(items, key, valKey, color, total, max) {
+  const list = items.slice(0, max || 10);
+  if (!list.length) return '<p style="font-size:11px;color:#999;font-style:italic;">Sem dados.</p>';
+  const top = list[0][valKey] || 1;
+  return '<div class="ga4-bar-list">' + list.map(r => {
+    const v = r[valKey] || 0;
+    const w = Math.max(2, v / top * 100);
+    return `<div class="ga4-bar-item">
+      <div class="ga4-bar-row"><span class="nm">${r[key]}</span><span class="vl">${fmt.num(v)}</span></div>
+      <div class="ga4-bar-track"><div class="ga4-bar-fill ${color || ''}" style="width:${w}%"></div></div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+// Agrega meses de monthly_data dentro do período selecionado.
+// monthPred = função (mes => bool) ou null (sem filtro).
+function _ga4AggregateMonths(monthlyData, monthPred) {
+  const inPeriod = m => !monthPred || monthPred(m.mes);
+  const months = (monthlyData || []).filter(inPeriod);
+  const sum = key => months.reduce((s, m) => s + (m[key] || 0), 0);
+  const mergeDict = key => {
+    const out = {};
+    months.forEach(m => {
+      Object.entries(m[key] || {}).forEach(([k, v]) => out[k] = (out[k] || 0) + v);
+    });
+    return Object.entries(out).map(([k, v]) => [k, v]).sort((a, b) => b[1] - a[1]);
+  };
+  const s = sum('sessions');
+  return {
+    months,                                  // pra desenhar a série temporal
+    totals: {
+      sessions:     s,
+      users:        sum('users'),
+      new_users:    sum('new_users'),
+      pageviews:    sum('pageviews'),
+      conversions:  sum('conversions'),
+      conv_rate:    s ? (sum('conversions') / s * 100) : 0,
+      bounce_rate:  s ? (sum('bounce_w') / s * 100) : 0,    // já vem em fração
+      avg_duration: s ? (sum('duration_w') / s) : 0,
+    },
+    top_cities:  mergeDict('cities').slice(0, 15).map(([city, sessions]) => ({ city, sessions })),
+    top_sources: mergeDict('sources').slice(0, 10).map(([source, sessions]) => ({ source, sessions })),
+    channels:    mergeDict('channels').map(([channel, sessions]) => ({ channel, sessions })),
+    devices:     mergeDict('devices').map(([device, sessions]) => ({ device, sessions })),
+    ages:        mergeDict('ages').map(([age, sessions]) => ({ age, sessions })),
+    genders:     mergeDict('genders').map(([gender, sessions]) => ({ gender, sessions })),
+  };
+}
+
 function renderGA4() {
-  const pred    = getFilteredMonths();
-  const monthly = filterMonthly(DATA.ga4.monthly, pred);
+  const rawLPs = (DATA.ga4_lps && DATA.ga4_lps.by_lp) || {};
 
-  const totalSessions = monthly.reduce((s, r) => s + r.sessions, 0);
-  const totalUsers = monthly.reduce((s, r) => s + r.users, 0);
-  const totalNew = monthly.reduce((s, r) => s + r.new_users, 0);
-  const totalConv = monthly.reduce((s, r) => s + r.conversions, 0);
-  const avgBounce = monthly.length > 0
-    ? monthly.reduce((s, r) => s + r.bounce_rate * r.sessions, 0) / (totalSessions || 1)
-    : 0;
+  // Se o summary.json ainda não tem ga4_lps (cache Supabase desatualizado),
+  // mostra mensagem clara pro user em vez de tela em branco.
+  if (!DATA.ga4_lps || !Object.keys(rawLPs).length) {
+    const html = `
+      <div style="background:#FEF3C7;border:1px solid #FBBF24;border-radius:12px;padding:24px;margin:8px 0;">
+        <h3 style="color:#92400E;font-size:15px;margin:0 0 10px;">⏳ Dados aguardando próxima coleta</h3>
+        <p style="font-size:13px;color:#78350F;margin:0 0 8px;line-height:1.6;">
+          A estrutura nova dos dados (LPs de expansão) ainda não foi gerada no servidor.
+          Rode o workflow manual no GitHub Actions pra atualizar:
+        </p>
+        <ol style="font-size:13px;color:#78350F;margin:8px 0 8px 18px;line-height:1.7;">
+          <li>Abra <a href="https://github.com/geovane-Maze/dashboard-marketing/actions" target="_blank" style="color:#0D3B66;font-weight:600;">github.com/geovane-Maze/dashboard-marketing/actions</a></li>
+          <li>Clique em <strong>"Coletar Dados Dashboard Marketing"</strong></li>
+          <li>Clique em <strong>"Run workflow"</strong> (canto direito)</li>
+          <li>Espere ~10-15 minutos e recarregue esta página com Ctrl+F5</li>
+        </ol>
+      </div>`;
+    document.getElementById('ga4-lp-overview').innerHTML = html;
+    document.getElementById('ga4-lp-details').innerHTML = '';
+    return;
+  }
 
-  document.getElementById('kpi-ga4').innerHTML = [
-    { label: 'Sessões', value: fmt.k(totalSessions), sub: 'período', cls: '' },
-    { label: 'Usuários', value: fmt.k(totalUsers), sub: 'período', cls: 'blue' },
-    { label: 'Novos Usuários', value: fmt.k(totalNew), sub: 'período', cls: '' },
-    { label: 'Conversões GA4', value: fmt.num(totalConv), sub: 'período', cls: 'green' },
-    { label: 'Taxa de Rejeição', value: fmt.pct(avgBounce), sub: 'média ponderada', cls: avgBounce > 70 ? 'red' : 'orange' },
-  ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
+  // Aviso sobre demografia ainda não coletada
+  const warn = document.getElementById('ga4-demo-warn');
+  if (warn) warn.style.display = (DATA.ga4_lps && DATA.ga4_lps.has_demographics) ? 'none' : 'inline';
 
-  const channels = DATA.ga4.channels.slice(0, 10);
-  makeChart('chart-ga4-channels', {
+  // ── Aplica o filtro de período (granularidade mensal) ─────────────────────
+  // getFilteredMonths() retorna função (mes => bool) ou null se nenhum filtro.
+  const monthPred = (typeof getFilteredMonths === 'function') ? getFilteredMonths() : null;
+  // lps = mesma estrutura de antes (totals/top_cities/etc), mas FILTRADA pelo período
+  const lps = {};
+  Object.entries(rawLPs).forEach(([k, lp]) => {
+    const agg = _ga4AggregateMonths(lp.monthly_data, monthPred);
+    lps[k] = {
+      meta: lp.meta,
+      totals: agg.totals,
+      top_cities: agg.top_cities,
+      top_sources: agg.top_sources,
+      channels: agg.channels,
+      devices: agg.devices,
+      ages: agg.ages,
+      genders: agg.genders,
+      monthly: agg.months.map(m => ({ mes: m.mes, sessions: m.sessions, users: m.users, conversions: m.conversions })),
+    };
+  });
+
+  // ── 1) Cards de overview (3 lado a lado) ──────────────────────────────────
+  const overview = GA4_LP_ORDER.map(k => {
+    const lp = lps[k]; if (!lp) return '';
+    const t = lp.totals;
+    // Se ainda não tem dados (página nova ou coleta GA4 desatualizada)
+    if (!t.sessions) {
+      return `
+        <div class="ga4-lp-card ${k}">
+          <h4>${GA4_LP_ICON[k]} ${lp.meta.label}</h4>
+          <a class="ga4-lp-url" href="${lp.meta.url}" target="_blank" rel="noopener">${lp.meta.url}</a>
+          <div style="padding:24px 4px;text-align:center;color:#888;">
+            <div style="font-size:24px;margin-bottom:6px;">⏳</div>
+            <div style="font-size:12px;font-weight:600;color:var(--text);">Sem dados ainda</div>
+            <div style="font-size:11px;color:#999;margin-top:6px;line-height:1.5;">
+              Aguardando próxima coleta GA4 (token expirado).
+              Os dados aparecem aqui automaticamente após recoletar.
+            </div>
+          </div>
+        </div>`;
+    }
+    return `
+      <div class="ga4-lp-card ${k}">
+        <h4>${GA4_LP_ICON[k]} ${lp.meta.label}</h4>
+        <a class="ga4-lp-url" href="${lp.meta.url}" target="_blank" rel="noopener">${lp.meta.url}</a>
+        <div class="ga4-lp-metrics">
+          <div class="ga4-lp-metric"><div class="lbl">Sessões</div><div class="val">${fmt.num(t.sessions)}</div></div>
+          <div class="ga4-lp-metric"><div class="lbl">Usuários</div><div class="val">${fmt.num(t.users)}</div></div>
+          <div class="ga4-lp-metric"><div class="lbl">Conversões</div><div class="val">${fmt.num(t.conversions)}</div></div>
+          <div class="ga4-lp-metric"><div class="lbl">Taxa Conversão</div><div class="val ${_ga4Class('conv', t.conv_rate)}">${t.conv_rate.toFixed(2)}%</div></div>
+          <div class="ga4-lp-metric"><div class="lbl">Taxa Rejeição</div><div class="val ${_ga4Class('rej', t.bounce_rate)}">${t.bounce_rate.toFixed(1)}%</div></div>
+          <div class="ga4-lp-metric"><div class="lbl">Duração Média</div><div class="val">${Math.round(t.avg_duration)}s</div></div>
+        </div>
+      </div>`;
+  }).join('');
+  document.getElementById('ga4-lp-overview').innerHTML = overview;
+
+  // ── 2) Gráfico de evolução mensal (1 linha por LP) ─────────────────────────
+  const allMonths = new Set();
+  GA4_LP_ORDER.forEach(k => (lps[k]?.monthly || []).forEach(m => allMonths.add(m.mes)));
+  const months = [...allMonths].sort();
+  const lookupMonthly = (k, mes) => (lps[k]?.monthly || []).find(m => m.mes === mes);
+
+  makeChart('chart-ga4-monthly-lps', {
+    type: 'line',
+    data: {
+      labels: months.map(mesLabel),
+      datasets: GA4_LP_ORDER.filter(k => lps[k]).map(k => ({
+        label: lps[k].meta.label,
+        data: months.map(m => (lookupMonthly(k, m)?.sessions) || 0),
+        borderColor: GA4_LP_COLOR[k],
+        backgroundColor: GA4_LP_COLOR[k] + '22',
+        borderWidth: 2,
+        pointRadius: 3,
+        tension: 0.3,
+        fill: false,
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
+
+  // ── 3) Comparativo Taxa Conversão × Rejeição ───────────────────────────────
+  const lpsArr = GA4_LP_ORDER.filter(k => lps[k]);
+  makeChart('chart-ga4-convrej', {
     type: 'bar',
     data: {
-      labels: channels.map(r => r.channel),
-      datasets: [{ label: 'Sessões', data: channels.map(r => r.sessions), backgroundColor: COLORS.teal + 'CC', borderRadius: 4 }]
+      labels: lpsArr.map(k => lps[k].meta.label),
+      datasets: [
+        { label: 'Conversão %', data: lpsArr.map(k => lps[k].totals.conv_rate),   backgroundColor: COLORS.green + 'CC', borderRadius: 4 },
+        { label: 'Rejeição %',  data: lpsArr.map(k => lps[k].totals.bounce_rate), backgroundColor: COLORS.red + 'CC',   borderRadius: 4 },
+      ]
     },
-    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } } }
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { y: { beginAtZero: true, ticks: { callback: v => v + '%' } } }
+    }
   });
 
-  const devices = DATA.ga4.devices;
-  makeChart('chart-ga4-devices', {
-    type: 'doughnut',
-    data: { labels: devices.map(r => r.device), datasets: [{ data: devices.map(r => r.sessions), backgroundColor: [COLORS.primary, COLORS.secondary, COLORS.teal] }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
-  });
-
-  const totalViews = DATA.ga4.top_pages.reduce((s, r) => s + r.views, 0) || 1;
-  document.getElementById('table-ga4-pages').innerHTML = DATA.ga4.top_pages.map((r, i) =>
-    `<tr><td>${i+1}</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.page}</td><td>${fmt.num(r.views)}</td></tr>`
-  ).join('') || '<tr><td colspan="3" class="empty">Sem dados</td></tr>';
-
-  const totalSrc = DATA.ga4.sources.reduce((s, r) => s + r.sessions, 0) || 1;
-  document.getElementById('table-ga4-sources').innerHTML = DATA.ga4.sources.map((r, i) =>
-    `<tr><td>${i+1}</td><td>${r.source}</td><td>${fmt.num(r.sessions)}</td><td>${(r.sessions/totalSrc*100).toFixed(1)}%</td></tr>`
-  ).join('') || '<tr><td colspan="4" class="empty">Sem dados</td></tr>';
+  // ── 4) Detalhamento por LP (cidades, fontes, canais, dispositivos) ─────────
+  const details = GA4_LP_ORDER.map(k => {
+    const lp = lps[k]; if (!lp) return '';
+    if (!lp.totals.sessions) return ''; // pula LPs sem dados — já mostrou aviso no card de overview
+    const ages    = lp.ages    && lp.ages.length    ? _ga4BarList(lp.ages,    'age', 'sessions', k, 0, 8)    : '<p style="font-size:11px;color:#999;font-style:italic;">Aguardando recoleta GA4 (Sinais ativos).</p>';
+    const genders = lp.genders && lp.genders.length ? _ga4BarList(lp.genders, 'gender', 'sessions', k, 0, 4) : '<p style="font-size:11px;color:#999;font-style:italic;">Aguardando recoleta GA4 (Sinais ativos).</p>';
+    return `
+      <div class="ga4-lp-section">
+        <div class="ga4-lp-head">
+          <h3>${GA4_LP_ICON[k]} ${lp.meta.label}</h3>
+          <span class="ga4-lp-tag">${fmt.num(lp.totals.sessions)} sessões · ${lp.totals.conversions} conversões</span>
+        </div>
+        <div class="ga4-lp-grid">
+          <div>
+            <div class="ga4-sub">📍 Top Cidades</div>
+            ${_ga4BarList(lp.top_cities, 'city', 'sessions', k, 0, 10)}
+          </div>
+          <div>
+            <div class="ga4-sub">📡 Canais</div>
+            ${_ga4BarList(lp.channels, 'channel', 'sessions', k, 0, 7)}
+          </div>
+          <div>
+            <div class="ga4-sub">📱 Dispositivos</div>
+            ${_ga4BarList(lp.devices, 'device', 'sessions', k, 0, 4)}
+          </div>
+          <div>
+            <div class="ga4-sub">👤 Sexo (em breve)</div>
+            ${genders}
+            <div class="ga4-sub" style="margin-top:12px;">🎂 Idade (em breve)</div>
+            ${ages}
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+  document.getElementById('ga4-lp-details').innerHTML = details;
 }
 
 // ─── PREVISIBILIDADE 2026 ────────────────────────────────────────────────────
@@ -4053,7 +4585,7 @@ const PREV_KPI = {
     ruim: 'Crescimento abaixo do previsto. Reavaliar o mix de canais, reforçar campanhas de maior ROAS e revisar a meta de investimento do mês.',
     bom: 'Crescimento acima da meta — ótimo ritmo! Documentar o que puxou o resultado para repetir.' },
   'vendas': { dir: 'up',
-    ruim: 'Vendas abaixo da meta. Priorizar leads quentes de fundo de funil, acelerar o follow-up Reunião PDF → COF e revisar a abordagem comercial.',
+    ruim: 'Vendas abaixo da meta. Priorizar leads quentes de fundo de funil, acelerar o follow-up 1ª Reunião Agendada → COF e revisar a abordagem comercial.',
     bom: 'Vendas acima da meta — parabéns! Replicar a abordagem dos negócios fechados.' },
   'receita faturada': { dir: 'up',
     ruim: 'Receita abaixo do previsto. Focar em deals de maior ticket e reduzir o tempo de ciclo entre Apresentação BP e Envio de COF.',
@@ -4541,17 +5073,17 @@ loadData();
     <a href="#" data-section="executivo" class="active">
       <i class="icon">📊</i><span>Visão Executiva</span>
     </a>
-    <a href="#" data-section="relatorio">
-      <i class="icon">📝</i><span>Relatório Resumido</span>
-    </a>
-    <a href="#" data-section="evolucao">
-      <i class="icon">📈</i><span>Evolução Mensal</span>
-    </a>
     <a href="#" data-section="crm">
       <i class="icon">🔄</i><span>Funil CRM</span>
     </a>
     <a href="#" data-section="perdas">
       <i class="icon">⚠️</i><span>Gargalos & Perdas</span>
+    </a>
+    <a href="#" data-section="previsibilidade">
+      <i class="icon">📈</i><span>Previsibilidade 2026</span>
+    </a>
+    <a href="#" data-section="criativos">
+      <i class="icon">🎨</i><span>Criativos</span>
     </a>
     <a href="#" data-section="meta">
       <i class="icon">📘</i><span>Meta Ads</span>
@@ -4559,17 +5091,17 @@ loadData();
     <a href="#" data-section="google">
       <i class="icon">🔍</i><span>Google Ads</span>
     </a>
-    <a href="#" data-section="criativos">
-      <i class="icon">🎨</i><span>Criativos</span>
+    <a href="#" data-section="relatorio">
+      <i class="icon">📝</i><span>Relatório Resumido</span>
+    </a>
+    <a href="#" data-section="evolucao">
+      <i class="icon">📈</i><span>Evolução Mensal</span>
     </a>
     <a href="#" data-section="utm">
       <i class="icon">🔗</i><span>UTM / Atribuição</span>
     </a>
     <a href="#" data-section="ga4">
       <i class="icon">🌐</i><span>Google Analytics</span>
-    </a>
-    <a href="#" data-section="previsibilidade">
-      <i class="icon">📈</i><span>Previsibilidade 2026</span>
     </a>
   </nav>
   <div class="mob-drawer-footer" id="mob-drawer-update">Carregando...</div>
