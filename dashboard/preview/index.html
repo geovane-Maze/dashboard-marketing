@@ -1350,25 +1350,26 @@
 
       <!-- Funil visual do CRM (mega-funil) -->
       <style>
-        #sec-crm .cmf-row{display:flex;align-items:center;gap:12px;margin-bottom:7px;}
-        #sec-crm .cmf-left{width:64px;text-align:right;font-size:13px;font-weight:700;flex-shrink:0;}
+        #sec-crm .cmf-row{display:flex;align-items:center;gap:12px;margin-bottom:6px;}
+        #sec-crm .cmf-conv{width:50px;text-align:right;font-size:13px;font-weight:800;flex-shrink:0;}
+        #sec-crm .cmf-name{width:188px;text-align:right;font-size:12.5px;font-weight:600;color:#334155;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
         #sec-crm .cmf-center{flex:1;display:flex;justify-content:center;min-width:0;}
-        #sec-crm .cmf-bar{position:relative;color:#fff;font-size:12px;font-weight:600;padding:11px 16px;border-radius:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:120px;max-width:100%;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 2px 6px rgba(0,0,0,.12);transition:width .4s;}
-        #sec-crm .cmf-num{background:rgba(255,255,255,.28);padding:1px 9px;border-radius:11px;font-weight:800;}
-        #sec-crm .cmf-right{width:310px;font-size:11px;line-height:1.4;flex-shrink:0;overflow:hidden;}
-        #sec-crm .cmf-right .cmf-mot{color:#334155;}
+        #sec-crm .cmf-bar{height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:14px;min-width:44px;box-shadow:0 2px 6px rgba(15,40,55,.18);transition:width .45s ease;}
+        #sec-crm .cmf-right{width:300px;flex-shrink:0;font-size:11px;line-height:1.35;overflow:hidden;}
         #sec-crm .cmf-right .cmf-camp{color:#64748b;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-        #sec-crm .cmf-head{font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+        #sec-crm .cmf-headrow{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+        #sec-crm .cmf-headrow span{font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
       </style>
       <div class="chart-card" style="margin-bottom:24px">
         <h3>🔻 Funil de Conversão CRM — <span id="crm-funnel-period" style="font-weight:400;color:#666;font-size:13px;">período</span></h3>
         <p style="font-size:11px;color:#666;margin:0 0 16px;">
           Leads que passaram por cada etapa no período (por data de criação). <strong>Esquerda</strong>: conversão da etapa anterior · <strong>centro</strong>: leads na etapa · <strong>direita</strong>: perdas, principal motivo e campanha.
         </p>
-        <div class="cmf-row" style="margin-bottom:10px;">
-          <div class="cmf-left cmf-head">Conv.</div>
-          <div class="cmf-center cmf-head" style="justify-content:center;">Etapa / leads</div>
-          <div class="cmf-right cmf-head">Perdas · motivo · campanha</div>
+        <div class="cmf-headrow">
+          <span style="width:50px;text-align:right;flex-shrink:0;">Conv.</span>
+          <span style="width:188px;text-align:right;flex-shrink:0;">Etapa</span>
+          <span style="flex:1;text-align:center;">Leads na etapa</span>
+          <span style="width:300px;flex-shrink:0;">Perdas · motivo · campanha</span>
         </div>
         <div id="crm-mega-funnel"></div>
       </div>
@@ -3177,27 +3178,31 @@ function renderCRM() {
     });
     const topOf = (o) => { const e = Object.entries(o || {}).sort((a, b) => b[1] - a[1])[0]; return e ? e[0] : '—'; };
 
-    const COL = ['#2b4ad0', '#3b5bdb', '#4263eb', '#4c6ef5', '#5c7cfa', '#748ffc', '#91a7ff', '#748ffc', '#5c7cfa', '#4c6ef5', '#4263eb'];
+    // Cores coesas teal → azul, afunilando
+    const COL = ['#0E7C86', '#127f93', '#1a7fa8', '#2378bd', '#2f6fce', '#3f6ee0', '#4c6ef5', '#5c7cfa', '#7088fb', '#8597fc', '#99a6fd'];
     const mouthMax = Math.max(totalLeads, passed[0] || 0, 1);
+    const barW = (n) => Math.max(n / mouthMax * 100, 4).toFixed(2);
 
     let rows = `<div class="cmf-row">
-      <div class="cmf-left"></div>
-      <div class="cmf-center"><div class="cmf-bar" style="width:100%;background:#16243f;">Todos os Leads do período<span class="cmf-num">${fmt.num(totalLeads)}</span></div></div>
+      <div class="cmf-conv"></div>
+      <div class="cmf-name" style="color:#16243f;font-weight:800;">Todos os Leads</div>
+      <div class="cmf-center"><div class="cmf-bar" style="width:100%;background:#16243f;">${fmt.num(totalLeads)}</div></div>
       <div class="cmf-right"></div>
     </div>`;
     STAGES.forEach((st, i) => {
       const cnt = passed[i];
       const prev = i === 0 ? (totalLeads || cnt) : passed[i - 1];
-      const conv = prev > 0 ? (cnt / prev * 100) : 0;
+      const convRaw = prev > 0 ? (cnt / prev * 100) : 0;
+      const conv = Math.min(convRaw, 100);
       const convC = conv < 30 ? '#dc2626' : (conv < 60 ? '#ea580c' : '#16a34a');
-      const w = Math.max(cnt / mouthMax * 100, 5);
       const L = lossAgg[i];
       const right = L
-        ? `<strong style="color:#dc2626">${fmt.num(L.total)} perdas</strong> · <span class="cmf-mot">${topOf(L.mot)}</span><span class="cmf-camp">📣 ${topOf(L.camp)}</span>`
+        ? `<strong style="color:#dc2626">${fmt.num(L.total)} perdas</strong> · ${topOf(L.mot)}<span class="cmf-camp">📣 ${topOf(L.camp)}</span>`
         : '<span style="color:#cbd5e1">sem perdas</span>';
       rows += `<div class="cmf-row">
-        <div class="cmf-left" style="color:${convC}">${conv.toFixed(0)}%</div>
-        <div class="cmf-center"><div class="cmf-bar" style="width:${w}%;background:${COL[i]};" title="${st}: ${fmt.num(cnt)} leads">${st}<span class="cmf-num">${fmt.num(cnt)}</span></div></div>
+        <div class="cmf-conv" style="color:${convC}">${conv.toFixed(0)}%</div>
+        <div class="cmf-name" title="${st}">${st}</div>
+        <div class="cmf-center"><div class="cmf-bar" style="width:${barW(cnt)}%;background:${COL[i]};">${fmt.num(cnt)}</div></div>
         <div class="cmf-right">${right}</div>
       </div>`;
     });
