@@ -1347,6 +1347,32 @@
     <div id="sec-crm" class="section">
       <div class="section-title">Funil CRM</div>
       <div class="kpi-grid-crm" id="kpi-crm"></div>
+
+      <!-- Funil visual do CRM (mega-funil) -->
+      <style>
+        #sec-crm .cmf-row{display:flex;align-items:center;gap:12px;margin-bottom:7px;}
+        #sec-crm .cmf-left{width:64px;text-align:right;font-size:13px;font-weight:700;flex-shrink:0;}
+        #sec-crm .cmf-center{flex:1;display:flex;justify-content:center;min-width:0;}
+        #sec-crm .cmf-bar{position:relative;color:#fff;font-size:12px;font-weight:600;padding:11px 16px;border-radius:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:120px;max-width:100%;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 2px 6px rgba(0,0,0,.12);transition:width .4s;}
+        #sec-crm .cmf-num{background:rgba(255,255,255,.28);padding:1px 9px;border-radius:11px;font-weight:800;}
+        #sec-crm .cmf-right{width:310px;font-size:11px;line-height:1.4;flex-shrink:0;overflow:hidden;}
+        #sec-crm .cmf-right .cmf-mot{color:#334155;}
+        #sec-crm .cmf-right .cmf-camp{color:#64748b;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        #sec-crm .cmf-head{font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+      </style>
+      <div class="chart-card" style="margin-bottom:24px">
+        <h3>🔻 Funil de Conversão CRM — <span id="crm-funnel-period" style="font-weight:400;color:#666;font-size:13px;">período</span></h3>
+        <p style="font-size:11px;color:#666;margin:0 0 16px;">
+          Leads que passaram por cada etapa no período (por data de criação). <strong>Esquerda</strong>: conversão da etapa anterior · <strong>centro</strong>: leads na etapa · <strong>direita</strong>: perdas, principal motivo e campanha.
+        </p>
+        <div class="cmf-row" style="margin-bottom:10px;">
+          <div class="cmf-left cmf-head">Conv.</div>
+          <div class="cmf-center cmf-head" style="justify-content:center;">Etapa / leads</div>
+          <div class="cmf-right cmf-head">Perdas · motivo · campanha</div>
+        </div>
+        <div id="crm-mega-funnel"></div>
+      </div>
+
       <div class="charts-row">
         <div class="chart-card">
           <h3>Negócios por Etapa</h3>
@@ -3122,6 +3148,67 @@ function renderCRM() {
     </div>`;
       }).join('')
     : '<p style="color:#999;padding:1rem">Sem negócios ativos</p>';
+
+  // ── Mega-funil de conversão do CRM ─────────────────────────────────────────
+  (function renderCrmMegaFunnel() {
+    const dPred = getDateFilter();
+    const STAGES = ['Entrada de Lead', 'Tentativa de Conexão', 'Lead Respondente', 'Prospect', '1ª Reunião Agendada', '1ª Reunião Realizada', 'Apresentação do Business Plan', 'Envio de COF', 'Workshop', 'Análise Financeira/Jurídica', 'Comitê Final'];
+    const sIdx = (e) => {
+      const el = (e || '').toLowerCase().trim();
+      for (let i = 0; i < STAGES.length; i++) {
+        const s = STAGES[i].toLowerCase();
+        if (el === s || el.includes(s) || s.includes(el)) return i;
+      }
+      return -1;
+    };
+    const totalLeads = (DATA.leads.daily || []).filter(r => !dPred || dPred(r.data)).reduce((s, r) => s + r.total, 0);
+    const deals = (crm.deals_minimal || []).filter(d => !dPred || dPred(d.criado_em));
+    const passed = STAGES.map((st, i) => deals.filter(d => i === 0 ? true : sIdx(d.etapa) >= i).length);
+
+    // Perdas por etapa (motivo + campanha)
+    const lossesP = (crm.losses_daily || []).filter(x => !dPred || dPred(x.criado || x.data));
+    const lossAgg = {};
+    lossesP.forEach(x => {
+      const i = sIdx(x.etapa); if (i < 0) return;
+      (lossAgg[i] = lossAgg[i] || { total: 0, mot: {}, camp: {} });
+      lossAgg[i].total++;
+      const m = x.motivo || '—'; lossAgg[i].mot[m] = (lossAgg[i].mot[m] || 0) + 1;
+      const c = x.utm_campaign || 'não identificado'; lossAgg[i].camp[c] = (lossAgg[i].camp[c] || 0) + 1;
+    });
+    const topOf = (o) => { const e = Object.entries(o || {}).sort((a, b) => b[1] - a[1])[0]; return e ? e[0] : '—'; };
+
+    const COL = ['#2b4ad0', '#3b5bdb', '#4263eb', '#4c6ef5', '#5c7cfa', '#748ffc', '#91a7ff', '#748ffc', '#5c7cfa', '#4c6ef5', '#4263eb'];
+    const mouthMax = Math.max(totalLeads, passed[0] || 0, 1);
+
+    let rows = `<div class="cmf-row">
+      <div class="cmf-left"></div>
+      <div class="cmf-center"><div class="cmf-bar" style="width:100%;background:#16243f;">Todos os Leads do período<span class="cmf-num">${fmt.num(totalLeads)}</span></div></div>
+      <div class="cmf-right"></div>
+    </div>`;
+    STAGES.forEach((st, i) => {
+      const cnt = passed[i];
+      const prev = i === 0 ? (totalLeads || cnt) : passed[i - 1];
+      const conv = prev > 0 ? (cnt / prev * 100) : 0;
+      const convC = conv < 30 ? '#dc2626' : (conv < 60 ? '#ea580c' : '#16a34a');
+      const w = Math.max(cnt / mouthMax * 100, 5);
+      const L = lossAgg[i];
+      const right = L
+        ? `<strong style="color:#dc2626">${fmt.num(L.total)} perdas</strong> · <span class="cmf-mot">${topOf(L.mot)}</span><span class="cmf-camp">📣 ${topOf(L.camp)}</span>`
+        : '<span style="color:#cbd5e1">sem perdas</span>';
+      rows += `<div class="cmf-row">
+        <div class="cmf-left" style="color:${convC}">${conv.toFixed(0)}%</div>
+        <div class="cmf-center"><div class="cmf-bar" style="width:${w}%;background:${COL[i]};" title="${st}: ${fmt.num(cnt)} leads">${st}<span class="cmf-num">${fmt.num(cnt)}</span></div></div>
+        <div class="cmf-right">${right}</div>
+      </div>`;
+    });
+    document.getElementById('crm-mega-funnel').innerHTML = rows;
+
+    const fmtBR = (s) => s ? s.split('-').reverse().join('/') : '';
+    const sv = document.getElementById('filter-date-start').value;
+    const ev = document.getElementById('filter-date-end').value;
+    const lbl = document.getElementById('crm-funnel-period');
+    if (lbl) lbl.textContent = (sv || ev) ? `${fmtBR(sv) || 'início'} → ${fmtBR(ev) || 'hoje'}` : 'todo o histórico';
+  })();
 
   // Won by month
   const reuniaoMensal = filterMonthly(DATA.crm.monthly_stages || [], pred);
