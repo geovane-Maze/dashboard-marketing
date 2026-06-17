@@ -979,7 +979,8 @@ def aggregate_meta_ads(rows, leads_daily_map=None):
         })
 
     creatives_list = []
-    for nome, d in sorted(creatives.items(), key=lambda x: -x[1]["gasto"])[:50]:
+    # Inclui todos os criativos (não só top 50) — a página Criativos filtra por período.
+    for nome, d in sorted(creatives.items(), key=lambda x: -x[1]["gasto"])[:300]:
         cpl = round(d["gasto"] / d["leads"], 2) if d["leads"] > 0 else 0
         ctr = round(d["cliques"] / d["impressoes"] * 100, 2) if d["impressoes"] > 0 else 0
         creatives_list.append({
