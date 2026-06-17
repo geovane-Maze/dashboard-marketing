@@ -23,6 +23,7 @@ GOOGLE_ADS_CREATIVES_SHEET_ID = "1dbK3qov09Q1vO43U4JThuIp_YVyaTAXTkiuAcE3XL8I"
 # Substituiu o fluxo manual de copiar/colar planilha do Google Ads.
 CRONOGRAMA_SHEET_ID = "19rDFjMX7y7L1_-1BMSBUNlyKOsduX8S3RY5C5BqVxKI"
 CRONOGRAMA_GOOGLE_TAB = "B2B - Google Banco de Dados"
+CRONOGRAMA_META_TAB = "B2B - Facebook Banco de Dados"
 
 
 def _get_client():
@@ -285,4 +286,91 @@ def get_google_ads_creatives_sheet_data():
         })
 
     print(f"  Criativos Google: {len(out)} linhas (puladas: {skipped})")
+    return out
+
+
+def get_meta_ads_sheet_data():
+    """
+    Coleta Meta Ads (nível de ANÚNCIO) da planilha "Cronograma - Clínica da Cidade",
+    aba "B2B - Facebook Banco de Dados" — alimentada automaticamente pelo Adveronix.
+
+    Substitui o fluxo antigo (API quebrada + export manual incompleto). Cobre TODOS
+    os criativos ativos por campanha/conjunto/anúncio.
+
+    Estrutura origem:
+      Day, Campaign Name, Ad Set Name, Ad Name, Date Created, Amount Spent,
+      Link Clicks, Post Engagement, Creative Instagram Permalink, Reach,
+      Frequency, Impressions, Purchases, Results, Cost per Result, ...
+
+    Agrega por (Day, Campaign, Ad Set, Ad) e devolve no formato que o ETL
+    (aggregate_meta_ads) espera: data, campanha, conjunto, anuncio, gasto,
+    cliques_link, impressoes, leads, permalink.
+
+    Obs: "leads" usa a coluna Results do Meta (resultado de otimização). O lead
+    REAL de franquia é cruzado depois no ETL via CRM (leads_rd por utm_content).
+    """
+    from collections import defaultdict
+    print("Coletando Meta Ads da Cronograma (Adveronix - Facebook)...")
+    gc = _get_client()
+    ss = gc.open_by_key(CRONOGRAMA_SHEET_ID)
+    try:
+        ws = ss.worksheet(CRONOGRAMA_META_TAB)
+    except Exception:
+        print(f"  ERRO: aba '{CRONOGRAMA_META_TAB}' não encontrada.")
+        return []
+
+    rows = ws.get_all_values()
+    if len(rows) < 2:
+        print("  Cronograma Meta: planilha vazia.")
+        return []
+
+    header = [h.strip().lower() for h in rows[0]]
+    def col(name):
+        try:
+            return header.index(name)
+        except ValueError:
+            return None
+    iDay  = col("day")
+    iCamp = col("campaign name")
+    iSet  = col("ad set name")
+    iAd   = col("ad name")
+    iSpent = col("amount spent")
+    iClk  = col("link clicks")
+    iImp  = col("impressions")
+    iRes  = col("results")
+    iLink = col("creative instagram permalink")
+    if iDay is None or iCamp is None or iAd is None:
+        print(f"  AVISO: header inesperado. Encontrado: {rows[0][:6]}")
+        return []
+
+    agg = defaultdict(lambda: {"gasto": 0.0, "cliques_link": 0.0, "impressoes": 0.0, "leads": 0.0, "permalink": ""})
+    for r in rows[1:]:
+        if len(r) <= iAd:
+            continue
+        day = r[iDay].strip()
+        camp = r[iCamp].strip()
+        anuncio = r[iAd].strip()
+        if not day or day.lower() in ("day", "total") or not anuncio:
+            continue
+        conj = r[iSet].strip() if iSet is not None and len(r) > iSet else ""
+        key = (day, camp, conj, anuncio)
+        a = agg[key]
+        a["gasto"]        += _parse_number(r[iSpent]) or 0 if iSpent is not None else 0
+        a["cliques_link"] += _parse_number(r[iClk]) or 0 if iClk is not None else 0
+        a["impressoes"]   += _parse_number(r[iImp]) or 0 if iImp is not None else 0
+        a["leads"]        += _parse_number(r[iRes]) or 0 if iRes is not None else 0
+        if iLink is not None and len(r) > iLink and r[iLink].strip():
+            a["permalink"] = r[iLink].strip()
+
+    out = []
+    for (day, camp, conj, anuncio), m in agg.items():
+        out.append({
+            "data": day, "campanha": camp, "conjunto": conj, "anuncio": anuncio,
+            "gasto": round(m["gasto"], 2), "cliques_link": int(m["cliques_link"]),
+            "impressoes": int(m["impressoes"]), "leads": round(m["leads"], 2),
+            "permalink": m["permalink"], "thumbnail": "",
+        })
+    out.sort(key=lambda r: r["data"])
+    if out:
+        print(f"  Meta Ads (Cronograma): {len(out)} linhas | de {out[0]['data']} até {out[-1]['data']}")
     return out

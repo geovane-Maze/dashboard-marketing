@@ -51,16 +51,17 @@ def run():
     except Exception as e:
         print(f"  ERRO Google Ads API: {e}")
 
-    # Meta Ads API
-    print("\n[5/6] Meta Ads API")
+    # Meta Ads — fonte primária: Adveronix (B2B - Facebook Banco de Dados),
+    # completo no nível de anúncio e atualizado diariamente.
+    print("\n[5/6] Meta Ads (Adveronix - Facebook)")
     meta_api_ok = False
     try:
-        meta_data = meta_ads.get_campaign_data(days_back=90)
+        meta_data = ads_sheets.get_meta_ads_sheet_data()
         if meta_data:
             writer.write_sheet("meta_ads", meta_data)
             meta_api_ok = True
     except Exception as e:
-        print(f"  ERRO Meta Ads API: {e}")
+        print(f"  ERRO Meta Ads (Adveronix): {e}")
 
     # Planilha externa como fallback se APIs falharam
     if not google_api_ok or not meta_api_ok:
