@@ -7,6 +7,14 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect x='6' y='4' width='52' height='56' rx='5' fill='%23B3D4F0' stroke='%23000' stroke-width='3'/><rect x='38' y='10' width='14' height='5' rx='1.5' fill='%23FFFFFF' stroke='%23000' stroke-width='2'/><circle cx='22' cy='22' r='9' fill='%23E74C3C' stroke='%23000' stroke-width='2'/><path d='M22 22 L22 13 A9 9 0 0 1 31 22 Z' fill='%2327AE60'/><line x1='34' y1='30' x2='52' y2='30' stroke='%23000' stroke-width='2'/><line x1='34' y1='36' x2='46' y2='36' stroke='%23000' stroke-width='2'/><rect x='12' y='42' width='8' height='12' fill='%23F4D35E' stroke='%23000' stroke-width='2'/><rect x='22' y='38' width='8' height='16' fill='%23F4A24A' stroke='%23000' stroke-width='2'/><rect x='32' y='34' width='8' height='20' fill='%23E67E22' stroke='%23000' stroke-width='2'/><rect x='42' y='40' width='8' height='14' fill='%23D35400' stroke='%23000' stroke-width='2'/></svg>">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script>
+  // Registra o plugin de rótulos fixos, mas DESLIGADO por padrão (só ligamos onde queremos)
+  if (window.Chart && window.ChartDataLabels) {
+    Chart.register(window.ChartDataLabels);
+    Chart.defaults.plugins.datalabels = { display: false };
+  }
+</script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
   // Aplica o tema salvo ANTES de pintar (evita flash de tela branca no dark)
@@ -1285,16 +1293,16 @@
         </div>
       </div>
 
-      <!-- Bloco 5c: Entrada de Leads por Dia -->
-      <div class="chart-card" style="margin-bottom:24px">
-        <h3>Entrada de Leads por Dia <span style="font-size:11px;color:#999;font-weight:400;">— fluxo diário no período</span></h3>
-        <div class="chart-wrap tall"><canvas id="chart-exec-leads-dia"></canvas></div>
-      </div>
-
-      <!-- Bloco 5d: Histórico Mensal — Leads, CPL e Investido -->
-      <div class="chart-card" style="margin-bottom:24px">
-        <h3>Histórico Mensal — Leads, CPL e Investido</h3>
-        <div class="chart-wrap tall"><canvas id="chart-exec-hist-mensal"></canvas></div>
+      <!-- Blocos 5c e 5d: Leads por Dia + Histórico Mensal (lado a lado) -->
+      <div class="charts-row" style="margin-bottom:24px">
+        <div class="chart-card">
+          <h3>Entrada de Leads por Dia <span style="font-size:11px;color:#999;font-weight:400;">— fluxo diário</span></h3>
+          <div class="chart-wrap tall"><canvas id="chart-exec-leads-dia"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Histórico Mensal — Leads, CPL e Investido</h3>
+          <div class="chart-wrap tall"><canvas id="chart-exec-hist-mensal"></canvas></div>
+        </div>
       </div>
 
       <!-- Bloco 6: Detalhe das Reuniões no Período (último) -->
@@ -3011,8 +3019,16 @@ function renderExecutivo() {
   const _ld = (DATA.leads.daily || []).filter(r => !datePred || datePred(r.data)).slice().sort((a, b) => a.data < b.data ? -1 : 1);
   makeChart('chart-exec-leads-dia', {
     type: 'line',
-    data: { labels: _ld.map(r => r.data.split('-').reverse().slice(0, 2).join('/')), datasets: [{ label: 'Leads', data: _ld.map(r => r.total), borderColor: COLORS.secondary, backgroundColor: COLORS.secondary + '22', borderWidth: 2, pointRadius: 2, tension: .35, fill: true }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+    data: { labels: _ld.map(r => r.data.split('-').reverse().slice(0, 2).join('/')), datasets: [{ label: 'Leads', data: _ld.map(r => r.total), borderColor: COLORS.secondary, backgroundColor: COLORS.secondary + '22', borderWidth: 2, pointRadius: 3, tension: .35, fill: true }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 18 } },
+      plugins: {
+        legend: { display: false },
+        datalabels: { display: true, align: 'top', anchor: 'end', offset: 3, color: '#185fa5', font: { size: 9, weight: 700 }, formatter: v => v > 0 ? v : '' }
+      },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
   });
 
   // ── Histórico Mensal — Leads, CPL e Investido ───────────────────────────────
@@ -3028,13 +3044,17 @@ function renderExecutivo() {
     data: {
       labels: _meses.map(mesLabel),
       datasets: [
-        { type: 'bar', label: 'Leads', data: _ldsM, backgroundColor: COLORS.secondary + 'CC', borderRadius: 4, yAxisID: 'y' },
-        { type: 'line', label: 'Total Investido (R$)', data: _invM, borderColor: '#8e44ad', backgroundColor: '#8e44ad22', borderWidth: 2, pointRadius: 3, yAxisID: 'y2', tension: .3 },
-        { type: 'line', label: 'CPL (R$)', data: _cplM, borderColor: COLORS.orange, borderWidth: 2, pointRadius: 3, yAxisID: 'y2', tension: .3, borderDash: [5, 4] },
+        { type: 'bar', label: 'Leads', data: _ldsM, backgroundColor: COLORS.secondary + 'CC', borderRadius: 4, yAxisID: 'y',
+          datalabels: { display: ctx => ctx.dataset.data[ctx.dataIndex] > 0, anchor: 'end', align: 'top', color: '#185fa5', font: { size: 9, weight: 700 }, formatter: v => v } },
+        { type: 'line', label: 'Total Investido (R$)', data: _invM, borderColor: '#8e44ad', backgroundColor: '#8e44ad22', borderWidth: 2, pointRadius: 3, yAxisID: 'y2', tension: .3,
+          datalabels: { display: ctx => ctx.dataset.data[ctx.dataIndex] > 0, align: 'top', offset: 4, color: '#8e44ad', font: { size: 8.5, weight: 700 }, formatter: v => 'R$' + (v / 1000).toFixed(1) + 'k' } },
+        { type: 'line', label: 'CPL (R$)', data: _cplM, borderColor: COLORS.orange, borderWidth: 2, pointRadius: 3, yAxisID: 'y2', tension: .3, borderDash: [5, 4],
+          datalabels: { display: ctx => ctx.dataset.data[ctx.dataIndex] > 0, align: 'bottom', offset: 4, color: '#ea580c', font: { size: 8.5, weight: 700 }, formatter: v => 'R$' + Math.round(v) } },
       ]
     },
     options: {
       responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      layout: { padding: { top: 22 } },
       plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: ctx => ctx.dataset.yAxisID === 'y2' ? ` ${ctx.dataset.label}: R$ ${Math.round(ctx.parsed.y).toLocaleString('pt-BR')}` : ` ${ctx.dataset.label}: ${ctx.parsed.y}` } } },
       scales: {
         y: { beginAtZero: true, position: 'left', title: { display: true, text: 'Leads' } },
