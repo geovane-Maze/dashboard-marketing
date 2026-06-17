@@ -776,8 +776,14 @@ def aggregate_crm(deals, leads=None):
     for deal in deals:
         etapa = normalize_etapa(deal.get("etapa") or "sem etapa")
         criado = parse_date_to_day(deal.get("criado_em"))
-        if criado:
-            deals_minimal.append({"etapa": etapa, "criado_em": criado})
+        if not criado:
+            continue
+        # Fonte do lead (cruza por e-mail). Pago = googlecpc/metaads; resto = orgânico.
+        email = (deal.get("contato_email") or "").strip().lower()
+        lead = lead_by_email.get(email)
+        src = (lead.get("utm_source") if lead else "") or ""
+        fonte = "googlecpc" if src == "googlecpc" else ("metaads" if src == "metaads" else "organico")
+        deals_minimal.append({"etapa": etapa, "criado_em": criado, "fonte": fonte})
 
     # ── Perdas: separação pago vs orgânico ───────────────────────────────────
     # Considera-se "pago" qualquer lead cuja utm_source seja googlecpc ou metaads.
