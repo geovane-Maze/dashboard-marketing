@@ -1353,7 +1353,7 @@
           <div id="crm-funnel-bars" style="padding: 8px 0;"></div>
         </div>
         <div class="chart-card">
-          <h3>Reunião PDF por Mês</h3>
+          <h3>1ª Reunião Agendada por Mês</h3>
           <div class="chart-wrap"><canvas id="chart-crm-won"></canvas></div>
         </div>
       </div>
@@ -1519,7 +1519,7 @@
       <div class="table-card" style="margin-bottom:24px;background:linear-gradient(135deg,#EEF2FF 0%,#F0F9FF 100%);border:1px solid #93C5FD;">
         <h3 style="margin-top:0;">🎯 Top Criativos por QUALIDADE de Lead</h3>
         <p style="font-size:11px;color:#1E3A8A;margin:0 0 12px;">
-          Ranqueado por <strong>quantos leads chegaram em etapas qualificadas</strong> (Reunião PDF, Apresentação BP, Envio COF, Workshop).
+          Ranqueado por <strong>quantos leads chegaram em etapas qualificadas</strong> (1ª Reunião Agendada, Apresentação BP, Envio COF, Workshop).
           <strong>Diferente</strong> do Top 5 acima (que vê volume) — aqui é QUALIDADE: criativos que trazem leads que realmente avançam.
         </p>
         <div style="overflow-x:auto;">
@@ -2309,17 +2309,17 @@ function renderRelatorio() {
                 <td class="pct">${crm.total_deals ? pct(crm.total_active/crm.total_deals*100) : '—'}</td>
               </tr>
               <tr>
-                <td>Atualmente em Reunião PDF</td>
+                <td>Atualmente em 1ª Reunião Agendada</td>
                 <td class="num">${num(crm.reuniao_pdf_total)}</td>
                 <td class="pct">${pct(crm.reuniao_pdf_pct)}</td>
               </tr>
               <tr>
-                <td>Ativos em Reunião PDF (hoje)</td>
+                <td>Ativos em 1ª Reunião Agendada (hoje)</td>
                 <td class="num">${num(crm.reuniao_pdf_ativo)}</td>
                 <td class="pct">${pct(crm.reuniao_pdf_ativo_pct)}</td>
               </tr>
               <tr>
-                <td>Chegaram em Reunião PDF — ${R.mes_label}</td>
+                <td>Chegaram em 1ª Reunião Agendada — ${R.mes_label}</td>
                 <td class="num">${num(crm.reuniao_pdf_mes)}</td>
                 <td class="pct">${crm.reuniao_pdf_mes_pct != null ? pct(crm.reuniao_pdf_mes_pct) : '—'}</td>
               </tr>
@@ -2577,8 +2577,8 @@ function downloadRelatorioResumidoPDF() {
     [
       ['Total de negócios (histórico)', fNum(crm.total_deals), '100%'],
       ['Negócios ativos', fNum(crm.total_active), crm.total_deals ? fP(crm.total_active/crm.total_deals*100):'—'],
-      ['Atualmente em Reunião PDF', fNum(crm.reuniao_pdf_total), fP(crm.reuniao_pdf_pct)],
-      ['Chegaram em Reunião PDF — '+(R.mes_label||''), fNum(crm.reuniao_pdf_mes), crm.reuniao_pdf_mes_pct != null ? fP(crm.reuniao_pdf_mes_pct):'—'],
+      ['Atualmente em 1ª Reunião Agendada', fNum(crm.reuniao_pdf_total), fP(crm.reuniao_pdf_pct)],
+      ['Chegaram em 1ª Reunião Agendada — '+(R.mes_label||''), fNum(crm.reuniao_pdf_mes), crm.reuniao_pdf_mes_pct != null ? fP(crm.reuniao_pdf_mes_pct):'—'],
       ['Ganhos (fechados)', fNum(crm.total_won), crm.total_deals ? fP(crm.total_won/crm.total_deals*100):'—'],
       ['Perdidos', fNum(crm.total_lost), crm.total_deals ? fP(crm.total_lost/crm.total_deals*100):'—'],
     ], [90, 35, 35], NAVY);
@@ -2624,17 +2624,20 @@ function downloadRelatorioResumidoPDF() {
 
 // ─── SECTION: EXECUTIVO ───────────────────────────────────────────────────────
 const FUNNEL_ORDER = [
-  // Funil atual
+  // Funil atual (11 etapas)
   'entrada de lead',
   'tentativa de conexão', 'tentativa de conexao',
   'lead respondente',
-  'pré-qualificado', 'pre-qualificado',
-  'reunião pdf', 'reuniao pdf', 'reunião de pdf',
+  'prospect', 'pré-qualificado', 'pre-qualificado',
+  '1ª reunião agendada', '1a reunião agendada', 'reunião pdf', 'reuniao pdf', 'reunião de pdf',
+  '1ª reunião realizada', '1a reunião realizada',
   'apresentação do business plan', 'apresentacao do business plan',
   'envio de cof',
   'workshop',
-  'aprovação final', 'aprovacao final',
+  'análise financeira/jurídica', 'analise financeira/juridica', 'análise financeira', 'analise financeira',
+  'comitê final', 'comite final',
   // Etapas legadas (dados históricos — aparecem ao final)
+  'aprovação final', 'aprovacao final',
   'contato inicial', 'nutrição 1', 'nutricao 1', 'nutrição 2', 'nutricao 2',
 ];
 
@@ -2768,7 +2771,7 @@ function renderExecutivo() {
     return null;
   };
   // Funil do período — deals que passaram em cada etapa (filtra por data de CRIAÇÃO)
-  const FUNIL_STAGES = ['Entrada de Lead', 'Tentativa de Conexão', 'Lead Respondente', 'Pré-qualificado', 'Reunião PDF', 'Apresentação do Business Plan', 'Envio de COF', 'Workshop'];
+  const FUNIL_STAGES = ['Entrada de Lead', 'Tentativa de Conexão', 'Lead Respondente', 'Prospect', '1ª Reunião Agendada', '1ª Reunião Realizada', 'Apresentação do Business Plan', 'Envio de COF', 'Workshop', 'Análise Financeira/Jurídica', 'Comitê Final'];
   const stageIdxOf = (etapa) => {
     const el = (etapa || '').toLowerCase().trim();
     for (let i = 0; i < FUNIL_STAGES.length; i++) {
@@ -2794,7 +2797,7 @@ function renderExecutivo() {
     meetDet.forEach(r => { const c = classM(r[field]); if (c === 'realizada') real++; else if (c === 'noshow') ns++; });
     return { realizada: real, noshow: ns };
   };
-  const mApres = meetTot('r1'); mApres.agendada = passedOf('Reunião PDF');
+  const mApres = meetTot('r1'); mApres.agendada = passedOf('1ª Reunião Agendada');
   const mBP = meetTot('r2'); mBP.agendada = passedOf('Apresentação do Business Plan');
   const meetBlock = (titulo, icon, bg, m) => `
     <div class="ads-group">
@@ -2870,7 +2873,7 @@ function renderExecutivo() {
 
   // ── Blocos 5 e 6: Perdas por Etapa do Funil (popup por plataforma / por motivo) ──
   const lossesPeriodo = (crm.losses_daily || []).filter(r => !datePred || datePred(r.criado || r.data));
-  const ORDER_FUNIL = ['entrada de lead', 'tentativa de conexão', 'lead respondente', 'pré-qualificado', 'reunião pdf', 'apresentação do business plan', 'envio de cof', 'workshop'];
+  const ORDER_FUNIL = ['entrada de lead', 'tentativa de conexão', 'lead respondente', 'prospect', 'pré-qualificado', '1ª reunião agendada', 'reunião pdf', '1ª reunião realizada', 'apresentação do business plan', 'envio de cof', 'workshop', 'análise financeira', 'comitê final', 'comite final'];
   const PLAT_OF = (src) => src === 'googlecpc' ? 'Google' : (src === 'metaads' ? 'Meta' : 'Orgânico / Outro');
   const PLAT_COLOR = { 'Google': '#4285F4', 'Meta': '#1877F2', 'Orgânico / Outro': '#16a085' };
   function buildLossFunnel(containerId, mode) {
@@ -2968,8 +2971,8 @@ function renderEvolucao() {
           backgroundColor: COLORS.secondary + 'CC', borderRadius: 4
         },
         {
-          label: 'Reunião PDF',
-          data: allMesesEvo.map(m => (stagesMonthMap[m] || {}).reuniao_pdf || 0),
+          label: '1ª Reunião Agendada',
+          data: allMesesEvo.map(m => (stagesMonthMap[m] || {}).reuniao_agendada || (stagesMonthMap[m] || {}).reuniao_pdf || 0),
           backgroundColor: COLORS.orange + 'CC', borderRadius: 4
         },
         {
@@ -3045,7 +3048,7 @@ function renderCRM() {
     const s = activeFunnel.find(r => r.etapa.toLowerCase() === name.toLowerCase());
     return s ? s.total : 0;
   }
-  const reuniaoPDFCount  = stageCount('Reunião PDF');
+  const reuniaoPDFCount  = stageCount('1ª Reunião Agendada');
   const apresentacaoBP   = stageCount('Apresentação do Business Plan');
   const workshopCount    = stageCount('Workshop');
 
@@ -3083,7 +3086,7 @@ function renderCRM() {
     // ── Linha 1: Visão geral do funil ─────────────────────────────────────────
     { label: 'Total de Negócios',             value: fmt.num(crm.total_deals),         sub: 'no CRM',                          cls: ''       },
     { label: 'Negócios Abertos',              value: fmt.num(crm.total_open),          sub: 'em andamento',                    cls: 'blue'   },
-    { label: 'Reunião PDF',                   value: fmt.num(reuniaoPDFCount),         sub: 'leads nesta etapa',               cls: 'blue'   },
+    { label: '1ª Reunião Agendada',           value: fmt.num(reuniaoPDFCount),         sub: 'leads nesta etapa',               cls: 'blue'   },
     { label: 'Apresentação do Business Plan', value: fmt.num(apresentacaoBP),          sub: 'leads nesta etapa',               cls: 'teal'   },
     // ── Linha 2: Eficiência e perdas ──────────────────────────────────────────
     { label: 'Workshop',                          value: fmt.num(workshopCount),       sub: 'leads nesta etapa',               cls: 'purple' },
@@ -3097,8 +3100,9 @@ function renderCRM() {
     { label: 'No-Show 2ª Reunião',            value: fmt.num(r2NS),                    sub: 'campo 2ª Reunião = Não',          cls: 'red'    },
   ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
 
-  // Funnel bars — usa active_funnel (ordem do pipeline, sem Etapa Descarte)
-  const crmFunnel  = crm.active_funnel || [];
+  // Funnel bars — usa active_funnel, reordenado pela ordem oficial do funil
+  const crmFunnel  = (crm.active_funnel || []).slice()
+    .sort((a, b) => funnelSortIndex(a.etapa) - funnelSortIndex(b.etapa));
   const crmMax     = Math.max(...crmFunnel.map(s => s.total), 1);
   const crmTotal   = crm.total_active || crmFunnel.reduce((a, s) => a + s.total, 0) || 1;
 
@@ -3125,7 +3129,7 @@ function renderCRM() {
     type: 'bar',
     data: {
       labels: reuniaoMensal.map(r => mesLabel(r.mes)),
-      datasets: [{ label: 'Reunião PDF', data: reuniaoMensal.map(r => r.reuniao_pdf || 0), backgroundColor: COLORS.orange + 'CC', borderRadius: 4 }]
+      datasets: [{ label: '1ª Reunião Agendada', data: reuniaoMensal.map(r => r.reuniao_agendada || r.reuniao_pdf || 0), backgroundColor: COLORS.orange + 'CC', borderRadius: 4 }]
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
   });
@@ -3975,10 +3979,11 @@ function renderCreatives() {
       // Ordem das etapas para mini-funil
       const STAGES_ORDER = [
         'Entrada de Lead', 'Tentativa de Conexão', 'Lead Respondente',
-        'Pré-qualificado', 'Reunião PDF', 'Apresentação do Business Plan',
-        'Envio de COF', 'Workshop'
+        'Prospect', '1ª Reunião Agendada', '1ª Reunião Realizada',
+        'Apresentação do Business Plan', 'Envio de COF', 'Workshop',
+        'Análise Financeira/Jurídica', 'Comitê Final'
       ];
-      const QUALIFIED_FROM = 4; // Reunião PDF em diante
+      const QUALIFIED_FROM = 4; // 1ª Reunião Agendada em diante
 
       qualBody.innerHTML = qualityList.slice(0, 20).map((c, i) => {
         const isMeta = c.source === 'meta';
@@ -4357,7 +4362,7 @@ const PREV_KPI = {
     ruim: 'Crescimento abaixo do previsto. Reavaliar o mix de canais, reforçar campanhas de maior ROAS e revisar a meta de investimento do mês.',
     bom: 'Crescimento acima da meta — ótimo ritmo! Documentar o que puxou o resultado para repetir.' },
   'vendas': { dir: 'up',
-    ruim: 'Vendas abaixo da meta. Priorizar leads quentes de fundo de funil, acelerar o follow-up Reunião PDF → COF e revisar a abordagem comercial.',
+    ruim: 'Vendas abaixo da meta. Priorizar leads quentes de fundo de funil, acelerar o follow-up 1ª Reunião Agendada → COF e revisar a abordagem comercial.',
     bom: 'Vendas acima da meta — parabéns! Replicar a abordagem dos negócios fechados.' },
   'receita faturada': { dir: 'up',
     ruim: 'Receita abaixo do previsto. Focar em deals de maior ticket e reduzir o tempo de ciclo entre Apresentação BP e Envio de COF.',

@@ -149,10 +149,11 @@ def compute_creative_funnel_quality(meta_rows, google_creatives_rows, leads, dea
     """
     PIPELINE = [
         'entrada de lead', 'tentativa de conexão', 'lead respondente',
-        'pré-qualificado', 'reunião pdf', 'apresentação do business plan',
-        'envio de cof', 'workshop',
+        'prospect', '1ª reunião agendada', '1ª reunião realizada',
+        'apresentação do business plan', 'envio de cof', 'workshop',
+        'análise financeira/jurídica', 'comitê final',
     ]
-    QUALIFIED_FROM = 4  # 'reunião pdf' em diante = qualificado
+    QUALIFIED_FROM = 4  # '1ª reunião agendada' em diante = qualificado
 
     def stage_idx(etapa):
         el = (etapa or '').lower().strip()
@@ -447,24 +448,41 @@ def parse_date_to_day(date_str):
 
 
 STAGE_NORMALIZE = {
-    # ── Funil atual ──────────────────────────────────────────────────────────
+    # ── Funil atual (11 etapas) ───────────────────────────────────────────────
     'entrada de lead':                     'Entrada de Lead',
     'tentativa de conexão':                'Tentativa de Conexão',
     'tentativa de conexao':                'Tentativa de Conexão',
     'lead respondente':                    'Lead Respondente',
-    'pré-qualificado':                     'Pré-qualificado',
-    'pre-qualificado':                     'Pré-qualificado',
-    'pré qualificado':                     'Pré-qualificado',
-    'pre qualificado':                     'Pré-qualificado',
-    'reunião pdf':                         'Reunião PDF',
-    'reuniao pdf':                         'Reunião PDF',
+    'prospect':                            'Prospect',
+    '1ª reunião agendada':                 '1ª Reunião Agendada',
+    '1a reunião agendada':                 '1ª Reunião Agendada',
+    '1ª reuniao agendada':                 '1ª Reunião Agendada',
+    '1a reuniao agendada':                 '1ª Reunião Agendada',
+    '1ª reunião realizada':                '1ª Reunião Realizada',
+    '1a reunião realizada':                '1ª Reunião Realizada',
+    '1ª reuniao realizada':                '1ª Reunião Realizada',
+    '1a reuniao realizada':                '1ª Reunião Realizada',
     'apresentação do business plan':       'Apresentação do Business Plan',
     'apresentacao do business plan':       'Apresentação do Business Plan',
     'envio de cof':                        'Envio de COF',
     'workshop':                            'Workshop',
+    'análise financeira/jurídica':         'Análise Financeira/Jurídica',
+    'analise financeira/juridica':         'Análise Financeira/Jurídica',
+    'análise financeira / jurídica':       'Análise Financeira/Jurídica',
+    'analise financeira / juridica':       'Análise Financeira/Jurídica',
+    'comitê final':                        'Comitê Final',
+    'comite final':                        'Comitê Final',
+    # ── Etapas RENOMEADAS no CRM — legados mesclados nos nomes novos ──────────
+    'pré-qualificado':                     'Prospect',
+    'pre-qualificado':                     'Prospect',
+    'pré qualificado':                     'Prospect',
+    'pre qualificado':                     'Prospect',
+    'reunião pdf':                         '1ª Reunião Agendada',
+    'reuniao pdf':                         '1ª Reunião Agendada',
+    'reunião de pdf':                      '1ª Reunião Agendada',
+    # ── Etapas legadas antigas (dados históricos) ────────────────────────────
     'aprovação final':                     'Aprovação Final',
     'aprovacao final':                     'Aprovação Final',
-    # ── Etapas legadas (dados históricos) ────────────────────────────────────
     'contato inicial':                     'Contato Inicial',
     'nutrição 1':                          'Nutrição 1',
     'nutricao 1':                          'Nutrição 1',
@@ -709,7 +727,9 @@ def aggregate_crm(deals, leads=None):
         mes_criado = parse_date_to_month(deal.get("criado_em"))
         if mes_criado:
             etapa_lower = etapa.lower()
-            if "reunião pdf" in etapa_lower or "reuniao pdf" in etapa_lower:
+            # reuniao_pdf = renomeada para "1ª Reunião Agendada" (mantém legado)
+            if ("1ª reunião agendada" in etapa_lower or "1a reunião agendada" in etapa_lower
+                    or "reunião pdf" in etapa_lower or "reuniao pdf" in etapa_lower):
                 monthly_stages[mes_criado]["reuniao_pdf"] += 1
             if "apresentação do business plan" in etapa_lower or "apresentacao do business plan" in etapa_lower:
                 monthly_stages[mes_criado]["apresentacao_bp"] += 1
@@ -732,12 +752,13 @@ def aggregate_crm(deals, leads=None):
 
     # Funil de ativos na ordem correta do pipeline
     PIPELINE_ORDER = [
-        # Funil atual
+        # Funil atual (11 etapas)
         'entrada de lead', 'tentativa de conexão', 'lead respondente',
-        'pré-qualificado', 'reunião pdf', 'apresentação do business plan',
-        'envio de cof', 'workshop', 'aprovação final',
+        'prospect', '1ª reunião agendada', '1ª reunião realizada',
+        'apresentação do business plan', 'envio de cof', 'workshop',
+        'análise financeira/jurídica', 'comitê final',
         # Etapas legadas (dados históricos — ficam ao final)
-        'contato inicial', 'nutrição 1', 'nutrição 2',
+        'aprovação final', 'contato inicial', 'nutrição 1', 'nutrição 2',
     ]
     def stage_sort_key(name):
         nl = name.lower()
@@ -1582,10 +1603,14 @@ def build_relatorio(leads, crm, meta_agg, google_agg, utm_agg, meta_rows=None, m
     total_lost     = crm.get("total_lost", 0)
     total_active   = crm.get("total_active", 0)
 
+    # "Reunião PDF" foi renomeada para "1ª Reunião Agendada" no CRM.
+    def _is_1a_agendada(nm):
+        nl = nm.lower()
+        return ("reuni" in nl and "agendada" in nl) or ("reuni" in nl and "pdf" in nl)
     reuniao_pdf_total  = next((e["total"] for e in crm.get("funnel", [])
-                               if "reuni" in e["etapa"].lower() and "pdf" in e["etapa"].lower()), 0)
+                               if _is_1a_agendada(e["etapa"])), 0)
     reuniao_pdf_ativo  = next((e["total"] for e in crm.get("active_funnel", [])
-                               if "reuni" in e["etapa"].lower() and "pdf" in e["etapa"].lower()), 0)
+                               if _is_1a_agendada(e["etapa"])), 0)
 
     taxa_reuniao_total = round(reuniao_pdf_total / total_deals * 100, 1) if total_deals else 0
     taxa_reuniao_ativo = round(reuniao_pdf_ativo / total_active * 100, 1) if total_active else 0
