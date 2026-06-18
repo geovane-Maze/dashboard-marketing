@@ -289,6 +289,45 @@ def get_google_ads_creatives_sheet_data():
     return out
 
 
+def _get_creative_thumbnails():
+    """
+    Mapa {ad_name: thumbnail_url} a partir da planilha antiga (ADS_SHEET),
+    coluna "Creative Thumbnail" — URLs do CDN de anúncios (scontent.xx.fbcdn.net),
+    que renderizam direto em <img> (diferente do permalink do Instagram, que é
+    bloqueado por referer no navegador).
+
+    O Adveronix (aba Cronograma) NÃO exporta a imagem do criativo, só o permalink.
+    Por isso buscamos o thumbnail aqui e cruzamos por "Ad Name" (match exato 1:1).
+    As URLs expiram (param oe=), mas a planilha é atualizada continuamente e a
+    coleta roda 3x/dia, então o link fica sempre fresco — igual ao fluxo antigo.
+    """
+    try:
+        gc = _get_client()
+        rows = gc.open_by_key(ADS_SHEET_ID).worksheet(ADS_TAB_NAME).get_all_values()
+    except Exception as e:
+        print(f"  AVISO: não consegui ler thumbnails da planilha antiga: {e}")
+        return {}
+    if len(rows) < 2:
+        return {}
+    header = [h.strip().lower() for h in rows[0]]
+    try:
+        iAd = header.index("ad name")
+        iTh = header.index("creative thumbnail")
+    except ValueError:
+        print("  AVISO: colunas 'Ad Name'/'Creative Thumbnail' não encontradas na planilha antiga.")
+        return {}
+    thumbs = {}
+    for r in rows[1:]:
+        if len(r) <= max(iAd, iTh):
+            continue
+        ad = r[iAd].strip()
+        th = r[iTh].strip()
+        if ad and th.startswith("http"):
+            thumbs[ad] = th  # linhas em ordem cronológica → última (mais recente) vence
+    print(f"  Thumbnails de criativo (planilha antiga): {len(thumbs)} anúncios.")
+    return thumbs
+
+
 def get_meta_ads_sheet_data():
     """
     Coleta Meta Ads (nível de ANÚNCIO) da planilha "Cronograma - Clínica da Cidade",
@@ -362,13 +401,15 @@ def get_meta_ads_sheet_data():
         if iLink is not None and len(r) > iLink and r[iLink].strip():
             a["permalink"] = r[iLink].strip()
 
+    thumbs = _get_creative_thumbnails()  # {ad_name: thumbnail_url} da planilha antiga
+
     out = []
     for (day, camp, conj, anuncio), m in agg.items():
         out.append({
             "data": day, "campanha": camp, "conjunto": conj, "anuncio": anuncio,
             "gasto": round(m["gasto"], 2), "cliques_link": int(m["cliques_link"]),
             "impressoes": int(m["impressoes"]), "leads": round(m["leads"], 2),
-            "permalink": m["permalink"], "thumbnail": "",
+            "permalink": m["permalink"], "thumbnail": thumbs.get(anuncio, ""),
         })
     out.sort(key=lambda r: r["data"])
     if out:
