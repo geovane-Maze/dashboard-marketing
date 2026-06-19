@@ -2727,6 +2727,12 @@ function renderExecutivo() {
     .filter(r => !datePred || datePred(r.data))
     .reduce((s, r) => s + r.total, 0);
 
+  // Leads importados (base de outro CRM) no período — pra separar base x atual
+  const importadosPeriodo = (DATA.leads.daily || [])
+    .filter(r => !datePred || datePred(r.data))
+    .reduce((s, r) => s + (r.importados || 0), 0);
+  const atuaisPeriodo = totalLeadsPeriodo - importadosPeriodo;
+
   // ── Dados UTM filtrados por dia ──────────────────────────────────────────────
   const filtSources = {};
   (DATA.utm.sources_daily || []).filter(r => !datePred || datePred(r.data))
@@ -2788,7 +2794,7 @@ function renderExecutivo() {
   const totalInvestido = googleGasto + metaGasto;
   const cplPago = pagos > 0 ? totalInvestido / pagos : 0;
   document.getElementById('kpi-leads-exec').innerHTML = [
-    { label: 'Total de Leads', value: fmt.num(totalLeadsPeriodo), sub: 'período selecionado', cls: '' },
+    { label: 'Total de Leads', value: fmt.num(totalLeadsPeriodo), sub: 'período selecionado' + (importadosPeriodo > 0 ? `<br><span style="color:var(--orange);font-weight:600">${fmt.num(importadosPeriodo)} importados</span> · ${fmt.num(atuaisPeriodo)} atuais` : `<br><span style="color:var(--green)">100% atuais</span> (sem base importada)`), cls: '' },
     { label: 'Leads Pago', value: fmt.num(pagos), sub: pct(pagos, totalLeadsPeriodo) + ' do total', cls: 'blue' },
     { label: 'Perda de Leads Pago', value: fmt.num(lostPago), sub: pct(lostPago, lostTotal) + ' das perdas', cls: 'red' },
     { label: 'Leads Orgânicos', value: fmt.num(organicos), sub: pct(organicos, totalLeadsPeriodo) + ' do total', cls: 'green' },
