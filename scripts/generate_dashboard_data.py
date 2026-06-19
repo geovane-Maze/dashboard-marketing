@@ -49,6 +49,58 @@ def read_sheet(gc, sheet_name):
 
 
 # ════════════════════════════════════════════════════════════════════
+# BACKFILL de leads importados (2 bases de outro CRM importadas no RD)
+# ════════════════════════════════════════════════════════════════════
+# As bases entraram no RD em maio/2026 SEM utm_source e com a data de
+# IMPORTAÇÃO (não a original). Resultado: ~926 leads pagos viravam "orgânico"
+# e todos caíam em maio/2026. O arquivo data/imports_backfill.json
+# (gerado a partir do export das planilhas, cruzado por e-mail → id do lead)
+# devolve a fonte real (utm_source canônico) e a data original (criado_em).
+# Para desfazer: basta remover/zerar esse arquivo — o ETL volta ao normal.
+IMPORTS_BACKFILL_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data", "imports_backfill.json"
+)
+
+
+def load_imports_backfill():
+    """Lê {lead_id: {criado_em?, utm_source?}}. Silencioso se o arquivo não existir."""
+    try:
+        with open(IMPORTS_BACKFILL_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        print(f"  Backfill de importados: {len(data)} leads ({IMPORTS_BACKFILL_FILE}).")
+        return data
+    except FileNotFoundError:
+        return {}
+    except Exception as e:
+        print(f"  AVISO: não consegui ler o backfill de importados: {e}")
+        return {}
+
+
+def apply_imports_backfill(leads, backfill):
+    """
+    Corrige in-place os leads importados: data original (criado_em) e fonte
+    (utm_source) quando ausente. Só toca nos ids presentes no backfill.
+    """
+    if not backfill:
+        return leads
+    n_data = n_src = 0
+    for lead in leads:
+        entry = backfill.get(str(lead.get("id", "")).strip())
+        if not entry:
+            continue
+        if entry.get("criado_em"):
+            lead["criado_em"] = entry["criado_em"]
+            n_data += 1
+        # só preenche fonte se o lead não tiver uma utm_source válida
+        if entry.get("utm_source") and not (lead.get("utm_source") or "").strip():
+            lead["utm_source"] = entry["utm_source"]
+            n_src += 1
+    print(f"  Backfill aplicado: data corrigida em {n_data} leads, fonte em {n_src}.")
+    return leads
+
+
+# ════════════════════════════════════════════════════════════════════
 # MATCHING utm_content (CRM) ↔ anuncio (Meta Ads)
 # ════════════════════════════════════════════════════════════════════
 _TOKEN_STOP = {
@@ -507,7 +559,10 @@ def is_repasse(campaign_name):
 
 
 def aggregate_leads(leads):
-    monthly = defaultdict(lambda: {"total": 0, "qualificados": 0})
+    monthly = defaultdict(lambda: {
+        "total": 0, "qualificados": 0,
+        "pago": 0, "organico": 0, "googlecpc": 0, "metaads": 0,
+    })
     daily = defaultdict(lambda: {"total": 0, "qualificados": 0})
     by_source = defaultdict(int)
     by_canal = defaultdict(int)
@@ -525,10 +580,21 @@ def aggregate_leads(leads):
         lc = str(lead.get("lifecycle_stage") or "").lower()
         qualif = "qualif" in lc or "mql" in lc
 
+        src_norm = (lead.get("utm_source") or "").strip()
         if mes:
             monthly[mes]["total"] += 1
             if qualif:
                 monthly[mes]["qualificados"] += 1
+            # Split pago/orgânico por mês (mesma regra do dashboard: pago = googlecpc/metaads).
+            # Reflete o backfill dos leads importados (fonte real recuperada do export).
+            if src_norm == "googlecpc":
+                monthly[mes]["googlecpc"] += 1
+                monthly[mes]["pago"] += 1
+            elif src_norm == "metaads":
+                monthly[mes]["metaads"] += 1
+                monthly[mes]["pago"] += 1
+            else:
+                monthly[mes]["organico"] += 1
         if dia:
             daily[dia]["total"] += 1
             if qualif:
@@ -1914,6 +1980,7 @@ def main():
     print("  Lendo leads...")
     leads = read_sheet(gc, "leads")
     leads = dedupe_by_id(leads, "leads")
+    leads = apply_imports_backfill(leads, load_imports_backfill())
 
     print("  Lendo CRM deals...")
     crm_deals = read_sheet(gc, "crm_deals")
