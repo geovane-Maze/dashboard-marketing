@@ -201,10 +201,10 @@ def compute_creative_funnel_quality(meta_rows, google_creatives_rows, leads, dea
     Returns: list ordenada por leads qualificados (decrescente).
     """
     PIPELINE = [
-        'entrada de lead', 'tentativa de conexão', 'lead respondente',
-        'prospect', '1ª reunião agendada', '1ª reunião realizada',
-        'apresentação do business plan', 'envio de cof', 'workshop',
-        'análise financeira/jurídica', 'comitê final',
+        'entrada de lead', 'tentativa de contato', 'qualificação',
+        'qualificado não agendada', '1ª reunião agendada', '1ª reunião realizada',
+        'reunião de bp agendada', 'reunião de bp realizada', 'envio de cof',
+        'visita / reunião com jamil', 'análise financeira/jurídica', 'comitê final',
     ]
     QUALIFIED_FROM = 4  # '1ª reunião agendada' em diante = qualificado
 
@@ -501,8 +501,20 @@ def parse_date_to_day(date_str):
 
 
 STAGE_NORMALIZE = {
-    # ── Funil atual (11 etapas) ───────────────────────────────────────────────
+    # ── Funil atual do RD (12 etapas) ─────────────────────────────────────────
     'entrada de lead':                     'Entrada de Lead',
+    'tentativa de contato':                'Tentativa de Contato',
+    'qualificação':                        'Qualificação',
+    'qualificacao':                        'Qualificação',
+    'qualificado não agendada':            'Qualificado Não agendada',
+    'qualificado nao agendada':            'Qualificado Não agendada',
+    'reunião de bp agendada':              'Reunião de BP Agendada',
+    'reuniao de bp agendada':              'Reunião de BP Agendada',
+    'reunião de bp realizada':             'Reunião de BP Realizada',
+    'reuniao de bp realizada':             'Reunião de BP Realizada',
+    'visita / reunião com jamil':          'Visita / Reunião com Jamil',
+    'visita / reuniao com jamil':          'Visita / Reunião com Jamil',
+    # ── Legados/planejados (dados históricos) ─────────────────────────────────
     'tentativa de conexão':                'Tentativa de Conexão',
     'tentativa de conexao':                'Tentativa de Conexão',
     'lead respondente':                    'Lead Respondente',
@@ -804,7 +816,8 @@ def aggregate_crm(deals, leads=None):
             if ("1ª reunião agendada" in etapa_lower or "1a reunião agendada" in etapa_lower
                     or "reunião pdf" in etapa_lower or "reuniao pdf" in etapa_lower):
                 monthly_stages[mes_criado]["reuniao_pdf"] += 1
-            if "apresentação do business plan" in etapa_lower or "apresentacao do business plan" in etapa_lower:
+            if ("reunião de bp agendada" in etapa_lower or "reuniao de bp agendada" in etapa_lower
+                    or "apresentação do business plan" in etapa_lower or "apresentacao do business plan" in etapa_lower):
                 monthly_stages[mes_criado]["apresentacao_bp"] += 1
             if "reunião agendada" in etapa_lower or "reuniao agendada" in etapa_lower:
                 monthly_stages[mes_criado]["reuniao_agendada"] += 1
@@ -825,12 +838,17 @@ def aggregate_crm(deals, leads=None):
 
     # Funil de ativos na ordem correta do pipeline
     PIPELINE_ORDER = [
-        # Funil atual (11 etapas)
-        'entrada de lead', 'tentativa de conexão', 'lead respondente',
-        'prospect', '1ª reunião agendada', '1ª reunião realizada',
-        'apresentação do business plan', 'envio de cof', 'workshop',
+        # Funil atual do RD (12 etapas) — ordem oficial
+        'entrada de lead', 'tentativa de contato', 'qualificação', 'qualificacao',
+        'qualificado não agendada', 'qualificado nao agendada',
+        '1ª reunião agendada', '1ª reunião realizada',
+        'reunião de bp agendada', 'reuniao de bp agendada',
+        'reunião de bp realizada', 'reuniao de bp realizada',
+        'envio de cof', 'visita / reunião com jamil', 'visita / reuniao com jamil',
         'análise financeira/jurídica', 'comitê final',
-        # Etapas legadas (dados históricos — ficam ao final)
+        # Etapas legadas/planejadas (dados históricos — ficam ao final)
+        'tentativa de conexão', 'lead respondente', 'prospect',
+        'apresentação do business plan', 'workshop',
         'aprovação final', 'contato inicial', 'nutrição 1', 'nutrição 2',
     ]
     def stage_sort_key(name):
