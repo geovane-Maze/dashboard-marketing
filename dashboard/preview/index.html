@@ -1347,6 +1347,12 @@
           <div class="chart-wrap tall"><canvas id="chart-leads-monthly"></canvas></div>
         </div>
       </div>
+      <div class="charts-row full">
+        <div class="chart-card">
+          <h3>Leads por Fonte — Mês a Mês <span style="font-size:11px;color:#999;font-weight:400;">— Pago (Google/Meta) vs Orgânico · inclui bases importadas com fonte recuperada</span></h3>
+          <div class="chart-wrap tall"><canvas id="chart-leads-fonte-mes"></canvas></div>
+        </div>
+      </div>
       <div class="charts-row">
         <div class="chart-card">
           <h3>Investimento Mensal — Meta Ads</h3>
@@ -3137,6 +3143,36 @@ function renderEvolucao() {
       ]
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }
+  });
+
+  // ── Leads por Fonte — Mês a Mês (empilhado: Pago Google / Pago Meta / Orgânico) ──
+  makeChart('chart-leads-fonte-mes', {
+    type: 'bar',
+    data: {
+      labels: allMesesEvo.map(mesLabel),
+      datasets: [
+        {
+          label: 'Pago — Google',
+          data: allMesesEvo.map(m => (leadsMonthMap[m] || {}).googlecpc || 0),
+          backgroundColor: COLORS.primary + 'CC', borderRadius: 4, stack: 'fonte'
+        },
+        {
+          label: 'Pago — Meta',
+          data: allMesesEvo.map(m => (leadsMonthMap[m] || {}).metaads || 0),
+          backgroundColor: COLORS.orange + 'CC', borderRadius: 4, stack: 'fonte'
+        },
+        {
+          label: 'Orgânico / Outros',
+          data: allMesesEvo.map(m => (leadsMonthMap[m] || {}).organico || 0),
+          backgroundColor: COLORS.secondary + '99', borderRadius: 4, stack: 'fonte'
+        },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+    }
   });
 
   const metaData = getMetaMonthly(pred);
