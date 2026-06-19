@@ -1,3 +1,7 @@
+import os
+import json
+import time
+
 import gspread
 from google.oauth2.service_account import Credentials
 import config
@@ -9,6 +13,15 @@ SCOPES = [
 
 ADS_SHEET_ID = "1GC9-gtQM--sgpEejMGh2_pfibIt9w_511cJ7Ct3ACYA"
 ADS_TAB_NAME = "[CDC -B2B Franquadora] Criativos Facebook/Google"
+
+# Snapshot dos thumbnails de criativo — rede de segurança contra falhas
+# transitórias (503/429) ao ler a planilha antiga (39k linhas). Se o read ao
+# vivo falhar, usamos o último snapshot bom para NUNCA deixar os criativos sem
+# imagem. Atualizado a cada read bem-sucedido.
+THUMBS_SNAPSHOT_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data", "creative_thumbs.json"
+)
 
 # Planilha Google Ads com dados diários (inclui campanhas Performance Max)
 # DEPRECATED: substituído pela Cronograma (export automático via Adveronix).
@@ -300,22 +313,41 @@ def _get_creative_thumbnails():
     Por isso buscamos o thumbnail aqui e cruzamos por "Ad Name" (match exato 1:1).
     As URLs expiram (param oe=), mas a planilha é atualizada continuamente e a
     coleta roda 3x/dia, então o link fica sempre fresco — igual ao fluxo antigo.
+
+    ROBUSTEZ: a planilha tem ~39k linhas e o Google às vezes devolve 503/429 no
+    read pesado. Fazemos retry com backoff e, se ainda assim falhar, caímos no
+    snapshot salvo (THUMBS_SNAPSHOT_FILE) — assim os criativos NUNCA ficam sem
+    imagem por uma falha transitória. Todo read bem-sucedido atualiza o snapshot.
     """
-    try:
-        gc = _get_client()
-        rows = gc.open_by_key(ADS_SHEET_ID).worksheet(ADS_TAB_NAME).get_all_values()
-    except Exception as e:
-        print(f"  AVISO: não consegui ler thumbnails da planilha antiga: {e}")
-        return {}
+    rows = None
+    last_err = None
+    for attempt in range(4):
+        try:
+            gc = _get_client()
+            rows = gc.open_by_key(ADS_SHEET_ID).worksheet(ADS_TAB_NAME).get_all_values()
+            break
+        except Exception as e:
+            last_err = e
+            wait = 3 * (attempt + 1)
+            print(f"  AVISO: read de thumbnails falhou (tentativa {attempt+1}/4): {e}. Retry em {wait}s.")
+            time.sleep(wait)
+
+    if rows is None:
+        snap = _load_thumbs_snapshot()
+        print(f"  FALLBACK: usando snapshot de thumbnails ({len(snap)} anúncios). Último erro: {last_err}")
+        return snap
+
     if len(rows) < 2:
-        return {}
+        return _load_thumbs_snapshot()
+
     header = [h.strip().lower() for h in rows[0]]
     try:
         iAd = header.index("ad name")
         iTh = header.index("creative thumbnail")
     except ValueError:
-        print("  AVISO: colunas 'Ad Name'/'Creative Thumbnail' não encontradas na planilha antiga.")
-        return {}
+        print("  AVISO: colunas 'Ad Name'/'Creative Thumbnail' não encontradas. Usando snapshot.")
+        return _load_thumbs_snapshot()
+
     thumbs = {}
     for r in rows[1:]:
         if len(r) <= max(iAd, iTh):
@@ -324,8 +356,35 @@ def _get_creative_thumbnails():
         th = r[iTh].strip()
         if ad and th.startswith("http"):
             thumbs[ad] = th  # linhas em ordem cronológica → última (mais recente) vence
-    print(f"  Thumbnails de criativo (planilha antiga): {len(thumbs)} anúncios.")
-    return thumbs
+
+    if thumbs:
+        _save_thumbs_snapshot(thumbs)
+        print(f"  Thumbnails de criativo (planilha antiga): {len(thumbs)} anúncios.")
+        return thumbs
+
+    # leu mas veio vazio (planilha sem coluna preenchida?) → não regride, usa snapshot
+    print("  AVISO: planilha antiga sem thumbnails preenchidos. Usando snapshot.")
+    return _load_thumbs_snapshot()
+
+
+def _load_thumbs_snapshot():
+    try:
+        with open(THUMBS_SNAPSHOT_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+    except Exception as e:
+        print(f"  AVISO: não consegui ler snapshot de thumbnails: {e}")
+        return {}
+
+
+def _save_thumbs_snapshot(thumbs):
+    try:
+        os.makedirs(os.path.dirname(THUMBS_SNAPSHOT_FILE), exist_ok=True)
+        with open(THUMBS_SNAPSHOT_FILE, "w", encoding="utf-8") as f:
+            json.dump(thumbs, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"  AVISO: não consegui salvar snapshot de thumbnails: {e}")
 
 
 def get_meta_ads_sheet_data():
