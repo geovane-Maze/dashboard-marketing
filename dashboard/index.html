@@ -2640,19 +2640,25 @@ function downloadRelatorioResumidoPDF() {
 
 // ─── SECTION: EXECUTIVO ───────────────────────────────────────────────────────
 const FUNNEL_ORDER = [
-  // Funil atual (11 etapas)
+  // Funil atual do RD (12 etapas) — ordem oficial
   'entrada de lead',
+  'tentativa de contato',
+  'qualificação', 'qualificacao',
+  'qualificado não agendada', 'qualificado nao agendada',
+  '1ª reunião agendada', '1a reunião agendada', '1ª reuniao agendada', 'reunião pdf', 'reuniao pdf', 'reunião de pdf',
+  '1ª reunião realizada', '1a reunião realizada', '1ª reuniao realizada',
+  'reunião de bp agendada', 'reuniao de bp agendada',
+  'reunião de bp realizada', 'reuniao de bp realizada',
+  'envio de cof',
+  'visita / reunião com jamil', 'visita / reuniao com jamil',
+  'análise financeira/jurídica', 'analise financeira/juridica', 'análise financeira', 'analise financeira',
+  'comitê final', 'comite final',
+  // Etapas legadas/planejadas (dados históricos — aparecem ao final)
   'tentativa de conexão', 'tentativa de conexao',
   'lead respondente',
   'prospect', 'pré-qualificado', 'pre-qualificado',
-  '1ª reunião agendada', '1a reunião agendada', 'reunião pdf', 'reuniao pdf', 'reunião de pdf',
-  '1ª reunião realizada', '1a reunião realizada',
   'apresentação do business plan', 'apresentacao do business plan',
-  'envio de cof',
   'workshop',
-  'análise financeira/jurídica', 'analise financeira/juridica', 'análise financeira', 'analise financeira',
-  'comitê final', 'comite final',
-  // Etapas legadas (dados históricos — aparecem ao final)
   'aprovação final', 'aprovacao final',
   'contato inicial', 'nutrição 1', 'nutricao 1', 'nutrição 2', 'nutricao 2',
 ];
@@ -2751,7 +2757,7 @@ function renderExecutivo() {
   </div>`).join('');
 
   // CPQ — Custo por Lead Qualificado (chegaram em "1ª Reunião Agendada")
-  const _ORDQ = ['entrada de lead', 'tentativa de conexão', 'lead respondente', 'prospect', '1ª reunião agendada', '1ª reunião realizada', 'apresentação do business plan', 'envio de cof', 'workshop', 'análise financeira', 'comitê final'];
+  const _ORDQ = ['entrada de lead', 'tentativa de contato', 'qualificação', 'qualificado não agendada', '1ª reunião agendada', '1ª reunião realizada', 'reunião de bp agendada', 'reunião de bp realizada', 'envio de cof', 'visita / reunião com jamil', 'análise financeira', 'comitê final'];
   const _idxQ = (e) => { const el = (e || '').toLowerCase().trim(); for (let i = 0; i < _ORDQ.length; i++) { const s = _ORDQ[i]; if (el === s || el.includes(s) || s.includes(el)) return i; } return -1; };
   const qualificados = (DATA.crm.deals_minimal || []).filter(d => (!datePred || datePred(d.criado_em)) && _idxQ(d.etapa) >= 4).length;
   const cpq = qualificados > 0 ? totalInvestido / qualificados : 0;
@@ -2794,7 +2800,7 @@ function renderExecutivo() {
     return null;
   };
   // Funil do período — deals que passaram em cada etapa (filtra por data de CRIAÇÃO)
-  const FUNIL_STAGES = ['Entrada de Lead', 'Tentativa de Conexão', 'Lead Respondente', 'Prospect', '1ª Reunião Agendada', '1ª Reunião Realizada', 'Apresentação do Business Plan', 'Envio de COF', 'Workshop', 'Análise Financeira/Jurídica', 'Comitê Final'];
+  const FUNIL_STAGES = ['Entrada de Lead', 'Tentativa de Contato', 'Qualificação', 'Qualificado Não agendada', '1ª Reunião Agendada', '1ª Reunião Realizada', 'Reunião de BP Agendada', 'Reunião de BP Realizada', 'Envio de COF', 'Visita / Reunião com Jamil', 'Análise Financeira/Jurídica', 'Comitê Final'];
   const stageIdxOf = (etapa) => {
     const el = (etapa || '').toLowerCase().trim();
     for (let i = 0; i < FUNIL_STAGES.length; i++) {
@@ -2828,7 +2834,7 @@ function renderExecutivo() {
     return { realizada: real, noshow: ns };
   };
   const mApres = meetTot('r1'); mApres.agendada = passedOf('1ª Reunião Agendada');
-  const mBP = meetTot('r2'); mBP.agendada = passedOf('Apresentação do Business Plan');
+  const mBP = meetTot('r2'); mBP.agendada = passedOf('Reunião de BP Agendada');
   const meetBlock = (titulo, icon, bg, m) => `
     <div class="ads-group">
       <div class="ads-group-header" style="background:${bg}">${icon} ${titulo}</div>
@@ -2916,7 +2922,7 @@ function renderExecutivo() {
 
   // ── Blocos 5 e 6: Perdas por Etapa do Funil (popup por plataforma / por motivo) ──
   const lossesPeriodo = (crm.losses_daily || []).filter(r => !datePred || datePred(r.criado || r.data));
-  const ORDER_FUNIL = ['entrada de lead', 'tentativa de conexão', 'lead respondente', 'prospect', 'pré-qualificado', '1ª reunião agendada', 'reunião pdf', '1ª reunião realizada', 'apresentação do business plan', 'envio de cof', 'workshop', 'análise financeira', 'comitê final', 'comite final'];
+  const ORDER_FUNIL = ['entrada de lead', 'tentativa de contato', 'qualificação', 'qualificado não agendada', '1ª reunião agendada', 'reunião pdf', '1ª reunião realizada', 'reunião de bp agendada', 'reunião de bp realizada', 'envio de cof', 'visita / reunião com jamil', 'análise financeira', 'comitê final', 'comite final', 'tentativa de conexão', 'lead respondente', 'prospect', 'apresentação do business plan', 'workshop'];
   const PLAT_OF = (src) => src === 'googlecpc' ? 'Google' : (src === 'metaads' ? 'Meta' : 'Orgânico / Outro');
   const PLAT_COLOR = { 'Google': '#4285F4', 'Meta': '#1877F2', 'Orgânico / Outro': '#16a085' };
   function buildLossFunnel(containerId, mode) {
@@ -3087,7 +3093,7 @@ function renderEvolucao() {
           backgroundColor: COLORS.orange + 'CC', borderRadius: 4
         },
         {
-          label: 'Apresentação do Business Plan',
+          label: 'Reunião de BP Agendada',
           data: allMesesEvo.map(m => (stagesMonthMap[m] || {}).apresentacao_bp || 0),
           backgroundColor: COLORS.green + 'CC', borderRadius: 4
         },
@@ -3201,7 +3207,7 @@ function renderCRM() {
     return s ? s.total : 0;
   }
   const reuniaoPDFCount  = stageCount('1ª Reunião Agendada');
-  const apresentacaoBP   = stageCount('Apresentação do Business Plan');
+  const apresentacaoBP   = stageCount('Reunião de BP Agendada');
   const workshopCount    = stageCount('Workshop');
 
   // ── Investimento total no período (Meta + Google) ──────────────────────────
@@ -3239,7 +3245,7 @@ function renderCRM() {
     { label: 'Total de Negócios',             value: fmt.num(crm.total_deals),         sub: 'no CRM',                          cls: ''       },
     { label: 'Negócios Abertos',              value: fmt.num(crm.total_open),          sub: 'em andamento',                    cls: 'blue'   },
     { label: '1ª Reunião Agendada',           value: fmt.num(reuniaoPDFCount),         sub: 'leads nesta etapa',               cls: 'blue'   },
-    { label: 'Apresentação do Business Plan', value: fmt.num(apresentacaoBP),          sub: 'leads nesta etapa',               cls: 'teal'   },
+    { label: 'Reunião de BP Agendada',        value: fmt.num(apresentacaoBP),          sub: 'leads nesta etapa',               cls: 'teal'   },
     // ── Linha 2: Eficiência e perdas ──────────────────────────────────────────
     { label: 'Workshop',                          value: fmt.num(workshopCount),       sub: 'leads nesta etapa',               cls: 'purple' },
     { label: 'Custo por Lead — Reun. Agendada',   value: fmt.currency(custoReuniaoAgendada), sub: 'invest. ÷ reun. agendadas',  cls: 'orange' },
@@ -3278,7 +3284,7 @@ function renderCRM() {
   // ── Mega-funil de conversão do CRM ─────────────────────────────────────────
   (function renderCrmMegaFunnel() {
     const dPred = getDateFilter();
-    const STAGES = ['Entrada de Lead', 'Tentativa de Conexão', 'Lead Respondente', 'Prospect', '1ª Reunião Agendada', '1ª Reunião Realizada', 'Apresentação do Business Plan', 'Envio de COF', 'Workshop', 'Análise Financeira/Jurídica', 'Comitê Final'];
+    const STAGES = ['Entrada de Lead', 'Tentativa de Contato', 'Qualificação', 'Qualificado Não agendada', '1ª Reunião Agendada', '1ª Reunião Realizada', 'Reunião de BP Agendada', 'Reunião de BP Realizada', 'Envio de COF', 'Visita / Reunião com Jamil', 'Análise Financeira/Jurídica', 'Comitê Final'];
     const sIdx = (e) => {
       const el = (e || '').toLowerCase().trim();
       for (let i = 0; i < STAGES.length; i++) {
@@ -4201,10 +4207,10 @@ function renderCreatives() {
     } else {
       // Ordem das etapas para mini-funil
       const STAGES_ORDER = [
-        'Entrada de Lead', 'Tentativa de Conexão', 'Lead Respondente',
-        'Prospect', '1ª Reunião Agendada', '1ª Reunião Realizada',
-        'Apresentação do Business Plan', 'Envio de COF', 'Workshop',
-        'Análise Financeira/Jurídica', 'Comitê Final'
+        'Entrada de Lead', 'Tentativa de Contato', 'Qualificação',
+        'Qualificado Não agendada', '1ª Reunião Agendada', '1ª Reunião Realizada',
+        'Reunião de BP Agendada', 'Reunião de BP Realizada', 'Envio de COF',
+        'Visita / Reunião com Jamil', 'Análise Financeira/Jurídica', 'Comitê Final'
       ];
       const QUALIFIED_FROM = 4; // 1ª Reunião Agendada em diante
 

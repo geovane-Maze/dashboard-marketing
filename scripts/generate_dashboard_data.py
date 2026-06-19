@@ -89,7 +89,6 @@ def apply_imports_backfill(leads, backfill):
         entry = backfill.get(str(lead.get("id", "")).strip())
         if not entry:
             continue
-        lead["_importado"] = True   # marca origem = base importada de outro CRM
         if entry.get("criado_em"):
             lead["criado_em"] = entry["criado_em"]
             n_data += 1
@@ -575,9 +574,8 @@ def aggregate_leads(leads):
     monthly = defaultdict(lambda: {
         "total": 0, "qualificados": 0,
         "pago": 0, "organico": 0, "googlecpc": 0, "metaads": 0,
-        "importados": 0,
     })
-    daily = defaultdict(lambda: {"total": 0, "qualificados": 0, "importados": 0})
+    daily = defaultdict(lambda: {"total": 0, "qualificados": 0})
     by_source = defaultdict(int)
     by_canal = defaultdict(int)
     by_lifecycle = defaultdict(int)
@@ -595,13 +593,10 @@ def aggregate_leads(leads):
         qualif = "qualif" in lc or "mql" in lc
 
         src_norm = (lead.get("utm_source") or "").strip()
-        importado = bool(lead.get("_importado"))
         if mes:
             monthly[mes]["total"] += 1
             if qualif:
                 monthly[mes]["qualificados"] += 1
-            if importado:
-                monthly[mes]["importados"] += 1
             # Split pago/orgânico por mês (mesma regra do dashboard: pago = googlecpc/metaads).
             # Reflete o backfill dos leads importados (fonte real recuperada do export).
             if src_norm == "googlecpc":
@@ -616,8 +611,6 @@ def aggregate_leads(leads):
             daily[dia]["total"] += 1
             if qualif:
                 daily[dia]["qualificados"] += 1
-            if importado:
-                daily[dia]["importados"] += 1
 
         src = lead.get("utm_source") or lead.get("canal") or "direto"
         by_source[src] += 1
