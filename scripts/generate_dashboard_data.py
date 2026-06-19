@@ -1989,6 +1989,225 @@ def aggregate_meetings(deals):
     }
 
 
+# ════════════════════════════════════════════════════════════════════
+# LEADS SCORING CLOSER — leads em etapas avançadas (de "Reunião de BP
+# Realizada" em diante), com score de prioridade para o closer.
+# ════════════════════════════════════════════════════════════════════
+SCORING_FROM_STAGE = 'reunião de bp realizada'   # filtro: desta etapa em diante
+
+# Pontos por etapa (mais avançado = mais perto do fechamento)
+_STAGE_PTS = [
+    ('reunião de bp realizada', 150),
+    ('envio de cof',            200),
+    ('visita / reunião com jamil', 220),
+    ('análise financeira',      240),
+    ('comitê final',            250),
+]
+
+
+def _capital_to_num(s):
+    """Extrai o valor em R$ de strings tipo 'R$ 770.000,00 (Setecentos...)'."""
+    if not s:
+        return None
+    m = re.search(r'(\d[\d\.]*,?\d*)', str(s).replace(' ', ''))
+    if not m:
+        return None
+    try:
+        return float(m.group(1).replace('.', '').replace(',', '.'))
+    except ValueError:
+        return None
+
+
+def _pts_etapa(etapa):
+    el = (etapa or '').lower().strip()
+    pts = 150
+    for name, p in _STAGE_PTS:
+        if name in el or el in name:
+            pts = p
+    return pts
+
+
+def _pts_capital(cap):
+    if cap is None:
+        return 0
+    if cap >= 760000:
+        return 200
+    if cap >= 500000:
+        return 150
+    if cap >= 300000:
+        return 100
+    return 60
+
+
+def _pts_prazo(prazo):
+    p = (prazo or '').lower()
+    if not p:
+        return 40
+    if 'imediat' in p or '0 a 3' in p or 'até 3' in p or 'ate 3' in p:
+        return 150
+    if '3 a 6' in p:
+        return 120
+    if '6 a 12' in p:
+        return 90
+    if 'acima' in p or 'mais de' in p or '12 a' in p:
+        return 60
+    return 70
+
+
+def _pts_engajamento(interacoes, r1, r2, fpq):
+    try:
+        n = int(float(interacoes or 0))
+    except (ValueError, TypeError):
+        n = 0
+    pts = min(n * 6, 90)
+    if (r1 or '').strip():
+        pts += 20
+    if (r2 or '').strip():
+        pts += 20
+    if 'sim' in (fpq or '').lower():
+        pts += 20
+    return min(pts, 150)
+
+
+def _pts_recencia(dias):
+    if dias is None:
+        return 30
+    if dias <= 7:
+        return 100
+    if dias <= 15:
+        return 80
+    if dias <= 30:
+        return 55
+    if dias <= 60:
+        return 30
+    return 15
+
+
+def _classificacao(total):
+    if total >= 800:
+        return ('Excelente', 5)
+    if total >= 650:
+        return ('Bom', 4)
+    if total >= 500:
+        return ('Regular', 3)
+    return ('Frio', 2)
+
+
+def build_leads_scoring_closer(crm_deals, leads, tarefas, atividades):
+    """
+    Lista de leads em etapas avançadas (de SCORING_FROM_STAGE em diante) com
+    score de prioridade para o closer. Cruza com `leads` (cidade/capital/prazo),
+    `crm_tarefas` (próxima tarefa) e `crm_atividades` (último contato).
+    """
+    order_idx = {name: i for i, name in enumerate([
+        'entrada de lead', 'tentativa de contato', 'qualificação',
+        'qualificado não agendada', '1ª reunião agendada', '1ª reunião realizada',
+        'reunião de bp agendada', 'reunião de bp realizada', 'envio de cof',
+        'visita / reunião com jamil', 'análise financeira/jurídica', 'comitê final',
+    ])}
+
+    def stage_pos(etapa):
+        el = (etapa or '').lower().strip()
+        for name, i in order_idx.items():
+            if el == name or el in name or name in el:
+                return i
+        return -1
+
+    from_pos = order_idx[SCORING_FROM_STAGE]
+    leads_by_email = {(l.get('email') or '').strip().lower(): l for l in leads}
+
+    # Índices de tarefas/atividades por deal
+    tar_by_deal = defaultdict(list)
+    for t in (tarefas or []):
+        if t.get('deal_id'):
+            tar_by_deal[t['deal_id']].append(t)
+    ativ_by_deal = defaultdict(list)
+    for a in (atividades or []):
+        if a.get('deal_id'):
+            ativ_by_deal[a['deal_id']].append(a)
+
+    now = datetime.now()
+    out = []
+    for d in crm_deals:
+        if stage_pos(d.get('etapa')) < from_pos:
+            continue
+        email = (d.get('contato_email') or '').strip().lower()
+        lead = leads_by_email.get(email, {})
+        cap_raw = lead.get('capital_disponivel') or ''
+        cap_num = _capital_to_num(cap_raw)
+        prazo = lead.get('prazo_abertura') or ''
+        cidade = lead.get('cidade') or ''
+        estado = lead.get('estado') or ''
+
+        # Próxima tarefa (aberta, mais próxima)
+        abertas = [t for t in tar_by_deal.get(d['id'], []) if (t.get('status') or '').lower() == 'open']
+        abertas.sort(key=lambda t: t.get('data') or '9999')
+        prox = abertas[0] if abertas else None
+        proxima_tarefa = None
+        if prox:
+            proxima_tarefa = {
+                "assunto": prox.get('assunto') or 'Tarefa',
+                "data": (prox.get('data') or '')[:10],
+                "responsavel": prox.get('responsavel') or '',
+            }
+
+        # Último contato (data mais recente entre atividades e tarefas concluídas)
+        datas = [a.get('data') for a in ativ_by_deal.get(d['id'], []) if a.get('data')]
+        datas += [t.get('data_conclusao') for t in tar_by_deal.get(d['id'], []) if t.get('data_conclusao')]
+        ultimo = max(datas) if datas else (d.get('atualizado_em') or '')
+        dias_ult = None
+        ult_dt = _parse_dt(ultimo)
+        if ult_dt:
+            dias_ult = (now - ult_dt).days
+
+        pts = {
+            "etapa":       _pts_etapa(d.get('etapa')),
+            "capital":     _pts_capital(cap_num),
+            "prazo":       _pts_prazo(prazo),
+            "engajamento": _pts_engajamento(d.get('interacoes'), d.get('reuniao_1'), d.get('reuniao_2'), d.get('fpq')),
+            "recencia":    _pts_recencia(dias_ult),
+            "dados":       _pts_dados([d.get('contato_telefone'), email, cidade, cap_raw, prazo, d.get('fonte')]),
+        }
+        total = sum(pts.values())
+        classif, estrelas = _classificacao(total)
+
+        out.append({
+            "id": d.get('id'),
+            "nome": d.get('nome') or d.get('contato_nome') or 'Sem nome',
+            "etapa": normalize_etapa(d.get('etapa')),
+            "cidade": cidade,
+            "estado": estado,
+            "capital": cap_raw,
+            "prazo": prazo,
+            "reuniao_1": d.get('reuniao_1') or '',
+            "business_plan": d.get('reuniao_2') or '',
+            "fpq": d.get('fpq') or '',
+            "proxima_tarefa": proxima_tarefa,
+            "ultimo_contato": (ultimo or '')[:10],
+            "interacoes": d.get('interacoes') or '0',
+            "pts": pts,
+            "score_total": total,
+            "classificacao": classif,
+            "estrelas": estrelas,
+            "fonte": d.get('fonte') or '',
+            "campanha": d.get('campanha') or '',
+            "telefone": d.get('contato_telefone') or '',
+            "email": d.get('contato_email') or '',
+            "responsavel": d.get('responsavel') or '',
+        })
+
+    out.sort(key=lambda x: -x['score_total'])
+    for i, item in enumerate(out):
+        item['ranking'] = i + 1
+    print(f"  Leads Scoring Closer: {len(out)} leads (de '{SCORING_FROM_STAGE}' em diante).")
+    return out
+
+
+def _pts_dados(campos):
+    filled = sum(1 for c in campos if (c or '').strip())
+    return min(filled * 25, 150)
+
+
 def main():
     print("Gerando dados do dashboard...")
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -2003,6 +2222,16 @@ def main():
     print("  Lendo CRM deals...")
     crm_deals = read_sheet(gc, "crm_deals")
     crm_deals = dedupe_by_id(crm_deals, "crm_deals")
+
+    print("  Lendo CRM tarefas/atividades (scoring closer)...")
+    try:
+        crm_tarefas = read_sheet(gc, "crm_tarefas")
+    except Exception as e:
+        print(f"  AVISO: crm_tarefas indisponível: {e}"); crm_tarefas = []
+    try:
+        crm_atividades = read_sheet(gc, "crm_atividades")
+    except Exception as e:
+        print(f"  AVISO: crm_atividades indisponível: {e}"); crm_atividades = []
 
 
     print("  Lendo Meta Ads...")
@@ -2084,6 +2313,7 @@ def main():
         "creative_quality": creative_quality,
         "previsibilidade": previsibilidade_data,
         "relatorio": build_relatorio(leads, crm_agg, meta_agg, google_agg, utm_agg, meta_rows=meta_ads, meetings_agg=meetings_agg),
+        "scoring_closer": build_leads_scoring_closer(crm_deals, leads, crm_tarefas, crm_atividades),
     }
 
     output_file = os.path.join(OUTPUT_DIR, "summary.json")

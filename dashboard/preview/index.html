@@ -1383,7 +1383,12 @@
 
     <!-- FUNIL CRM -->
     <div id="sec-crm" class="section">
-      <div class="section-title">Funil CRM</div>
+      <div class="crm-tabs">
+        <button class="crm-tab active" data-crmtab="funil" onclick="switchCrmTab('funil')">Funil CRM</button>
+        <button class="crm-tab" data-crmtab="scoring" onclick="switchCrmTab('scoring')">Leads Scoring Closer</button>
+      </div>
+
+      <div id="crm-view-funil">
       <div class="kpi-grid-crm" id="kpi-crm"></div>
 
       <!-- Funil visual do CRM (mega-funil) -->
@@ -1457,6 +1462,66 @@
           <thead><tr><th>Data (criação)</th><th>Cliente</th><th>Responsável</th><th>1ª Reunião</th><th>2ª Reunião</th><th>Justificativa No-Show</th></tr></thead>
           <tbody id="table-meetings"></tbody>
         </table>
+      </div>
+      </div><!-- /crm-view-funil -->
+
+      <!-- ══ ABA: LEADS SCORING CLOSER ══ -->
+      <div id="crm-view-scoring" style="display:none;">
+        <style>
+          .crm-tabs{display:flex;gap:6px;border-bottom:2px solid #e2e8f0;margin-bottom:22px;}
+          .crm-tab{background:none;border:none;padding:10px 18px;font-size:15px;font-weight:700;color:#94a3b8;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:.15s;}
+          .crm-tab:hover{color:#475569;}
+          .crm-tab.active{color:var(--primary,#0f2837);border-bottom-color:var(--secondary,#2563eb);}
+          .sc-card{background:#fff;border:1px solid #e9eef5;border-radius:16px;padding:20px 22px;margin-bottom:18px;box-shadow:0 4px 18px rgba(15,40,55,.06);}
+          .sc-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+          .sc-rank{width:54px;height:54px;border-radius:14px;background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;flex-shrink:0;}
+          .sc-rank small{font-size:9px;font-weight:600;opacity:.85;text-transform:uppercase;}
+          .sc-rank b{font-size:20px;line-height:1;}
+          .sc-avatar{width:54px;height:54px;border-radius:50%;background:#e0e7ff;color:#3730a3;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;flex-shrink:0;}
+          .sc-id{flex:1;min-width:180px;}
+          .sc-name{font-size:17px;font-weight:800;color:#1e293b;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+          .sc-badge-qual{font-size:9px;font-weight:700;background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.03em;}
+          .sc-contact{font-size:12px;color:#64748b;margin-top:4px;}
+          .sc-contact span{margin-right:14px;white-space:nowrap;}
+          .sc-scorebox{text-align:center;padding:0 14px;}
+          .sc-scorebox .v{font-size:30px;font-weight:800;color:#2563eb;line-height:1;}
+          .sc-scorebox .l{font-size:10px;color:#94a3b8;text-transform:uppercase;}
+          .sc-class{text-align:center;min-width:96px;}
+          .sc-class .tag{display:inline-block;font-size:12px;font-weight:800;padding:4px 14px;border-radius:20px;}
+          .sc-class .stars{color:#f59e0b;font-size:13px;margin-top:4px;letter-spacing:1px;}
+          .sc-source{font-size:11px;color:#64748b;border-left:1px solid #eef2f7;padding-left:16px;min-width:120px;}
+          .sc-source b{color:#334155;display:block;font-size:12px;margin-bottom:2px;}
+          .sc-stepper{display:flex;align-items:flex-start;margin:20px 0 4px;overflow-x:auto;padding-bottom:6px;}
+          .sc-step{display:flex;flex-direction:column;align-items:center;font-size:10px;color:#94a3b8;min-width:78px;position:relative;text-align:center;}
+          .sc-step .dot{width:30px;height:30px;border-radius:50%;background:#f1f5f9;border:2px solid #e2e8f0;display:flex;align-items:center;justify-content:center;font-size:13px;margin-bottom:6px;color:#94a3b8;z-index:1;}
+          .sc-step.done .dot{background:#dbeafe;border-color:#3b82f6;color:#1d4ed8;}
+          .sc-step.current .dot{background:#2563eb;border-color:#2563eb;color:#fff;box-shadow:0 0 0 4px #dbeafe;}
+          .sc-step.current{color:#1d4ed8;font-weight:700;}
+          .sc-step:not(:last-child)::after{content:'';position:absolute;top:15px;left:50%;width:100%;height:2px;background:#e2e8f0;z-index:0;}
+          .sc-step.done:not(:last-child)::after{background:#3b82f6;}
+          .sc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:16px 0;padding:14px 0;border-top:1px solid #f1f5f9;border-bottom:1px solid #f1f5f9;}
+          .sc-field .k{font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.03em;}
+          .sc-field .v{font-size:13px;color:#334155;font-weight:600;margin-top:2px;}
+          .sc-yes{color:#16a34a;font-weight:700;} .sc-no{color:#dc2626;font-weight:700;} .sc-na{color:#94a3b8;}
+          .sc-pts{display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin:16px 0;}
+          @media(max-width:900px){.sc-pts{grid-template-columns:repeat(4,1fr);}}
+          .sc-pt{background:#f8fafc;border-radius:10px;padding:10px 8px;text-align:center;}
+          .sc-pt .ic{font-size:15px;}
+          .sc-pt .v{font-size:17px;font-weight:800;color:#334155;}
+          .sc-pt .l{font-size:9px;color:#94a3b8;text-transform:uppercase;}
+          .sc-pt.total{background:#eef2ff;}
+          .sc-pt.total .v{color:#4338ca;}
+          .sc-notes{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px;}
+          @media(max-width:760px){.sc-notes{grid-template-columns:1fr;}}
+          .sc-note{background:#fafbfc;border:1px dashed #d8e0ea;border-radius:10px;padding:12px 14px;}
+          .sc-note h5{margin:0 0 6px;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.03em;}
+          .sc-note .empty{font-size:12px;color:#b0bac6;font-style:italic;}
+        </style>
+        <p style="font-size:13px;color:#64748b;margin:0 0 18px;">
+          Leads em etapas avançadas — <strong>a partir de "Reunião de BP Realizada"</strong> — rankeados por score de prioridade para o closer.
+          <span id="scoring-count" style="color:#94a3b8;"></span>
+        </p>
+        <div id="scoring-cards"></div>
       </div>
     </div>
 
@@ -3542,6 +3607,87 @@ function renderCRM() {
         }).join('')
       : '<tr><td colspan="6" class="empty">Sem reuniões registradas no período selecionado.</td></tr>';
   }
+
+  renderScoringCloser();
+}
+
+// ─── ABA: Leads Scoring Closer ────────────────────────────────────────────────
+function switchCrmTab(tab) {
+  document.querySelectorAll('.crm-tab').forEach(b => b.classList.toggle('active', b.dataset.crmtab === tab));
+  document.getElementById('crm-view-funil').style.display   = tab === 'funil'   ? '' : 'none';
+  document.getElementById('crm-view-scoring').style.display = tab === 'scoring' ? '' : 'none';
+}
+
+function renderScoringCloser() {
+  const cont = document.getElementById('scoring-cards');
+  if (!cont) return;
+  const list = DATA.scoring_closer || [];
+  const cntEl = document.getElementById('scoring-count');
+  if (cntEl) cntEl.textContent = list.length ? `· ${list.length} leads` : '';
+  if (!list.length) {
+    cont.innerHTML = '<p style="color:#94a3b8;padding:40px;text-align:center;">Nenhum lead em etapa avançada no momento.</p>';
+    return;
+  }
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const STEP = ['1ª Reunião Agendada', '1ª Reunião Realizada', 'Reunião de BP Agendada', 'Reunião de BP Realizada', 'Envio de COF', 'Visita / Reunião com Jamil', 'Análise Financeira/Jurídica', 'Comitê Final'];
+  const SHORT = ['Reun. 1 Agend.', 'Reun. 1 Real.', 'BP Agendada', 'BP Realizada', 'Envio COF', 'Visita Jamil', 'Análise', 'Comitê'];
+  const stepIdx = e => { const el = (e || '').toLowerCase(); for (let i = 0; i < STEP.length; i++) { const s = STEP[i].toLowerCase(); if (el === s || el.includes(s) || s.includes(el)) return i; } return -1; };
+  const initials = n => (n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
+  const cColor = c => c === 'Excelente' ? { bg: '#dcfce7', fg: '#15803d' } : c === 'Bom' ? { bg: '#dbeafe', fg: '#1d4ed8' } : c === 'Regular' ? { bg: '#fef9c3', fg: '#a16207' } : { bg: '#fee2e2', fg: '#b91c1c' };
+  const yn = v => { const s = (v || '').trim().toLowerCase(); if (!s) return '<span class="sc-na">—</span>'; if (s === 'não' || s === 'nao') return '<span class="sc-no">✗ Não</span>'; return `<span class="sc-yes">✔ ${esc(v)}</span>`; };
+  const fmtDate = d => d ? String(d).split('-').reverse().join('/') : '—';
+  const IC = { etapa: '🎯', capital: '💰', prazo: '📅', engajamento: '📈', recencia: '⏱️', dados: '🗂️' };
+  const LB = { etapa: 'Pts Etapa', capital: 'Pts Capital', prazo: 'Pts Prazo', engajamento: 'Pts Engaj.', recencia: 'Pts Recência', dados: 'Pts Dados' };
+
+  cont.innerHTML = list.map(x => {
+    const cur = stepIdx(x.etapa);
+    const steps = STEP.map((s, i) => {
+      const cls = i < cur ? 'done' : i === cur ? 'current' : '';
+      const ic = i < cur ? '✓' : (i === cur ? '◉' : '○');
+      return `<div class="sc-step ${cls}"><div class="dot">${ic}</div>${SHORT[i]}</div>`;
+    }).join('');
+    const cc = cColor(x.classificacao);
+    const stars = '★'.repeat(x.estrelas) + '☆'.repeat(5 - x.estrelas);
+    const pts = ['etapa', 'capital', 'prazo', 'engajamento', 'recencia', 'dados']
+      .map(k => `<div class="sc-pt"><div class="ic">${IC[k]}</div><div class="v">${x.pts[k]}</div><div class="l">${LB[k]}</div></div>`).join('');
+    const prox = x.proxima_tarefa
+      ? `${esc(x.proxima_tarefa.assunto)} · ${fmtDate(x.proxima_tarefa.data)}${x.proxima_tarefa.responsavel ? ' · ' + esc(x.proxima_tarefa.responsavel) : ''}`
+      : '<span class="sc-na">Sem tarefa aberta</span>';
+    const fonteCanal = (x.fonte || '').split('|')[0].trim() || '—';
+    const capShort = (x.capital || '').split('(')[0].trim();
+    return `
+    <div class="sc-card">
+      <div class="sc-head">
+        <div class="sc-rank"><small>Rank</small><b>#${x.ranking}</b></div>
+        <div class="sc-avatar">${esc(initials(x.nome))}</div>
+        <div class="sc-id">
+          <div class="sc-name">${esc(x.nome)} <span class="sc-badge-qual">Lead Qualificado</span></div>
+          <div class="sc-contact"><span>📞 ${esc(x.telefone) || '—'}</span><span>✉ ${esc(x.email) || '—'}</span></div>
+        </div>
+        <div class="sc-scorebox"><div class="v">${x.score_total}</div><div class="l">de 1.000 pts</div></div>
+        <div class="sc-class"><span class="tag" style="background:${cc.bg};color:${cc.fg};">${esc(x.classificacao)}</span><div class="stars">${stars}</div></div>
+        <div class="sc-source"><b>Fonte</b>${esc(fonteCanal)}${x.campanha ? '<br>' + esc(x.campanha.slice(0, 38)) : ''}</div>
+      </div>
+      <div class="sc-stepper">${steps}</div>
+      <div class="sc-grid">
+        <div class="sc-field"><div class="k">Etapa atual</div><div class="v">${esc(x.etapa)}</div></div>
+        <div class="sc-field"><div class="k">Cidade</div><div class="v">${esc(x.cidade) || '—'}${x.estado ? ' / ' + esc(x.estado) : ''}</div></div>
+        <div class="sc-field"><div class="k">Capital informado</div><div class="v">${capShort ? esc(capShort) : '<span class="sc-na">—</span>'}</div></div>
+        <div class="sc-field"><div class="k">Prazo de abertura</div><div class="v">${esc(x.prazo) || '—'}</div></div>
+        <div class="sc-field"><div class="k">1ª Reunião</div><div class="v">${yn(x.reuniao_1)}</div></div>
+        <div class="sc-field"><div class="k">Business Plan</div><div class="v">${yn(x.business_plan)}</div></div>
+        <div class="sc-field"><div class="k">FPQ</div><div class="v">${yn(x.fpq)}</div></div>
+        <div class="sc-field"><div class="k">Interações</div><div class="v">${esc(x.interacoes)}</div></div>
+        <div class="sc-field"><div class="k">Próxima tarefa</div><div class="v">${prox}</div></div>
+        <div class="sc-field"><div class="k">Último contato</div><div class="v">${fmtDate(x.ultimo_contato)}</div></div>
+      </div>
+      <div class="sc-pts">${pts}<div class="sc-pt total"><div class="ic">🏆</div><div class="v">${x.score_total}</div><div class="l">Score Total</div></div></div>
+      <div class="sc-notes">
+        <div class="sc-note"><h5>📝 Comentários internos</h5><div class="empty">Campo manual — sem conteúdo exportado do RD.</div></div>
+        <div class="sc-note"><h5>💬 Resumo das conversas mais relevantes</h5><div class="empty">Campo manual — o RD não exporta o conteúdo das conversas.</div></div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // ─── SECTION: PERDAS ──────────────────────────────────────────────────────────
