@@ -3288,7 +3288,7 @@ function renderCRM() {
   }
   const reuniaoPDFCount  = stageCount('1ª Reunião Agendada');
   const apresentacaoBP   = stageCount('Reunião de BP Agendada');
-  const workshopCount    = stageCount('Workshop');
+  const visitaJamilCount = stageCount('Visita / Reunião com Jamil');
 
   // ── Investimento total no período (Meta + Google) ──────────────────────────
   const metaMonthly   = getMetaMonthly(pred);
@@ -3327,7 +3327,7 @@ function renderCRM() {
     { label: '1ª Reunião Agendada',           value: fmt.num(reuniaoPDFCount),         sub: 'leads nesta etapa',               cls: 'blue'   },
     { label: 'Reunião de BP Agendada',        value: fmt.num(apresentacaoBP),          sub: 'leads nesta etapa',               cls: 'teal'   },
     // ── Linha 2: Eficiência e perdas ──────────────────────────────────────────
-    { label: 'Workshop',                          value: fmt.num(workshopCount),       sub: 'leads nesta etapa',               cls: 'purple' },
+    { label: 'Visita / Reunião com Jamil',        value: fmt.num(visitaJamilCount),    sub: 'leads nesta etapa',               cls: 'purple' },
     { label: 'Custo por Lead — Reun. Agendada',   value: fmt.currency(custoReuniaoAgendada), sub: 'invest. ÷ reun. agendadas',  cls: 'orange' },
     { label: 'Taxa de No-Show',                   value: fmt.pct(taxaNoShow),          sub: 'no-show ÷ reun. agendadas',       cls: 'orange' },
     { label: 'Negócios Perdidos',                 value: fmt.num(crm.total_lost),      sub: 'com motivo registrado',           cls: 'red'    },
