@@ -3661,27 +3661,29 @@ function renderScoringCloser() {
       : '<span class="sc-na">Sem tarefa aberta</span>';
     const fonteCanal = (x.fonte || '').split('|')[0].trim() || '—';
     const capShort = (x.capital || '').split('(')[0].trim();
-    // Qualificação manual do time no RD CRM (temperatura), colorida frio→quente
+    // Qualificação manual do time no RD CRM (temperatura), colorida frio→quente.
+    // É a marcação humana — distinta da "classificação" (score calculado).
     const QMAP = {'Muito frio':['#dbeafe','#1d4ed8'],'Frio':['#e0f2fe','#0369a1'],'Morno':['#fef9c3','#a16207'],'Quente':['#ffedd5','#c2410c'],'Muito quente':['#fee2e2','#b91c1c']};
     const q = x.qualificacao_crm || '';
     const qc = QMAP[q] || ['#f1f5f9','#64748b'];
-    const qBadge = `<span class="sc-badge-qual" style="background:${qc[0]};color:${qc[1]};" title="Qualificação do time no RD CRM">🌡️ ${esc(q || 'Sem qualificação')}</span>`;
+    const qChip = `<span style="display:inline-block;font-size:12px;font-weight:700;padding:2px 10px;border-radius:20px;background:${qc[0]};color:${qc[1]};">🌡️ ${esc(q || 'Sem qualificação')}</span>`;
     return `
     <div class="sc-card">
       <div class="sc-head">
         <div class="sc-rank"><small>Rank</small><b>#${x.ranking}</b></div>
         <div class="sc-avatar">${esc(initials(x.nome))}</div>
         <div class="sc-id">
-          <div class="sc-name">${esc(x.nome)} <span class="sc-badge-qual">Lead Qualificado</span> ${qBadge}</div>
+          <div class="sc-name">${esc(x.nome)} <span class="sc-badge-qual">Lead Qualificado</span></div>
           <div class="sc-contact"><span>📞 ${esc(x.telefone) || '—'}</span><span>✉ ${esc(x.email) || '—'}</span></div>
         </div>
-        <div class="sc-scorebox"><div class="v">${x.score_total}</div><div class="l">de 1.000 pts</div></div>
+        <div class="sc-scorebox"><div class="l" style="margin-bottom:2px;">Prioridade (score)</div><div class="v">${x.score_total}</div><div class="l">de 1.000 pts</div></div>
         <div class="sc-class"><span class="tag" style="background:${cc.bg};color:${cc.fg};">${esc(x.classificacao)}</span><div class="stars">${stars}</div></div>
         <div class="sc-source"><b>Fonte</b>${esc(fonteCanal)}${x.campanha ? '<br>' + esc(x.campanha.slice(0, 38)) : ''}</div>
       </div>
       <div class="sc-stepper">${steps}</div>
       <div class="sc-grid">
         <div class="sc-field"><div class="k">Etapa atual</div><div class="v">${esc(x.etapa)}</div></div>
+        <div class="sc-field"><div class="k">Qualificação no RD (manual)</div><div class="v">${qChip}</div></div>
         <div class="sc-field"><div class="k">Cidade</div><div class="v">${esc(x.cidade) || '—'}${x.estado ? ' / ' + esc(x.estado) : ''}</div></div>
         <div class="sc-field"><div class="k">Capital informado</div><div class="v">${capShort ? esc(capShort) : '<span class="sc-na">—</span>'}</div></div>
         <div class="sc-field"><div class="k">Prazo de abertura</div><div class="v">${esc(x.prazo) || '—'}</div></div>
