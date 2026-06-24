@@ -4012,14 +4012,18 @@ function renderMeta() {
     const c = campMap[r.campanha] || (campMap[r.campanha] = { gasto: 0, impressoes: 0, cliques: 0, leadsPlat: 0 });
     c.gasto += r.gasto || 0; c.impressoes += r.impressoes || 0; c.cliques += r.cliques || 0; c.leadsPlat += r.leads || 0;
   });
+  // Leads CRM por campanha: casa nome da campanha ↔ utm_campaign do lead.
+  // Os dois descrevem a MESMA campanha mas com grafias diferentes (pontos vs
+  // colchetes/acentos), então normalizamos (sem acento/pontuação) antes de casar.
+  const normCamp = x => (x || '').normalize('NFKD').toLowerCase().replace(/[^a-z0-9]/g, '');
   const utmLeadsMap = {};
   (DATA.utm.campaigns_daily || [])
     .filter(r => r.source === 'metaads' && (!datePred || datePred(r.data)))
-    .forEach(r => { const k = (r.campaign || '').toLowerCase().trim(); utmLeadsMap[k] = (utmLeadsMap[k] || 0) + r.total; });
+    .forEach(r => { const k = normCamp(r.campaign); if (k) utmLeadsMap[k] = (utmLeadsMap[k] || 0) + r.total; });
   const crmLeads = name => {
-    const k = (name || '').toLowerCase().trim();
+    const k = normCamp(name);
     if (utmLeadsMap[k] !== undefined) return utmLeadsMap[k];
-    for (const [kk, v] of Object.entries(utmLeadsMap)) { if (k.includes(kk) || kk.includes(k)) return v; }
+    for (const [kk, v] of Object.entries(utmLeadsMap)) { if (k && (k.includes(kk) || kk.includes(k))) return v; }
     return 0;
   };
   const camps = Object.entries(campMap).filter(([, d]) => d.gasto > 0).sort((a, b) => b[1].gasto - a[1].gasto);
