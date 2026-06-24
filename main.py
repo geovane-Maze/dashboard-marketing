@@ -40,13 +40,18 @@ def run():
     except Exception as e:
         print(f"  ERRO GA4: {e}")
 
-    # Google Ads API (inclui Performance Max via FROM campaign)
+    # Google Ads API (inclui Performance Max via FROM campaign — a planilha
+    # Adveronix NÃO captura PMax, então a API é a fonte completa).
+    # Janela larga (560d) cobre todo o histórico; merge_sheet preserva o que já
+    # existe e corrige retroativamente (incl. PMax) sem truncar a Evolução Mensal.
     print("\n[4/6] Google Ads API")
     google_api_ok = False
     try:
-        google_data = google_ads.get_campaign_data(days_back=90)
+        google_data = google_ads.get_campaign_data(days_back=560)
         if google_data:
-            writer.write_sheet("google_ads", google_data)
+            writer.merge_sheet("google_ads", google_data,
+                               dedup_keys=["data", "campanha"],
+                               date_col="data", retention_days=900)
             google_api_ok = True
     except Exception as e:
         print(f"  ERRO Google Ads API: {e}")
@@ -70,7 +75,11 @@ def run():
             try:
                 google_data = ads_sheets.get_google_ads_sheet_data()
                 if google_data:
-                    writer.write_sheet("google_ads", google_data)
+                    # merge (não write) pra não destruir o histórico com PMax já
+                    # gravado pela API em coletas anteriores.
+                    writer.merge_sheet("google_ads", google_data,
+                                       dedup_keys=["data", "campanha"],
+                                       date_col="data", retention_days=900)
                     google_api_ok = True
             except Exception as e:
                 print(f"  ERRO Google Ads planilha diária: {e}")
