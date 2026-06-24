@@ -1112,6 +1112,8 @@ def aggregate_meta_ads(rows, leads_daily_map=None):
                 "anuncio": nome,
                 "gasto":   round(v["gasto"], 2),
                 "leads":   leads_crm,   # <-- CRM, não plataforma!
+                "impressoes": int(v["impressoes"]),
+                "cliques":    int(v["cliques"]),
             })
 
     return {

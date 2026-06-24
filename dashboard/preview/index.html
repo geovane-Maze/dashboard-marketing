@@ -237,19 +237,24 @@
     gap: 16px; margin-bottom: 28px;
   }
   .kpi-card {
-    background: var(--bg); border-radius: 12px;
-    padding: 20px 16px 16px; border: 1px solid var(--border);
-    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    background: var(--bg); border-radius: 14px;
+    padding: 18px 14px 16px; border: 1px solid var(--border);
+    box-shadow: 0 4px 14px rgba(13,59,102,0.08), 0 1px 3px rgba(0,0,0,0.05);
     display: flex; flex-direction: column; align-items: center;
-    text-align: center; gap: 6px;
+    text-align: center; gap: 5px;
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 24px rgba(13,59,102,0.14), 0 2px 6px rgba(0,0,0,0.06);
   }
   .kpi-card .kpi-label {
     font-size: 11px; color: #888; text-transform: uppercase;
     letter-spacing: 0.6px; font-weight: 600; line-height: 1.3;
   }
   .kpi-card .kpi-value {
-    font-size: 32px; font-weight: 700; color: var(--primary);
-    line-height: 1; margin: 4px 0;
+    font-size: 24px; font-weight: 800; color: var(--primary);
+    line-height: 1.15; margin: 3px 0; white-space: nowrap; letter-spacing: -0.4px;
   }
   .kpi-card .kpi-sub {
     font-size: 11px; color: #aaa; line-height: 1.3;
@@ -4061,12 +4066,31 @@ function renderMeta() {
     }
   });
 
-  // ── 3. QUALIDADE DOS PÚBLICOS (conjuntos) ──
+  // Mapas por anúncio NO PERÍODO (creatives_daily filtrado) — só o que rodou no período.
+  // `leads` no creatives_daily já é CRM; impressoes/cliques vêm do ETL (após coleta nova).
+  const byAd = {}; creatives.forEach(c => { byAd[c.anuncio] = c; });
+  const perAd = {};
+  (M.creatives_daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
+    const a = perAd[r.anuncio] || (perAd[r.anuncio] = { gasto: 0, leadsCRM: 0, impressoes: 0, cliques: 0 });
+    a.gasto += r.gasto || 0; a.leadsCRM += r.leads || 0; a.impressoes += r.impressoes || 0; a.cliques += r.cliques || 0;
+  });
+  const activeAds = Object.entries(perAd).filter(([, d]) => d.gasto > 0);
+
+  // Gasto 7D — sempre os últimos 7 dias com dados (independe do filtro de período)
+  const cdaily = M.creatives_daily || [];
+  const maxData = cdaily.reduce((mx, r) => r.data > mx ? r.data : mx, '');
+  let cut7 = '';
+  if (maxData) { const d = new Date(maxData + 'T00:00:00'); d.setDate(d.getDate() - 6); cut7 = d.toISOString().slice(0, 10); }
+  const g7d = {}; cdaily.forEach(r => { if (cut7 && r.data >= cut7) g7d[r.anuncio] = (g7d[r.anuncio] || 0) + (r.gasto || 0); });
+
+  // ── 3. QUALIDADE DOS PÚBLICOS (conjuntos ativos no período) ──
   const adsetMap = {};
-  creatives.forEach(c => {
-    const key = c.conjunto || '(sem conjunto)';
-    const a = adsetMap[key] || (adsetMap[key] = { conjunto: key, campanha: c.campanha || '', gasto: 0, leadsCRM: 0, impressoes: 0, cliques: 0 });
-    a.gasto += c.gasto || 0; a.leadsCRM += c.leads_rd || 0; a.impressoes += c.impressoes || 0; a.cliques += c.cliques || 0;
+  activeAds.forEach(([anuncio, d]) => {
+    const meta = byAd[anuncio] || {};
+    const key = meta.conjunto || '(sem conjunto)';
+    const a = adsetMap[key] || (adsetMap[key] = { conjunto: key, campanha: meta.campanha || '', gasto: 0, leadsCRM: 0, impressoes: 0, cliques: 0 });
+    a.gasto += d.gasto; a.leadsCRM += d.leadsCRM; a.impressoes += d.impressoes; a.cliques += d.cliques;
+    if (!a.campanha && meta.campanha) a.campanha = meta.campanha;
   });
   const adsets = Object.values(adsetMap).map(a => {
     a._cpl = a.leadsCRM > 0 ? a.gasto / a.leadsCRM : 0;
@@ -4082,24 +4106,20 @@ function renderMeta() {
       <td><strong>${fmt.num(a.leadsCRM)}</strong></td>
       <td>${a.leadsCRM > 0 ? fmt.currency(a._cpl) : '—'}</td>
       <td>${cpm > 0 ? fmt.currency(cpm) : '—'}</td>
-      <td>${fmt.k(a.cliques)}</td>
+      <td>${a.cliques > 0 ? fmt.k(a.cliques) : '—'}</td>
       <td>${cpc > 0 ? fmt.currency(cpc) : '—'}</td>
       <td><span class="q-badge ${a.q.cls}">${a.q.nivel}</span><div class="q-acao">${a.q.acao}</div></td>
       <td>${fmt.currency(a.gasto)}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="10" class="empty">Sem conjuntos.</td></tr>';
+  }).join('') || '<tr><td colspan="10" class="empty">Sem conjuntos ativos no período.</td></tr>';
 
-  // ── 4. QUALIDADE DOS ANÚNCIOS (criativos) ──
-  const cdaily = M.creatives_daily || [];
-  const maxData = cdaily.reduce((mx, r) => r.data > mx ? r.data : mx, '');
-  let cut7 = '';
-  if (maxData) { const d = new Date(maxData + 'T00:00:00'); d.setDate(d.getDate() - 6); cut7 = d.toISOString().slice(0, 10); }
-  const g7d = {}; cdaily.forEach(r => { if (cut7 && r.data >= cut7) g7d[r.anuncio] = (g7d[r.anuncio] || 0) + (r.gasto || 0); });
-  const ads = creatives.map(c => {
-    const lc = c.leads_rd || 0, cpl = lc > 0 ? c.gasto / lc : 0;
-    return { anuncio: c.anuncio, campanha: c.campanha, conjunto: c.conjunto, gasto: c.gasto || 0, gasto7d: g7d[c.anuncio] || 0,
-      leadsPlat: c.leads || 0, leadsCRM: lc, _cpl: cpl, thumbnail: c.thumbnail, permalink: c.permalink,
-      ativo: activeCamps.has(c.campanha), q: qualidadeAds(cpl, c.gasto || 0, lc, T) };
+  // ── 4. QUALIDADE DOS ANÚNCIOS (criativos ativos no período) ──
+  const ads = activeAds.map(([anuncio, d]) => {
+    const meta = byAd[anuncio] || {};
+    const cpl = d.leadsCRM > 0 ? d.gasto / d.leadsCRM : 0;
+    return { anuncio, campanha: meta.campanha || '', conjunto: meta.conjunto || '', gasto: d.gasto, gasto7d: g7d[anuncio] || 0,
+      leadsPlat: meta.leads || 0, leadsCRM: d.leadsCRM, _cpl: cpl, thumbnail: meta.thumbnail, permalink: meta.permalink,
+      ativo: activeCamps.has(meta.campanha), q: qualidadeAds(cpl, d.gasto, d.leadsCRM, T) };
   }).sort((x, y) => y.gasto - x.gasto);
   document.getElementById('table-meta-ads').innerHTML = ads.map(c => {
     const img = c.thumbnail
