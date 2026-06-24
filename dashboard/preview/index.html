@@ -3661,13 +3661,18 @@ function renderScoringCloser() {
       : '<span class="sc-na">Sem tarefa aberta</span>';
     const fonteCanal = (x.fonte || '').split('|')[0].trim() || '—';
     const capShort = (x.capital || '').split('(')[0].trim();
+    // Qualificação manual do time no RD CRM (temperatura), colorida frio→quente
+    const QMAP = {'Muito frio':['#dbeafe','#1d4ed8'],'Frio':['#e0f2fe','#0369a1'],'Morno':['#fef9c3','#a16207'],'Quente':['#ffedd5','#c2410c'],'Muito quente':['#fee2e2','#b91c1c']};
+    const q = x.qualificacao_crm || '';
+    const qc = QMAP[q] || ['#f1f5f9','#64748b'];
+    const qBadge = `<span class="sc-badge-qual" style="background:${qc[0]};color:${qc[1]};" title="Qualificação do time no RD CRM">🌡️ ${esc(q || 'Sem qualificação')}</span>`;
     return `
     <div class="sc-card">
       <div class="sc-head">
         <div class="sc-rank"><small>Rank</small><b>#${x.ranking}</b></div>
         <div class="sc-avatar">${esc(initials(x.nome))}</div>
         <div class="sc-id">
-          <div class="sc-name">${esc(x.nome)} <span class="sc-badge-qual">Lead Qualificado</span></div>
+          <div class="sc-name">${esc(x.nome)} <span class="sc-badge-qual">Lead Qualificado</span> ${qBadge}</div>
           <div class="sc-contact"><span>📞 ${esc(x.telefone) || '—'}</span><span>✉ ${esc(x.email) || '—'}</span></div>
         </div>
         <div class="sc-scorebox"><div class="v">${x.score_total}</div><div class="l">de 1.000 pts</div></div>

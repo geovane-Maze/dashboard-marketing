@@ -2094,6 +2094,18 @@ def _classificacao(total):
     return ('Frio', 2)
 
 
+# Qualificação manual do deal no RD CRM (campo `rating`, 1–5 = temperatura).
+# Confirmado: rating=1 = "Muito frio" (cruzado com a interface). None = sem qualificação.
+QUALIFICACAO_CRM = {1: "Muito frio", 2: "Frio", 3: "Morno", 4: "Quente", 5: "Muito quente"}
+
+
+def _qualificacao_crm(rating):
+    try:
+        return QUALIFICACAO_CRM.get(int(rating), "")
+    except (TypeError, ValueError):
+        return ""
+
+
 def build_leads_scoring_closer(crm_deals, leads, tarefas, atividades):
     """
     Lista de leads em etapas avançadas (de SCORING_FROM_STAGE em diante) com
@@ -2195,6 +2207,7 @@ def build_leads_scoring_closer(crm_deals, leads, tarefas, atividades):
             "telefone": d.get('contato_telefone') or '',
             "email": d.get('contato_email') or '',
             "responsavel": d.get('responsavel') or '',
+            "qualificacao_crm": _qualificacao_crm(d.get('rating')),  # temperatura manual do time no RD
         })
 
     out.sort(key=lambda x: -x['score_total'])
