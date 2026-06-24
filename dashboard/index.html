@@ -778,6 +778,12 @@
     transition: box-shadow .15s, border-color .15s;
   }
   .gc-card:hover { box-shadow: 0 4px 12px rgba(180,83,9,0.12); border-color: #B45309; }
+  .gc-thumb {
+    width: 100%; height: 140px; border-radius: 8px; overflow: hidden;
+    margin-bottom: 10px; background: #FEF3C7;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .gc-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .gc-header {
     display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
     margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
@@ -1440,6 +1446,11 @@
           .sc-class{text-align:center;min-width:96px;}
           .sc-class .tag{display:inline-block;font-size:12px;font-weight:800;padding:4px 14px;border-radius:20px;}
           .sc-class .stars{color:#f59e0b;font-size:13px;margin-top:4px;letter-spacing:1px;}
+          .sc-cap{font-size:9.5px;color:#64748b;margin-top:5px;line-height:1.3;font-weight:600;}
+          .sc-closer{text-align:center;min-width:112px;border-left:1px solid #eef2f7;padding-left:16px;}
+          .sc-closer-lbl{font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;font-weight:700;}
+          .sc-closer .tag{display:inline-block;font-size:12px;font-weight:800;padding:4px 12px;border-radius:20px;}
+          .sc-closer .stars{color:#f59e0b;font-size:13px;margin-top:4px;letter-spacing:1px;}
           .sc-source{font-size:11px;color:#64748b;border-left:1px solid #eef2f7;padding-left:16px;min-width:120px;}
           .sc-source b{color:#334155;display:block;font-size:12px;margin-bottom:2px;}
           .sc-stepper{display:flex;align-items:flex-start;margin:20px 0 4px;overflow-x:auto;padding-bottom:6px;}
@@ -3575,17 +3586,28 @@ function renderScoringCloser() {
       : '<span class="sc-na">Sem tarefa aberta</span>';
     const fonteCanal = (x.fonte || '').split('|')[0].trim() || '—';
     const capShort = (x.capital || '').split('(')[0].trim();
+    // Lead Scoring = qualificação manual do time no RD CRM (temperatura), com
+    // estrelas (Muito frio=1 … Muito quente=5). É a leitura humana do closer —
+    // distinta da "Prioridade (score)", que vem dos dados de cadastro.
+    const QMAP = {'Muito frio':['#dbeafe','#1d4ed8'],'Frio':['#e0f2fe','#0369a1'],'Morno':['#fef9c3','#a16207'],'Quente':['#ffedd5','#c2410c'],'Muito quente':['#fee2e2','#b91c1c']};
+    const QSTARS = {'Muito frio':1,'Frio':2,'Morno':3,'Quente':4,'Muito quente':5};
+    const q = x.qualificacao_crm || '';
+    const qc = QMAP[q] || ['#f1f5f9','#64748b'];
+    const qn = QSTARS[q] || 0;
+    const qStarsHtml = '★'.repeat(qn) + '☆'.repeat(5 - qn);
+    const qTag = q || 'Sem qualif.';
     return `
     <div class="sc-card">
       <div class="sc-head">
         <div class="sc-rank"><small>Rank</small><b>#${x.ranking}</b></div>
         <div class="sc-avatar">${esc(initials(x.nome))}</div>
         <div class="sc-id">
-          <div class="sc-name">${esc(x.nome)} <span class="sc-badge-qual">Lead Qualificado</span></div>
+          <div class="sc-name">${esc(x.nome)}</div>
           <div class="sc-contact"><span>📞 ${esc(x.telefone) || '—'}</span><span>✉ ${esc(x.email) || '—'}</span></div>
         </div>
-        <div class="sc-scorebox"><div class="v">${x.score_total}</div><div class="l">de 1.000 pts</div></div>
-        <div class="sc-class"><span class="tag" style="background:${cc.bg};color:${cc.fg};">${esc(x.classificacao)}</span><div class="stars">${stars}</div></div>
+        <div class="sc-scorebox"><div class="l" style="margin-bottom:2px;">Prioridade (score)</div><div class="v">${x.score_total}</div><div class="l">de 1.000 pts</div></div>
+        <div class="sc-class"><span class="tag" style="background:${cc.bg};color:${cc.fg};">${esc(x.classificacao)}</span><div class="stars">${stars}</div><div class="sc-cap">📋 Baseado em<br>dados de cadastro</div></div>
+        <div class="sc-closer"><div class="sc-closer-lbl">Lead Scoring</div><span class="tag" style="background:${qc[0]};color:${qc[1]};">🌡️ ${esc(qTag)}</span><div class="stars">${qStarsHtml}</div><div class="sc-cap">👤 Qualificado<br>pelo Closer</div></div>
         <div class="sc-source"><b>Fonte</b>${esc(fonteCanal)}${x.campanha ? '<br>' + esc(x.campanha.slice(0, 38)) : ''}</div>
       </div>
       <div class="sc-stepper">${steps}</div>
@@ -4172,9 +4194,11 @@ function renderCreatives() {
     });
   });
   Object.entries(googleByAd).forEach(([nome, d]) => {
+    const full = (DATA.google_ads_creatives?.creatives || []).find(c => c.anuncio === nome);
     merged.push({
       source: 'google', anuncio: nome,
       campanha: d.campanha, tipo: d.tipo,
+      thumbnail: full?.thumbnail || '',
       volume: d.volume, gasto: d.gasto,
       cpl: d.volume > 0 ? d.gasto / d.volume : 0,
     });
@@ -4190,13 +4214,13 @@ function renderCreatives() {
         const sourceTag = isMeta
           ? `<span class="criativo-mes-source meta">META ADS</span>`
           : `<span class="criativo-mes-source google">GOOGLE ADS</span>`;
-        const thumb = isMeta && c.thumbnail
+        const thumb = c.thumbnail
           ? `<img class="criativo-mes-thumb" src="${c.thumbnail}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
           : '';
-        const placeholderDisplay = (isMeta && c.thumbnail) ? 'none' : 'flex';
+        const placeholderDisplay = c.thumbnail ? 'none' : 'flex';
         const placeholder = isMeta
           ? `<div class="criativo-mes-thumb-placeholder" style="display:${placeholderDisplay}">🖼️</div>`
-          : `<div class="criativo-mes-thumb-placeholder" style="display:flex;background:#FEF3C7;color:#B45309;">📝</div>`;
+          : `<div class="criativo-mes-thumb-placeholder" style="display:${placeholderDisplay};background:#FEF3C7;color:#B45309;">📝</div>`;
         const cardTag = (isMeta && c.permalink) ? 'a' : 'div';
         const linkAttrs = (isMeta && c.permalink) ? `href="${c.permalink}" target="_blank" rel="noopener"` : '';
         // Sempre "leads" (CRM) — não importa a fonte, é leads do RD Station
@@ -4291,6 +4315,7 @@ function renderCreatives() {
       qualidade:    meta.qualidade || '',
       headlines:    meta.headlines || '',
       descriptions: meta.descriptions || '',
+      thumbnail:    meta.thumbnail || '',
       gasto:        d.gasto,
       leads:        d.leads,                       // CRM
       cpl:          d.leads > 0 ? d.gasto / d.leads : 0,
@@ -4313,6 +4338,7 @@ function renderCreatives() {
   document.getElementById('google-creatives-content').innerHTML = googleList.length
     ? `<div class="google-creatives-grid">${googleList.slice(0, 20).map(c => `
         <div class="gc-card">
+          ${c.thumbnail ? `<div class="gc-thumb"><img src="${c.thumbnail}" alt="" loading="lazy" onerror="this.closest('.gc-thumb').style.display='none'"></div>` : ''}
           <div class="gc-header">
             <div class="gc-title">${tipoEmoji(c.tipo)} ${c.anuncio}</div>
             <div class="gc-type">${c.tipo || 'Anúncio'}</div>
