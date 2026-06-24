@@ -778,6 +778,12 @@
     transition: box-shadow .15s, border-color .15s;
   }
   .gc-card:hover { box-shadow: 0 4px 12px rgba(180,83,9,0.12); border-color: #B45309; }
+  .gc-thumb {
+    width: 100%; height: 140px; border-radius: 8px; overflow: hidden;
+    margin-bottom: 10px; background: #FEF3C7;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .gc-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .gc-header {
     display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
     margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
@@ -4252,9 +4258,11 @@ function renderCreatives() {
     });
   });
   Object.entries(googleByAd).forEach(([nome, d]) => {
+    const full = (DATA.google_ads_creatives?.creatives || []).find(c => c.anuncio === nome);
     merged.push({
       source: 'google', anuncio: nome,
       campanha: d.campanha, tipo: d.tipo,
+      thumbnail: full?.thumbnail || '',
       volume: d.volume, gasto: d.gasto,
       cpl: d.volume > 0 ? d.gasto / d.volume : 0,
     });
@@ -4270,13 +4278,13 @@ function renderCreatives() {
         const sourceTag = isMeta
           ? `<span class="criativo-mes-source meta">META ADS</span>`
           : `<span class="criativo-mes-source google">GOOGLE ADS</span>`;
-        const thumb = isMeta && c.thumbnail
+        const thumb = c.thumbnail
           ? `<img class="criativo-mes-thumb" src="${c.thumbnail}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
           : '';
-        const placeholderDisplay = (isMeta && c.thumbnail) ? 'none' : 'flex';
+        const placeholderDisplay = c.thumbnail ? 'none' : 'flex';
         const placeholder = isMeta
           ? `<div class="criativo-mes-thumb-placeholder" style="display:${placeholderDisplay}">🖼️</div>`
-          : `<div class="criativo-mes-thumb-placeholder" style="display:flex;background:#FEF3C7;color:#B45309;">📝</div>`;
+          : `<div class="criativo-mes-thumb-placeholder" style="display:${placeholderDisplay};background:#FEF3C7;color:#B45309;">📝</div>`;
         const cardTag = (isMeta && c.permalink) ? 'a' : 'div';
         const linkAttrs = (isMeta && c.permalink) ? `href="${c.permalink}" target="_blank" rel="noopener"` : '';
         // Sempre "leads" (CRM) — não importa a fonte, é leads do RD Station
@@ -4371,6 +4379,7 @@ function renderCreatives() {
       qualidade:    meta.qualidade || '',
       headlines:    meta.headlines || '',
       descriptions: meta.descriptions || '',
+      thumbnail:    meta.thumbnail || '',
       gasto:        d.gasto,
       leads:        d.leads,                       // CRM
       cpl:          d.leads > 0 ? d.gasto / d.leads : 0,
@@ -4393,6 +4402,7 @@ function renderCreatives() {
   document.getElementById('google-creatives-content').innerHTML = googleList.length
     ? `<div class="google-creatives-grid">${googleList.slice(0, 20).map(c => `
         <div class="gc-card">
+          ${c.thumbnail ? `<div class="gc-thumb"><img src="${c.thumbnail}" alt="" loading="lazy" onerror="this.closest('.gc-thumb').style.display='none'"></div>` : ''}
           <div class="gc-header">
             <div class="gc-title">${tipoEmoji(c.tipo)} ${c.anuncio}</div>
             <div class="gc-type">${c.tipo || 'Anúncio'}</div>

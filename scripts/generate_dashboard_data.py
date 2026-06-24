@@ -1577,7 +1577,7 @@ def aggregate_google_ads_creatives(rows, leads_daily_map=None):
         "gasto": 0.0, "conversoes_plataforma": 0.0,
         "campanha": "", "grupo": "", "tipo": "",
         "url_final": "", "cta": "", "qualidade": "",
-        "headlines": "", "descriptions": "",
+        "headlines": "", "descriptions": "", "thumbnail": "",
         "primeira_data": "", "ultima_data": "",
     })
 
@@ -1609,7 +1609,7 @@ def aggregate_google_ads_creatives(rows, leads_daily_map=None):
         d["gasto"]                 += gasto
         d["conversoes_plataforma"] += conv
         for f in ("campanha", "grupo", "tipo", "url_final", "cta", "qualidade",
-                  "headlines", "descriptions"):
+                  "headlines", "descriptions", "thumbnail"):
             v = (r.get(f) or "").strip()
             if v:
                 d[f] = v
@@ -1635,6 +1635,7 @@ def aggregate_google_ads_creatives(rows, leads_daily_map=None):
             "qualidade":    d["qualidade"],
             "headlines":    d["headlines"],
             "descriptions": d["descriptions"],
+            "thumbnail":    d["thumbnail"],
             "gasto":        round(d["gasto"], 2),
             "leads_crm":    leads_crm,                                    # <-- VERDADE
             "cpl_crm":      cpl_crm,                                      # <-- VERDADE

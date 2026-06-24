@@ -92,11 +92,20 @@ def run():
     else:
         print("\n[6/6] APIs OK — planilhas fallback não necessárias")
 
-    # Google Ads creatives (texto por anúncio — sem thumbnail por limitação da planilha)
+    # Google Ads creatives — texto/métricas vêm da planilha Adveronix; a imagem/
+    # vídeo do criativo vem da API (a planilha não traz), casada por nome do
+    # anúncio. Mesmo padrão do Meta (planilha + thumbnail por fonte separada).
     print("\n[7/7] Google Ads Criativos")
     try:
         creatives_data = ads_sheets.get_google_ads_creatives_sheet_data()
         if creatives_data:
+            try:
+                gthumbs = google_ads.get_creative_thumbnails()
+                if gthumbs:
+                    for row in creatives_data:
+                        row["thumbnail"] = gthumbs.get((row.get("anuncio") or "").strip(), "")
+            except Exception as e:
+                print(f"  AVISO: thumbnails Google não aplicados: {e}")
             writer.write_sheet("google_ads_creatives", creatives_data)
     except Exception as e:
         print(f"  ERRO Google Ads Criativos: {e}")

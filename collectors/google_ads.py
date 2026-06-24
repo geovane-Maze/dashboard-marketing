@@ -64,3 +64,70 @@ def get_campaign_data(days_back=90):
 
     print(f"Total de linhas coletadas: {len(rows)}")
     return rows
+
+
+def get_creative_thumbnails():
+    """
+    Mapa {nome_do_anuncio: thumbnail_url} via API Google Ads.
+
+    Espelha o padrao do Meta (_get_creative_thumbnails em ads_sheets): a planilha
+    Adveronix da texto/metricas dos criativos, mas NAO traz a imagem/video do
+    criativo do Google — so a API tem isso.
+
+    - Imagens (Demand Gen / Display): asset.image_asset.full_size.url
+      (tpc.googlesyndication.com/simgad/... — renderiza direto em <img>).
+    - Videos (YouTube / Demand Gen video): img.youtube.com/vi/{id}/hqdefault.jpg.
+
+    Escolhe 1 thumb por anuncio pela prioridade de field_type. Casa por nome
+    (match exato 1:1), entao anuncios sem nome ficam de fora — consistente com a
+    planilha de criativos, que tambem ignora anuncios sem nome.
+    """
+    PRIO = {
+        "MARKETING_IMAGE": 1, "SQUARE_MARKETING_IMAGE": 2,
+        "PORTRAIT_MARKETING_IMAGE": 3, "YOUTUBE_VIDEO": 4,
+        "LANDSCAPE_LOGO": 9, "LOGO": 9,
+    }
+    query = """
+        SELECT
+            ad_group_ad.ad.name,
+            ad_group_ad_asset_view.field_type,
+            asset.type,
+            asset.image_asset.full_size.url,
+            asset.youtube_video_asset.youtube_video_id
+        FROM ad_group_ad_asset_view
+        WHERE ad_group_ad.status != 'REMOVED'
+    """
+    print("Coletando thumbnails de criativos do Google Ads (API)...")
+    out = {}          # nome -> thumb
+    best_prio = {}    # nome -> prioridade do field_type escolhido
+
+    try:
+        client = get_client()
+        service = client.get_service("GoogleAdsService")
+        customer_id = config.GOOGLE_ADS_CUSTOMER_ID.replace("-", "")
+        for row in service.search(customer_id=customer_id, query=query):
+            nome = (row.ad_group_ad.ad.name or "").strip()
+            if not nome:
+                continue
+            atype = row.asset.type_.name
+            if atype == "IMAGE":
+                thumb = row.asset.image_asset.full_size.url
+            elif atype == "YOUTUBE_VIDEO":
+                vid = row.asset.youtube_video_asset.youtube_video_id
+                thumb = f"https://img.youtube.com/vi/{vid}/hqdefault.jpg" if vid else ""
+            else:
+                continue
+            if not thumb:
+                continue
+            ft = row.ad_group_ad_asset_view.field_type.name
+            p = PRIO.get(ft, 5)
+            if nome not in best_prio or p < best_prio[nome]:
+                best_prio[nome] = p
+                out[nome] = thumb
+    except GoogleAdsException as ex:
+        print(f"  AVISO thumbnails Google: {ex.error.code().name}")
+    except Exception as e:
+        print(f"  AVISO thumbnails Google: {e}")
+
+    print(f"  Thumbnails Google: {len(out)} anuncios com imagem/video.")
+    return out
