@@ -2098,7 +2098,7 @@ def _classificacao(total):
 
 # Qualificação manual do deal no RD CRM (campo `rating`, 1–5 = temperatura).
 # Confirmado: rating=1 = "Muito frio" (cruzado com a interface). None = sem qualificação.
-QUALIFICACAO_CRM = {1: "Muito frio", 2: "Frio", 3: "Morno", 4: "Quente", 5: "Muito quente"}
+QUALIFICACAO_CRM = {1: "Muito frio", 2: "Frio", 3: "Morno", 4: "Quente", 5: "Venda certa!"}
 
 
 def _qualificacao_crm(rating):

@@ -3586,11 +3586,10 @@ function renderScoringCloser() {
       : '<span class="sc-na">Sem tarefa aberta</span>';
     const fonteCanal = (x.fonte || '').split('|')[0].trim() || '—';
     const capShort = (x.capital || '').split('(')[0].trim();
-    // Lead Scoring = qualificação manual do time no RD CRM (temperatura), com
-    // estrelas (Muito frio=1 … Muito quente=5). É a leitura humana do closer —
-    // distinta da "Prioridade (score)", que vem dos dados de cadastro.
-    const QMAP = {'Muito frio':['#dbeafe','#1d4ed8'],'Frio':['#e0f2fe','#0369a1'],'Morno':['#fef9c3','#a16207'],'Quente':['#ffedd5','#c2410c'],'Muito quente':['#fee2e2','#b91c1c']};
-    const QSTARS = {'Muito frio':1,'Frio':2,'Morno':3,'Quente':4,'Muito quente':5};
+    // Lead Scoring = qualificação manual do time no RD CRM (temperatura/rating),
+    // com estrelas (Muito frio=1 … Venda certa!=5). É a leitura humana do closer.
+    const QMAP = {'Muito frio':['#dbeafe','#1d4ed8'],'Frio':['#e0f2fe','#0369a1'],'Morno':['#fef9c3','#a16207'],'Quente':['#ffedd5','#c2410c'],'Venda certa!':['#dcfce7','#15803d']};
+    const QSTARS = {'Muito frio':1,'Frio':2,'Morno':3,'Quente':4,'Venda certa!':5};
     const q = x.qualificacao_crm || '';
     const qc = QMAP[q] || ['#f1f5f9','#64748b'];
     const qn = QSTARS[q] || 0;
@@ -3605,8 +3604,6 @@ function renderScoringCloser() {
           <div class="sc-name">${esc(x.nome)}</div>
           <div class="sc-contact"><span>📞 ${esc(x.telefone) || '—'}</span><span>✉ ${esc(x.email) || '—'}</span></div>
         </div>
-        <div class="sc-scorebox"><div class="l" style="margin-bottom:2px;">Prioridade (score)</div><div class="v">${x.score_total}</div><div class="l">de 1.000 pts</div></div>
-        <div class="sc-class"><span class="tag" style="background:${cc.bg};color:${cc.fg};">${esc(x.classificacao)}</span><div class="stars">${stars}</div><div class="sc-cap">📋 Baseado em<br>dados de cadastro</div></div>
         <div class="sc-closer"><div class="sc-closer-lbl">Lead Scoring</div><span class="tag" style="background:${qc[0]};color:${qc[1]};">🌡️ ${esc(qTag)}</span><div class="stars">${qStarsHtml}</div><div class="sc-cap">👤 Qualificado<br>pelo Closer</div></div>
         <div class="sc-source"><b>Fonte</b>${esc(fonteCanal)}${x.campanha ? '<br>' + esc(x.campanha.slice(0, 38)) : ''}</div>
       </div>
@@ -3623,7 +3620,6 @@ function renderScoringCloser() {
         <div class="sc-field"><div class="k">Próxima tarefa</div><div class="v">${prox}</div></div>
         <div class="sc-field"><div class="k">Último contato</div><div class="v">${fmtDate(x.ultimo_contato)}</div></div>
       </div>
-      <div class="sc-pts">${pts}<div class="sc-pt total"><div class="ic">🏆</div><div class="v">${x.score_total}</div><div class="l">Score Total</div></div></div>
       <div class="sc-notes">
         <div class="sc-note"><h5>📝 Comentários internos</h5><div class="empty">Campo manual — sem conteúdo exportado do RD.</div></div>
         <div class="sc-note"><h5>💬 Resumo das conversas mais relevantes</h5><div class="empty">Campo manual — o RD não exporta o conteúdo das conversas.</div></div>
