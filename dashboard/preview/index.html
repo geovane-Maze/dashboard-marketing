@@ -530,7 +530,59 @@
   .ga4-bar-fill.pablo      { background: #F59E0B; }
   .ga4-mini-chart { position: relative; height: 160px; }
 
-  /* ═══ PREVISIBILIDADE 2026 ═══ */
+  /* ═══ PREVISIBILIDADE 2026 — modelo nativo ═══ */
+  .prev-cenario-bar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;
+  }
+  .prev-cenario-lbl { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+  .prev-cen-btn {
+    padding: 7px 14px; border: 2px solid var(--border); background: var(--card);
+    border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 12.5px;
+    color: var(--text-secondary); transition: all .15s;
+  }
+  .prev-cen-btn small { font-weight: 400; opacity: .7; margin-left: 3px; }
+  .prev-cen-btn:hover { border-color: var(--primary); }
+  .prev-cen-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  /* Cards do ano */
+  .prev-cards {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;
+  }
+  .prev-card {
+    background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--primary);
+    border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  .prev-card.verde   { border-left-color: #22c55e; }
+  .prev-card.azul    { border-left-color: #3fa9f5; }
+  .prev-card.roxo    { border-left-color: #7b61ff; }
+  .prev-card.amarelo { border-left-color: #f59e0b; }
+  .prev-card-lbl { font-size: 11.5px; color: var(--text-secondary); font-weight: 600; }
+  .prev-card-val { font-size: 24px; font-weight: 800; color: var(--text); margin: 4px 0 2px; }
+  .prev-card-sub { font-size: 11px; color: #94a3b8; }
+  /* Tabela mês a mês */
+  .prev-table2 { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .prev-table2 th, .prev-table2 td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; }
+  .prev-table2 th { background: var(--primary); color: #fff; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; }
+  .prev-table2 th:first-child, .prev-table2 td:first-child { text-align: left; }
+  .prev-table2 tbody tr:hover { background: rgba(63,169,245,.06); }
+  .prev-tr-real { background: rgba(245,158,11,.07); }
+  .prev-meta-sub { font-size: 10px; color: #94a3b8; font-weight: 400; margin-top: 2px; }
+  .prev-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; }
+  .prev-badge.meta { background: #FEF3C7; color: #92400e; }
+  .prev-badge.real { background: #DBEAFE; color: #1e40af; }
+  .prev-badge.proj { background: #ede9fe; color: #6d28d9; }
+  /* Funil meta × real */
+  .prev-funil-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .prev-funil-tbl th, .prev-funil-tbl td { padding: 6px 9px; border-bottom: 1px solid var(--border); }
+  .prev-funil-tbl th { color: var(--text-secondary); font-size: 10.5px; text-transform: uppercase; text-align: right; }
+  .prev-funil-tbl th:first-child { text-align: left; }
+  .prev-fun-et { color: var(--text); font-weight: 500; }
+  .prev-fun-track { background: var(--border); border-radius: 6px; height: 9px; overflow: hidden; }
+  .prev-fun-fill { background: linear-gradient(90deg, #3fa9f5, #22c55e); height: 100%; border-radius: 6px; }
+  /* Resumo */
+  .prev-resumo-list { margin: 6px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.7; color: var(--text); }
+  .prev-resumo-list li { margin-bottom: 6px; }
+
+  /* ═══ PREVISIBILIDADE 2026 (legado — espelho planilha) ═══ */
   .prev-tabs {
     display: flex; gap: 8px; margin-bottom: 16px;
   }
@@ -1855,39 +1907,37 @@
     <!-- PREVISIBILIDADE 2026 -->
     <div id="sec-previsibilidade" class="section">
       <div class="section-title">📈 Previsibilidade 2026</div>
-      <p style="font-size:12px;color:#666;margin:0 0 16px;">
-        Espelho da planilha <strong>PREVISIBILIDADE IA</strong> · Atualização automática a cada coleta (3x/dia) ·
+      <p style="font-size:12px;color:#666;margin:0 0 14px;">
+        <strong>Jan–Abr</strong>: meta · <strong>Mai–Jun</strong>: real do CRM (sem importações) ·
+        <strong>Jul–Dez</strong>: projeção · Ticket R$ 1.000.000 ·
         <span id="prev-ultima-atualizacao" style="color:var(--primary);font-weight:600;"></span>
       </p>
 
-      <!-- Tabs PREVISIBILIDADE vs ATINGIMENTO vs RELATÓRIO -->
-      <div class="prev-tabs">
-        <button class="prev-tab active" id="prev-tab-prev" onclick="switchPrevTab('previsibilidade')">
-          📊 PREVISIBILIDADE (Meta)
-        </button>
-        <button class="prev-tab" id="prev-tab-real" onclick="switchPrevTab('atingimento')">
-          ✅ ATINGIMENTO (Real)
-        </button>
-        <button class="prev-tab" id="prev-tab-relatorio" onclick="switchPrevTab('relatorio')">
-          📝 Relatório / Próximos Passos
-        </button>
+      <!-- Seletor de cenário (afeta Jul–Dez) -->
+      <div class="prev-cenario-bar">
+        <span class="prev-cenario-lbl">Cenário Jul–Dez:</span>
+        <button class="prev-cen-btn" data-cen="pessimista" onclick="setPrevCenario('pessimista')">🔴 Pessimista <small>−30%</small></button>
+        <button class="prev-cen-btn active" data-cen="real" onclick="setPrevCenario('real')">⚪ Real <small>base</small></button>
+        <button class="prev-cen-btn" data-cen="otimista" onclick="setPrevCenario('otimista')">🟢 Otimista <small>+30%</small></button>
       </div>
 
-      <p id="prev-hint-real" style="display:none;font-size:11px;color:#888;margin:0 0 10px;">
-        🟢 Verde = bateu/superou a meta · 🔴 Vermelho = abaixo da meta. Passe o mouse nas células
-        coloridas para ver o diagnóstico e a sugestão. Meses ainda não fechados não são coloridos.
-      </p>
+      <!-- Cards KPI do ano (no cenário selecionado) -->
+      <div id="prev-cards" class="prev-cards"></div>
 
-      <div id="prev-table-container" class="prev-table-wrap">
-        <p style="color:#999;padding:20px;">Carregando dados de previsibilidade...</p>
+      <!-- Gráfico Receita real + meta + projeção -->
+      <div class="card" style="margin-top:16px;">
+        <div class="card-title">💰 Receita mensal — Real × Meta × Projeção</div>
+        <div style="height:320px;"><canvas id="prevChart"></canvas></div>
       </div>
 
-      <div id="prev-report-container" style="display:none;"></div>
+      <!-- Tabela mês a mês -->
+      <div id="prev-tabela" class="prev-table-wrap" style="margin-top:16px;"></div>
 
-      <p style="font-size:11px;color:#999;margin-top:16px;font-style:italic;">
-        💡 Pra editar os dados, abre a planilha <a href="https://docs.google.com/spreadsheets/d/1f_G15gb637rTU7JfO1lWt7lYuYJBmrM3lvMezNuj0-U/edit#gid=593567545" target="_blank" rel="noopener" style="color:var(--primary);">PREVISIBILIDADE IA</a>.
-        Esta página atualiza no próximo cron (07:30 / 13:30 / 16:00 BRT).
-      </p>
+      <!-- Funil 15 etapas: meta × real -->
+      <div id="prev-funil" style="margin-top:18px;"></div>
+
+      <!-- Resumo automático -->
+      <div id="prev-resumo" style="margin-top:18px;"></div>
     </div>
 
   </div><!-- /content -->
@@ -4911,30 +4961,13 @@ function renderGA4() {
 }
 
 // ─── PREVISIBILIDADE 2026 ────────────────────────────────────────────────────
-let _prevTabAtual = 'previsibilidade';
+let _prevCenario = 'real';   // pessimista | real | otimista (afeta Jul–Dez)
 
-function switchPrevTab(tab) {
-  _prevTabAtual = tab;
-  document.getElementById('prev-tab-prev').classList.toggle('active', tab === 'previsibilidade');
-  document.getElementById('prev-tab-real').classList.toggle('active', tab === 'atingimento');
-  const relBtn = document.getElementById('prev-tab-relatorio');
-  if (relBtn) relBtn.classList.toggle('active', tab === 'relatorio');
-
-  const tableC  = document.getElementById('prev-table-container');
-  const reportC = document.getElementById('prev-report-container');
-  const hint    = document.getElementById('prev-hint-real');
-
-  if (tab === 'relatorio') {
-    if (tableC)  tableC.style.display  = 'none';
-    if (reportC) reportC.style.display = 'block';
-    if (hint)    hint.style.display    = 'none';
-    renderPrevReport();
-  } else {
-    if (tableC)  tableC.style.display  = 'block';
-    if (reportC) reportC.style.display = 'none';
-    if (hint)    hint.style.display    = (tab === 'atingimento') ? 'block' : 'none';
-    renderPrevisibilidade();
-  }
+function setPrevCenario(c) {
+  _prevCenario = c;
+  document.querySelectorAll('.prev-cen-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.cen === c));
+  renderPrevisibilidade();
 }
 
 // ── Parser pt-BR: "R$ 1.000.000,00" / "78,33%" / "-58,51%" → número ──────────
@@ -5056,280 +5089,196 @@ function _prevAttachTooltip(container) {
   });
 }
 
+const PREV_MES_ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+function _prevMi(v) {                       // R$ 1.169.832 -> "R$ 1,17 mi"
+  if (!v) return 'R$ 0';
+  if (v >= 1e6) return 'R$ ' + (v / 1e6).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' mi';
+  if (v >= 1e3) return 'R$ ' + Math.round(v / 1e3) + 'k';
+  return 'R$ ' + Math.round(v);
+}
+
 function renderPrevisibilidade() {
-  const wrap = document.getElementById('prev-table-container');
-  const P = DATA.previsibilidade;
+  const P = DATA.previsibilidade_nativa;
+  const cardsEl = document.getElementById('prev-cards');
+  const tabEl   = document.getElementById('prev-tabela');
+  const funEl   = document.getElementById('prev-funil');
+  const resEl   = document.getElementById('prev-resumo');
 
-  if (!P) {
-    wrap.innerHTML = `
-      <div style="padding:24px;text-align:center;color:#999;">
-        <p style="font-size:14px;">⚠️ Dados de previsibilidade ainda não foram coletados.</p>
-        <p style="font-size:11px;">A planilha PREVISIBILIDADE IA será lida no próximo cron (07:30 / 13:30 / 16:00 BRT).</p>
-      </div>`;
+  if (!P || P.modelo !== 'nativo' || !P.linha) {
+    if (cardsEl) cardsEl.innerHTML =
+      `<div style="padding:24px;color:#999;grid-column:1/-1;">⚠️ Previsibilidade nativa ainda não coletada (rode o ETL / próximo cron).</div>`;
+    [tabEl, funEl, resEl].forEach(e => e && (e.innerHTML = ''));
     return;
   }
 
-  // Última atualização
   const upd = document.getElementById('prev-ultima-atualizacao');
-  if (upd && P.ultima_atualizacao) {
-    upd.textContent = `Última atualização: ${P.ultima_atualizacao}`;
-  }
+  if (upd && P.ultima_atualizacao) upd.textContent = `Atualizado: ${P.ultima_atualizacao}`;
 
-  const bloco = P[_prevTabAtual];
-  if (!bloco || !bloco.rows || !bloco.rows.length) {
-    wrap.innerHTML = `<p style="padding:24px;color:#999;">Bloco "${_prevTabAtual}" não encontrado na planilha.</p>`;
-    return;
-  }
+  const cen   = P.cenarios[_prevCenario] || P.cenarios.real;
+  const linha = P.linha;
 
-  const meses = bloco.meses || [];
+  // ── Cards do ano (no cenário) ──────────────────────────────────────────────
+  const invAno = linha.reduce((s, l) => s + (l.investimento || 0), 0);
+  const recAno = cen.total_receita;
+  const vendAno = cen.total_vendas;
+  const roas = invAno ? recAno / invAno : 0;
+  if (cardsEl) cardsEl.innerHTML = [
+    {lbl: 'Receita projetada (ano)', val: _prevMi(recAno), sub: `H2: ${_prevMi(cen.receita.slice(6).reduce((a,b)=>a+b,0))}`, cls: 'verde'},
+    {lbl: 'Investimento (ano)',      val: _prevMi(invAno), sub: 'Real até jun + projeção', cls: 'azul'},
+    {lbl: 'Vendas projetadas (ano)', val: vendAno.toLocaleString('pt-BR', {maximumFractionDigits: 1}), sub: 'chegam ao Negócio Fechado', cls: 'roxo'},
+    {lbl: 'ROAS médio',              val: roas.toFixed(1).replace('.', ',') + 'x', sub: `CAC ~ ${_prevMi(vendAno ? invAno / vendAno : 0)}`, cls: 'amarelo'},
+  ].map(c => `
+    <div class="prev-card ${c.cls}">
+      <div class="prev-card-lbl">${c.lbl}</div>
+      <div class="prev-card-val">${c.val}</div>
+      <div class="prev-card-sub">${c.sub}</div>
+    </div>`).join('');
 
-  // Trimestres baseados na posição dos meses (Jan-Mar = Q1, Abr-Jun = Q2, etc.)
-  const trimestres = ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''];
-  meses.forEach((m, i) => {
-    const mLow = m.toLowerCase();
-    if (['janeiro', 'fevereiro', 'março'].includes(mLow) && i % 3 === 0) trimestres[i * 3] = 'Q1';
-    else if (['abril', 'maio', 'junho'].includes(mLow) && trimestres[i * 3] === '') trimestres[i * 3] = 'Q2';
-    else if (['julho', 'agosto', 'setembro'].includes(mLow) && trimestres[i * 3] === '') trimestres[i * 3] = 'Q3';
-    else if (['outubro', 'novembro', 'dezembro'].includes(mLow) && trimestres[i * 3] === '') trimestres[i * 3] = 'Q4';
-  });
-  // Detectar trimestres baseado no primeiro mês de cada
-  const quarterStart = {};
-  meses.forEach((m, i) => {
-    const ml = m.toLowerCase();
-    if (ml === 'janeiro') quarterStart[i] = 'Q1';
-    else if (ml === 'abril') quarterStart[i] = 'Q2';
-    else if (ml === 'julho') quarterStart[i] = 'Q3';
-    else if (ml === 'outubro') quarterStart[i] = 'Q4';
-  });
-
-  // ── Header trimestres ──
-  let headerQ = '<tr class="quarter-row"><th></th>';
-  meses.forEach((_, i) => {
-    if (quarterStart[i]) {
-      headerQ += `<th colspan="3">${quarterStart[i]}</th>`;
-    } else {
-      // só adiciona se nenhum colspan anterior cobre essa posição
-      headerQ += `<th colspan="3"></th>`;
-    }
-  });
-  headerQ += '</tr>';
-
-  // ── Header meses ──
-  let headerM = '<tr class="month-row"><th>Mês</th>';
-  meses.forEach(m => {
-    headerM += `<th colspan="3">${m}</th>`;
-  });
-  headerM += '</tr>';
-
-  // ── Sub-header: % CRM / Custo ──
-  let headerSub = '<tr class="subheader-row"><th></th>';
-  meses.forEach(() => {
-    headerSub += '<th>Valor</th><th>% CRM</th><th>Custo / Leads</th>';
-  });
-  headerSub += '</tr>';
-
-  // ── Coloração Real vs Meta: só na aba Atingimento ──────────────────────────
-  const isReal = _prevTabAtual === 'atingimento';
-  const metaByLabel = {};
-  ((P.previsibilidade && P.previsibilidade.rows) || []).forEach(mr => {
-    metaByLabel[_prevNorm(mr.label)] = mr;
-  });
-
-  // ── Linhas de dados ──
-  let bodyHtml = '';
-  bloco.rows.forEach(r => {
-    const rowClass = `prev-row-${r.categoria}`;
-    const cfg = isReal ? _prevKpiConfig(r) : null;
-    const metaRow = cfg ? metaByLabel[_prevNorm(r.label)] : null;
-    bodyHtml += `<tr class="${rowClass}">`;
-    bodyHtml += `<td>${r.label}</td>`;
-    r.valores.forEach((v, i) => {
-      let cls = '', ico = '', tipAttr = '';
-      if (cfg && metaRow) {
-        const metaV = (metaRow.valores[i] || {}).v || '';
-        const cmp = _prevCompare(v.v, metaV, cfg.dir);
-        if (cmp) {
-          cls = cmp.good ? 'prev-cell-good' : 'prev-cell-bad';
-          ico = cmp.good ? ' <span class="prev-ico up">▲</span>' : ' <span class="prev-ico down">▼</span>';
-          tipAttr = ` data-tip="${_prevEscAttr(_prevBuildTip(r.label, cmp, cfg))}"`;
-        }
-      }
-      bodyHtml += `<td class="${cls}"${tipAttr}>${(v.v || '')}${ico}</td>`;
-      bodyHtml += `<td class="prev-pct-col">${v.pct || ''}</td>`;
-      bodyHtml += `<td class="prev-custo-col">${v.custo || ''}</td>`;
+  // ── Gráfico: barras (realizado/projeção) + linha meta ──────────────────────
+  const ctx = document.getElementById('prevChart');
+  if (ctx) {
+    if (CHARTS.prev) CHARTS.prev.destroy();
+    const barColors = linha.map((l, i) => i <= 5
+      ? 'rgba(63,169,245,.85)'                                  // realizado (azul)
+      : (_prevCenario === 'otimista' ? 'rgba(34,197,94,.80)'
+        : _prevCenario === 'pessimista' ? 'rgba(239,68,68,.70)'
+        : 'rgba(123,97,255,.75)'));                             // projeção
+    CHARTS.prev = new Chart(ctx, {
+      data: {
+        labels: PREV_MES_ABREV,
+        datasets: [
+          {type: 'bar', label: 'Receita (real até jun · projeção jul–dez)', data: cen.receita,
+           backgroundColor: barColors, borderRadius: 4, order: 2},
+          {type: 'line', label: 'Meta (planilha)', data: linha.map(l => l.meta.receita),
+           borderColor: '#94a3b8', borderDash: [6, 4], borderWidth: 2, pointRadius: 2,
+           backgroundColor: 'transparent', tension: .3, order: 1},
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: {
+          legend: {labels: {boxWidth: 12, font: {size: 11}}},
+          tooltip: {callbacks: {label: c => `${c.dataset.label}: ${fmt.currency(c.parsed.y)}`}},
+        },
+        scales: {y: {ticks: {callback: v => _prevMi(v)}}},
+      },
     });
-    bodyHtml += '</tr>';
+  }
+
+  // ── Tabela mês a mês ───────────────────────────────────────────────────────
+  const fonteBadge = {meta: '<span class="prev-badge meta">meta</span>',
+                      real: '<span class="prev-badge real">real CRM</span>',
+                      projecao: '<span class="prev-badge proj">projeção</span>'};
+  let rows = '';
+  linha.forEach((l, i) => {
+    const rec = cen.receita[i], vd = cen.vendas[i];
+    const isReal = l.fonte === 'real';
+    const sub = isReal
+      ? `<div class="prev-meta-sub">meta: ${l.meta.leads} lds · ${l.meta.vendas} vd · ${_prevMi(l.meta.receita)}${l.importados ? ` · −${l.importados} imports` : ''}${l.parcial ? ' · parcial' : ''}</div>`
+      : '';
+    rows += `<tr class="${isReal ? 'prev-tr-real' : ''}">
+      <td><strong>${l.mes}</strong>${sub}</td>
+      <td>${fonteBadge[l.fonte] || l.fonte}</td>
+      <td>${fmt.currency(l.investimento)}</td>
+      <td>${l.leads.toLocaleString('pt-BR')}</td>
+      <td>${l.cpl ? fmt.currency(l.cpl) : '—'}</td>
+      <td>${vd.toLocaleString('pt-BR', {maximumFractionDigits: 1})}</td>
+      <td><strong>${_prevMi(rec)}</strong></td>
+    </tr>`;
   });
+  if (tabEl) tabEl.innerHTML = `
+    <div class="card-title" style="margin-bottom:8px;">📋 Mês a mês <span style="font-weight:400;color:#888;font-size:11px;">(cenário: ${_prevCenario})</span></div>
+    <table class="prev-table2">
+      <thead><tr><th>Mês</th><th>Fonte</th><th>Investim.</th><th>Leads</th><th>CPL</th><th>Vendas</th><th>Receita</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
 
-  wrap.innerHTML = `
-    <table class="prev-table">
-      <thead>
-        ${headerQ}
-        ${headerM}
-        ${headerSub}
-      </thead>
-      <tbody>${bodyHtml}</tbody>
-    </table>
-  `;
+  // ── Funil 15 etapas: meta (Maio) × real (Maio) ─────────────────────────────
+  const F = P.funil || {};
+  let fr = '';
+  (F.etapas || []).forEach((et, i) => {
+    const meta = F.meta_maio[i], real = F.real_maio[i], pct = F.pcts[i];
+    const realTxt = real === null ? '<span style="color:#bbb;">—</span>' : real;
+    const bar = meta ? Math.min(100, (real || 0) / meta * 100) : 0;
+    fr += `<tr>
+      <td class="prev-fun-et">${et}</td>
+      <td style="text-align:right;">${meta}</td>
+      <td style="text-align:right;font-weight:600;">${realTxt}</td>
+      <td style="text-align:right;color:#888;">${pct ? String(pct).replace('.', ',') + '%' : ''}</td>
+      <td style="width:120px;"><div class="prev-fun-track"><div class="prev-fun-fill" style="width:${bar}%;"></div></div></td>
+    </tr>`;
+  });
+  if (funEl) funEl.innerHTML = `
+    <div class="card">
+      <div class="card-title">🔄 Funil de conversão — Meta × Real (Maio/2026)</div>
+      <p style="font-size:11px;color:#888;margin:2px 0 10px;">Meta = planilha · Real = CRM (etapas que o CRM não separa aparecem como “—”). O funil real para em <strong>Visita/Jamil</strong> — ninguém chegou ao Comitê ainda.</p>
+      <table class="prev-funil-tbl">
+        <thead><tr><th>Etapa</th><th style="text-align:right;">Meta</th><th style="text-align:right;">Real</th><th style="text-align:right;">% meta</th><th>Atingim.</th></tr></thead>
+        <tbody>${fr}</tbody>
+      </table>
+    </div>`;
 
-  _prevAttachTooltip(wrap);
+  // ── Resumo automático ──────────────────────────────────────────────────────
+  if (resEl) resEl.innerHTML = _prevResumoHtml(P, cen);
+}
+
+function _prevResumoHtml(P, cen) {
+  const linha = P.linha;
+  const mai = linha[4], jun = linha[5];
+  const h2Pess = P.cenarios.pessimista.receita.slice(6).reduce((a,b)=>a+b,0);
+  const h2Real = P.cenarios.real.receita.slice(6).reduce((a,b)=>a+b,0);
+  const h2Otim = P.cenarios.otimista.receita.slice(6).reduce((a,b)=>a+b,0);
+  const leadsGap = mai.meta.leads ? ((mai.leads - mai.meta.leads) / mai.meta.leads * 100).toFixed(0) : 0;
+  return `
+    <div class="card">
+      <div class="card-title">🧭 Resumo automático</div>
+      <ul class="prev-resumo-list">
+        <li><strong>Realizado (Mai–Jun):</strong> Maio teve <strong>${mai.leads} leads reais</strong> (sem importações), CPL ${fmt.currency(mai.cpl)} — ${leadsGap >= 0 ? 'acima' : Math.abs(leadsGap) + '% abaixo'} da meta de ${mai.meta.leads}. Junho ${jun.leads} leads (parcial). <strong>0 vendas fechadas</strong> nos dois meses.</li>
+        <li><strong>Gargalo do funil:</strong> o avanço real para em <strong>Visita/Jamil</strong> (Maio: ${P.funil.real_maio[10] ?? 0} deals). Nenhum deal chegou a Análise Jurídica/Comitê — por isso a receita realizada é R$ 0 e a projeção até o Comitê é <em>meta</em>, não histórico.</li>
+        <li><strong>Projeção H2 (Jul–Dez):</strong> 🔴 ${_prevMi(h2Pess)} · ⚪ ${_prevMi(h2Real)} · 🟢 ${_prevMi(h2Otim)} de receita, conforme cenário (±30%).</li>
+        <li><strong>Próximo passo:</strong> destravar o trecho <em>Visita → Comitê</em> (hoje 0). Cada deal que fecha = R$ 1 mi. Acelerar COF → Visita e padronizar a etapa jurídica.</li>
+      </ul>
+    </div>`;
 }
 
 // ── Análise Real vs Meta do último mês fechado (compartilhada tela + PDF) ─────
 function _prevAnalyze() {
-  const P = DATA.previsibilidade;
-  if (!P || !P.atingimento || !P.previsibilidade) return null;
+  const P = DATA.previsibilidade_nativa;
+  if (!P || P.modelo !== 'nativo' || !P.linha) return null;
 
-  const meses    = P.atingimento.meses || [];
-  const realRows = P.atingimento.rows || [];
-  const metaByLabel = {};
-  (P.previsibilidade.rows || []).forEach(mr => { metaByLabel[_prevNorm(mr.label)] = mr; });
-  const realByLabel = {};
-  realRows.forEach(rr => { realByLabel[_prevNorm(rr.label)] = rr; });
-
-  // Detecta o último mês com dado real "substancial" (Vendas/Receita/Leads/CPL ≠ placeholder)
-  const coreLabels = ['vendas', 'receita faturada', 'leads', 'cpl'];
-  let mesIdx = -1;
-  for (let i = meses.length - 1; i >= 0; i--) {
-    const temReal = coreLabels.some(l => {
-      const rr = realByLabel[l]; if (!rr) return false;
-      const n = _prevParseBR((rr.valores[i] || {}).v);
-      return n !== null && n !== 0;
-    });
-    if (temReal) { mesIdx = i; break; }
+  // último mês com resultado REAL fechado (não parcial)
+  let idx = -1;
+  for (let i = P.linha.length - 1; i >= 0; i--) {
+    if (P.linha[i].fonte === 'real' && !P.linha[i].parcial) { idx = i; break; }
   }
-  if (mesIdx < 0) return { mesNome: null, bons: [], ruins: [], passos: [], mesIdx: -1 };
+  if (idx < 0) return { mesNome: null, bons: [], ruins: [], passos: [], mesIdx: -1 };
 
-  const bons = [], ruins = [], passos = [];
-  const passosSet = new Set();
-  realRows.forEach(rr => {
-    const cfg = _prevKpiConfig(rr);
-    if (!cfg) return;
-    const metaRow = metaByLabel[_prevNorm(rr.label)];
-    if (!metaRow) return;
-    const cmp = _prevCompare((rr.valores[mesIdx] || {}).v, (metaRow.valores[mesIdx] || {}).v, cfg.dir);
+  const l = P.linha[idx];
+  const metricas = [
+    { label: 'Leads',   dir: 'up',   real: l.leads,   meta: l.meta.leads,   key: 'leads' },
+    { label: 'CPL',     dir: 'down', real: l.cpl,     meta: l.meta.cpl,     key: 'cpl',              moeda: true },
+    { label: 'Vendas',  dir: 'up',   real: l.vendas,  meta: l.meta.vendas,  key: 'vendas' },
+    { label: 'Receita', dir: 'up',   real: l.receita, meta: l.meta.receita, key: 'receita faturada', moeda: true },
+  ];
+
+  const bons = [], ruins = [], passos = [], passosSet = new Set();
+  metricas.forEach(m => {
+    const realStr = m.moeda ? fmt.currency(m.real) : String(m.real);
+    const metaStr = m.moeda ? fmt.currency(m.meta) : String(m.meta);
+    const cmp = _prevCompare(realStr, metaStr, m.dir);   // null se ainda não realizado (real 0)
     if (!cmp) return;
-    const item = { label: rr.label, cmp, cfg };
+    const cfg = PREV_KPI[m.key] || { bom: '', ruim: '' };
+    const item = { label: m.label, cmp, cfg };
     if (cmp.good) bons.push(item);
     else {
       ruins.push(item);
-      if (!passosSet.has(cfg.ruim)) { passosSet.add(cfg.ruim); passos.push(cfg.ruim); }
+      if (cfg.ruim && !passosSet.has(cfg.ruim)) { passosSet.add(cfg.ruim); passos.push(cfg.ruim); }
     }
   });
-  return { mesNome: meses[mesIdx] || '', bons, ruins, passos, mesIdx };
+  return { mesNome: l.mes, bons, ruins, passos, mesIdx: idx };
 }
 
-// ── Relatório / Próximos Passos (tela) ───────────────────────────────────────
-function renderPrevReport() {
-  const cont = document.getElementById('prev-report-container');
-  if (!cont) return;
-  const A = _prevAnalyze();
-  if (!A) {
-    cont.innerHTML = '<p class="rep-empty" style="padding:20px;">Dados de previsibilidade ainda não coletados.</p>';
-    return;
-  }
-  if (!A.mesNome) {
-    cont.innerHTML = '<div class="prev-report"><p class="rep-empty">Ainda não há mês com resultado real preenchido para analisar.</p></div>';
-    return;
-  }
-
-  const liGood = it => `<li><span class="rep-metric">${it.label}</span> — Real ${it.cmp.realStr} vs Meta ${it.cmp.metaStr} <span class="rep-sub">(${it.cmp.gapTxt})</span></li>`;
-
-  cont.innerHTML = `
-    <div class="prev-report">
-      <div class="rep-topbar">
-        <p class="rep-head">Análise referente a <strong>${A.mesNome}</strong> (Real × Meta) — último mês com resultado preenchido.</p>
-        <button class="rep-pdf-btn" onclick="downloadPrevReportPDF()">⬇️ Baixar PDF</button>
-      </div>
-
-      <div class="rep-card good">
-        <h4>✅ O que melhoramos / batemos a meta (${A.bons.length})</h4>
-        ${A.bons.length ? `<ul>${A.bons.map(liGood).join('')}</ul>` : '<p class="rep-empty">Nenhum KPI superou a meta neste mês.</p>'}
-      </div>
-
-      <div class="rep-card bad">
-        <h4>⚠️ O que ficou abaixo da meta (${A.ruins.length})</h4>
-        ${A.ruins.length ? `<ul>${A.ruins.map(liGood).join('')}</ul>` : '<p class="rep-empty">Nenhum KPI ficou abaixo da meta — excelente mês! 🎉</p>'}
-      </div>
-
-      <div class="rep-card next">
-        <h4>🎯 Próximos passos</h4>
-        ${A.passos.length ? `<ul>${A.passos.map(s => `<li>${s}</li>`).join('')}</ul>` : '<p class="rep-empty">Sem pontos críticos. Manter a estratégia atual e monitorar.</p>'}
-      </div>
-    </div>
-  `;
-}
-
-// ── Gera e baixa o relatório em PDF (jsPDF, texto nativo) ─────────────────────
-function downloadPrevReportPDF() {
-  const A = _prevAnalyze();
-  if (!A || !A.mesNome) { alert('Não há mês com resultado real preenchido para gerar o relatório.'); return; }
-  const jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
-  if (!jsPDFCtor) { alert('Biblioteca de PDF ainda não carregou. Recarregue a página e tente novamente.'); return; }
-
-  const doc = new jsPDFCtor({ unit: 'mm', format: 'a4' });
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  const mL = 15, mR = 15, contentW = pageW - mL - mR;
-  let y = 0;
-
-  const NAVY = [13, 59, 102], BLUE = [63, 169, 245], GREEN = [34, 197, 94],
-        RED = [239, 68, 68], GRAY = [107, 114, 128], DARK = [31, 41, 55];
-
-  const ensureSpace = h => { if (y + h > pageH - 15) { doc.addPage(); y = 18; } };
-
-  // Cabeçalho
-  doc.setFillColor(NAVY[0], NAVY[1], NAVY[2]); doc.rect(0, 0, pageW, 26, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
-  doc.text('Clínica da Cidade — Expansão CDC', mL, 11);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-  doc.text('Relatório de Previsibilidade 2026 · Próximos Passos', mL, 18);
-  y = 36;
-
-  // Subtítulo
-  doc.setTextColor(DARK[0], DARK[1], DARK[2]); doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
-  doc.text(`Análise referente a ${A.mesNome} (Real x Meta)`, mL, y); y += 6;
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
-  doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')} · último mês com resultado preenchido`, mL, y);
-  y += 10;
-
-  function section(title, color, items, isText) {
-    ensureSpace(12);
-    doc.setFillColor(color[0], color[1], color[2]); doc.rect(mL, y - 4.5, 2.5, 7, 'F');
-    doc.setTextColor(DARK[0], DARK[1], DARK[2]); doc.setFont('helvetica', 'bold'); doc.setFontSize(11.5);
-    doc.text(title, mL + 5, y); y += 8;
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
-    if (!items.length) {
-      ensureSpace(6); doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
-      doc.text('—', mL + 5, y); y += 8; return;
-    }
-    doc.setTextColor(DARK[0], DARK[1], DARK[2]);
-    items.forEach(it => {
-      const line = isText
-        ? `•  ${it}`
-        : `•  ${it.label}: Real ${it.cmp.realStr} vs Meta ${it.cmp.metaStr}  (${it.cmp.gapTxt})`;
-      const wrapped = doc.splitTextToSize(line, contentW - 4);
-      ensureSpace(wrapped.length * 5 + 2);
-      doc.text(wrapped, mL + 5, y); y += wrapped.length * 5 + 2;
-    });
-    y += 5;
-  }
-
-  section(`O que melhoramos / batemos a meta (${A.bons.length})`, GREEN, A.bons, false);
-  section(`O que ficou abaixo da meta (${A.ruins.length})`, RED, A.ruins, false);
-  section('Próximos passos', BLUE, A.passos, true);
-
-  // Rodapé em todas as páginas
-  const pages = doc.internal.getNumberOfPages();
-  for (let p = 1; p <= pages; p++) {
-    doc.setPage(p); doc.setFontSize(8); doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
-    doc.text('Dashboard Marketing — Clínica da Cidade Franchising', mL, pageH - 8);
-    doc.text(`Página ${p}/${pages}`, pageW - mR, pageH - 8, { align: 'right' });
-  }
-
-  doc.save(`Relatorio_Previsibilidade_${A.mesNome}_2026.pdf`);
-}
+// (Relatório/PDF da previsibilidade removidos — o Plano de Ação Real×Meta vive na Visão Executiva via _prevAnalyze.)
 
 // ─── SUPABASE: configuração ───────────────────────────────────────────────────
 // PREENCHA com os valores do seu projeto em: supabase.com → Project Settings → API
@@ -5382,6 +5331,19 @@ async function downloadAndRender() {
 }
 
 async function loadData() {
+  // DEV: rodando em localhost, carrega o summary.json local (sem login) — facilita
+  // revisar o preview antes de o ETL publicar no Supabase. Só vale em localhost.
+  const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
+  if (isLocal) {
+    try {
+      const r = await fetch('../data/summary.json', { cache: 'no-store' });
+      if (r.ok) {
+        DATA = await r.json();
+        await startDashboard();
+        return;
+      }
+    } catch (_) { /* cai pro fluxo normal abaixo */ }
+  }
   try {
     // Se já existe sessão ativa (localStorage), pula o login
     const { data: { session } } = await sb.auth.getSession();

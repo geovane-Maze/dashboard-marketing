@@ -2259,7 +2259,7 @@ def main():
     print("  Lendo GA4...")
     ga4 = read_sheet(gc, "ga4_sessions")
 
-    print("  Lendo Previsibilidade 2026...")
+    print("  Lendo Previsibilidade 2026 (espelho planilha — legado/produção)...")
     previsibilidade_data = None
     try:
         from collectors import previsibilidade
@@ -2274,6 +2274,9 @@ def main():
     except Exception as e:
         print(f"    AVISO: não consegui ler planilha de Previsibilidade: {e}")
         previsibilidade_data = None
+
+    # Previsibilidade NATIVA (modelo novo) é montada mais abaixo — precisa do
+    # investimento mensal já agregado (meta_agg/google_agg).
 
     print("  Lendo Google Ads Criativos...")
     google_ads_creatives_rows = []
@@ -2308,6 +2311,27 @@ def main():
     utm_agg     = aggregate_utm(leads)
     leads_agg   = aggregate_leads(leads)
 
+    # Previsibilidade NATIVA (Jan-Abr meta planilha + Mai-Jun real do CRM + Jul-Dez projeção).
+    # Vai numa chave SEPARADA (`previsibilidade_nativa`) p/ não quebrar a produção,
+    # que ainda renderiza o espelho legado em `previsibilidade`. Usa o investimento
+    # mensal real (meta+google) p/ o CPL de Mai/Jun.
+    print("  Montando Previsibilidade 2026 (nativa: planilha + CRM real)...")
+    previsibilidade_nativa_data = None
+    try:
+        from collectors import previsibilidade_nativa
+        previsibilidade_nativa_data = previsibilidade_nativa.get_previsibilidade_data(
+            meta_monthly=meta_agg.get("monthly"),
+            google_monthly=google_agg.get("monthly"),
+        )
+        if previsibilidade_nativa_data:
+            mai = previsibilidade_nativa_data["linha"][4]
+            print(f"    OK: {len(previsibilidade_nativa_data['linha'])} meses · "
+                  f"Maio real {mai['leads']} leads · "
+                  f"H2 real R$ {previsibilidade_nativa_data['cenarios']['real']['total_receita']:,.0f}")
+    except Exception as e:
+        print(f"    AVISO: não consegui montar Previsibilidade nativa: {e}")
+        previsibilidade_nativa_data = None
+
     summary = {
         "last_update": datetime.now().strftime("%d/%m/%Y %H:%M"),
         "totals": {
@@ -2328,6 +2352,7 @@ def main():
         "google_ads_creatives": aggregate_google_ads_creatives(google_ads_creatives_rows, leads_daily_map=google_leads_daily),
         "creative_quality": creative_quality,
         "previsibilidade": previsibilidade_data,
+        "previsibilidade_nativa": previsibilidade_nativa_data,
         "relatorio": build_relatorio(leads, crm_agg, meta_agg, google_agg, utm_agg, meta_rows=meta_ads, meetings_agg=meetings_agg),
         "scoring_closer": build_leads_scoring_closer(crm_deals, leads, crm_tarefas, crm_atividades),
     }
