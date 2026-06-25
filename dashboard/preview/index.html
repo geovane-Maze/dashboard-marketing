@@ -1624,7 +1624,7 @@
 
       <!-- 3. Qualidade dos públicos (conjuntos) -->
       <div class="table-card">
-        <h3>Qualidade dos públicos <span style="font-size:11px;color:#94a3b8;font-weight:400;">· conjuntos · meta CPL R$ 175</span></h3>
+        <h3>Qualidade dos públicos <span style="font-size:11px;color:#94a3b8;font-weight:400;">· conjuntos · bom até CPL R$ 360</span></h3>
         <table>
           <thead><tr>
             <th>Status</th><th>Campanha</th><th>Conjunto</th><th>Leads CRM</th><th>CPL</th>
@@ -1636,7 +1636,7 @@
 
       <!-- 4. Qualidade dos anúncios (criativos) -->
       <div class="table-card">
-        <h3>Qualidade dos anúncios <span style="font-size:11px;color:#94a3b8;font-weight:400;">· clique na imagem p/ ver o criativo</span></h3>
+        <h3>Qualidade dos anúncios <span style="font-size:11px;color:#94a3b8;font-weight:400;">· bom até CPL R$ 360 · clique na imagem p/ ver o criativo</span></h3>
         <table>
           <thead><tr>
             <th>Criativo</th><th>Anúncio</th><th>Campanha</th><th>Conjunto</th><th>Gasto</th>
@@ -3948,36 +3948,59 @@ function renderPerdas() {
 
 // ─── SECTION: META ADS ────────────────────────────────────────────────────────
 // ─── Régua de qualidade de Ads (CPL vs meta) — compartilhada Meta/Google ──────
+// CPL_TARGET = meta de CPL a NÍVEL DE CONTA (KPI). CPL_QUALIDADE = limiar a nível
+// de conjunto/anúncio, naturalmente mais alto (granular). Acima de QUALIDADE = ruim.
 const CPL_TARGET = { meta: 175, google: 160 };
+const CPL_QUALIDADE = { meta: 360, google: 360 };
 function qualidadeAds(cpl, gasto, leadsCRM, target) {
-  // Trava de volume: gastou menos que o valor de 1 lead (a meta) → ainda não dá pra julgar.
-  if ((gasto || 0) < target) return { nivel: 'Dados insuf.', acao: 'Observar', cls: 'q-warn' };
-  if (!leadsCRM)          return { nivel: 'Ruim',         acao: 'Pausar',       cls: 'q-bad'  };
-  if (cpl <= target)      return { nivel: 'Bom',          acao: 'Manter ativo', cls: 'q-good' };
-  if (cpl <= target * 1.3) return { nivel: 'Atenção',     acao: 'Observar',     cls: 'q-warn' };
+  // Sem leads: se gastou menos que o valor de 1 lead (a meta), ainda não dá pra
+  // julgar (dados insuf.); se já gastou mais que isso e não trouxe lead, é ruim.
+  if (!leadsCRM) return (gasto || 0) < target
+    ? { nivel: 'Dados insuf.', acao: 'Observar', cls: 'q-warn' }
+    : { nivel: 'Ruim',         acao: 'Pausar',   cls: 'q-bad' };
+  // Com leads: julga pelo CPL (independe do volume gasto).
+  if (cpl <= target)       return { nivel: 'Bom',     acao: 'Manter ativo', cls: 'q-good' };
+  if (cpl <= target * 1.3) return { nivel: 'Atenção', acao: 'Observar',     cls: 'q-warn' };
   return { nivel: 'Ruim', acao: 'Pausar', cls: 'q-bad' };
 }
 function buildAdsResumo(plataforma, ctx) {
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const { tGasto, tLeadsCRM, kCpl, T, adsets, ads } = ctx;
+  const { tGasto, tLeadsCRM, kCpl, kCtr, tImpr, tCliques, T, TQ, nCamps, adsets, ads } = ctx;
+  const c = v => v > 0 ? fmt.currency(v) : '—';
+  const cpc = tCliques > 0 ? tGasto / tCliques : 0;
+  const cont = arr => ({
+    bom:   arr.filter(a => a.q.nivel === 'Bom').length,
+    aten:  arr.filter(a => a.q.nivel === 'Atenção').length,
+    ruim:  arr.filter(a => a.q.nivel === 'Ruim').length,
+    insuf: arr.filter(a => a.q.nivel === 'Dados insuf.').length,
+  });
+  const cj = cont(adsets), an = cont(ads);
   const pausar   = ads.filter(a => a.q.acao === 'Pausar');
   const observar = ads.filter(a => a.q.acao === 'Observar');
   const manter   = ads.filter(a => a.q.acao === 'Manter ativo');
   const topPausar = pausar.slice().sort((a, b) => b.gasto - a.gasto).slice(0, 3);
-  const topManter = manter.slice().sort((a, b) => a._cpl - b._cpl).slice(0, 3);
-  const adsetsRuins = adsets.filter(a => a.q.acao === 'Pausar');
+  const topManter = manter.filter(a => a.leadsCRM > 0).sort((a, b) => a._cpl - b._cpl).slice(0, 3);
+  const adsetsRuins = adsets.filter(a => a.q.acao === 'Pausar').sort((a, b) => b.gasto - a.gasto);
+  const gastoPausar = pausar.reduce((s, a) => s + a.gasto, 0);
+
   const p = [];
-  p.push(`<p><strong>Panorama ${plataforma}:</strong> ${fmt.currency(tGasto)} investidos geraram <strong>${fmt.num(tLeadsCRM)} leads no CRM</strong> — CPL de <strong>${fmt.currency(kCpl)}</strong> (meta R$ ${T}). ${kCpl > 0 && kCpl <= T ? '✅ Dentro da meta.' : kCpl > T ? '⚠️ Acima da meta.' : ''}</p>`);
-  if (pausar.length)      p.push(`<p>🔴 <strong>Pausar — ${pausar.length} anúncio(s):</strong> ${topPausar.map(a => esc(a.anuncio) + ' (' + fmt.currency(a.gasto) + ')').join(', ')}${pausar.length > 3 ? '…' : ''}. CPL muito acima da meta ou sem leads no CRM.</p>`);
-  if (adsetsRuins.length) p.push(`<p>👥 <strong>Públicos a revisar — ${adsetsRuins.length} conjunto(s):</strong> ${adsetsRuins.slice(0, 3).map(a => esc(a.conjunto)).join(', ')}${adsetsRuins.length > 3 ? '…' : ''}.</p>`);
-  if (observar.length)    p.push(`<p>🟡 <strong>Observar — ${observar.length}:</strong> CPL um pouco acima da meta; acompanhar antes de decidir.</p>`);
-  if (manter.length)      p.push(`<p>🟢 <strong>Manter / escalar — ${manter.length}:</strong> ${topManter.map(a => esc(a.anuncio)).join(', ')}. Melhor CPL — candidatos a mais verba.</p>`);
-  if (!ads.length)        p.push('<p>Sem anúncios com dados no momento.</p>');
+  p.push(`<p><strong>📊 Panorama ${plataforma}:</strong> ${fmt.currency(tGasto)} investidos · <strong>${fmt.num(tLeadsCRM)} leads CRM</strong> · CPL <strong>${c(kCpl)}</strong> (meta de conta R$ ${T}) · ${fmt.k(tImpr)} impressões · ${fmt.k(tCliques)} cliques · CTR ${fmt.pct(kCtr)} · CPC ${c(cpc)}.</p>`);
+  p.push(`<p><strong>🩺 Saúde:</strong> ${nCamps} campanha(s) ativa(s) · <strong>Públicos:</strong> ${cj.bom} bom / ${cj.aten} atenção / ${cj.ruim} ruim${cj.insuf ? ` / ${cj.insuf} s/ dados` : ''} · <strong>Anúncios:</strong> ${an.bom} bom / ${an.aten} atenção / ${an.ruim} ruim${an.insuf ? ` / ${an.insuf} s/ dados` : ''} <span style="color:#94a3b8;">(limiar conjunto/anúncio R$ ${TQ})</span>.</p>`);
+
+  const steps = [];
+  if (pausar.length)      steps.push(`🔴 <strong>Pausar ${pausar.length} anúncio(s)</strong> — ${fmt.currency(gastoPausar)} em gasto, CPL acima de R$ ${TQ} ou sem leads: ${topPausar.map(a => esc(a.anuncio) + ' (' + c(a._cpl) + ')').join(', ')}${pausar.length > 3 ? '…' : ''}.`);
+  if (adsetsRuins.length) steps.push(`👥 <strong>Revisar ${adsetsRuins.length} público(s)</strong> ruins: ${adsetsRuins.slice(0, 3).map(a => esc(a.conjunto)).join(', ')}${adsetsRuins.length > 3 ? '…' : ''}.`);
+  if (observar.length)    steps.push(`🟡 <strong>Observar ${observar.length} anúncio(s)</strong> com CPL entre R$ ${TQ} e R$ ${Math.round(TQ * 1.3)} — acompanhar antes de pausar.`);
+  if (topManter.length)   steps.push(`🟢 <strong>Escalar:</strong> ${topManter.map(a => esc(a.anuncio) + ' (' + c(a._cpl) + ')').join(', ')} — melhor CPL, candidatos a mais verba.`);
+  if (kCpl > T)           steps.push(`⚠️ CPL geral (${c(kCpl)}) acima da meta de conta (R$ ${T}) — concentrar verba nos públicos/anúncios "Bom".`);
+  if (steps.length) p.push('<p style="margin-bottom:4px;"><strong>✅ Próximos passos:</strong></p><ul style="margin:0;padding-left:20px;">' + steps.map(s => `<li style="margin-bottom:5px;">${s}</li>`).join('') + '</ul>');
+  if (!ads.length) p.push('<p>Sem anúncios com dados no período selecionado.</p>');
   return p.join('');
 }
 
 function renderMeta() {
-  const T = CPL_TARGET.meta;
+  const T = CPL_TARGET.meta;          // meta de CPL a nível de conta (KPI)
+  const TQ = CPL_QUALIDADE.meta;      // limiar de qualidade conjunto/anúncio
   const pred = getFilteredMonths();
   const datePred = getDateFilter();
   const M = DATA.meta_ads || {};
@@ -4012,23 +4035,19 @@ function renderMeta() {
     const c = campMap[r.campanha] || (campMap[r.campanha] = { gasto: 0, impressoes: 0, cliques: 0, leadsPlat: 0 });
     c.gasto += r.gasto || 0; c.impressoes += r.impressoes || 0; c.cliques += r.cliques || 0; c.leadsPlat += r.leads || 0;
   });
-  // Leads CRM por campanha: casa nome da campanha ↔ utm_campaign do lead.
-  // Os dois descrevem a MESMA campanha mas com grafias diferentes (pontos vs
-  // colchetes/acentos), então normalizamos (sem acento/pontuação) antes de casar.
-  const normCamp = x => (x || '').normalize('NFKD').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const utmLeadsMap = {};
-  (DATA.utm.campaigns_daily || [])
-    .filter(r => r.source === 'metaads' && (!datePred || datePred(r.data)))
-    .forEach(r => { const k = normCamp(r.campaign); if (k) utmLeadsMap[k] = (utmLeadsMap[k] || 0) + r.total; });
-  const crmLeads = name => {
-    const k = normCamp(name);
-    if (utmLeadsMap[k] !== undefined) return utmLeadsMap[k];
-    for (const [kk, v] of Object.entries(utmLeadsMap)) { if (k && (k.includes(kk) || kk.includes(k))) return v; }
-    return 0;
-  };
+  // Leads CRM por campanha = soma dos leads CRM por anúncio (creatives_daily,
+  // MESMA fonte das tabelas de públicos/anúncios) agrupada por campanha. Garante
+  // consistência: o total da campanha = soma dos seus conjuntos/anúncios. (O match
+  // por utm_campaign era pior — perdia a maioria dos leads das campanhas grandes.)
+  const adCampMap = {}; (M.creatives || []).forEach(c => { adCampMap[c.anuncio] = c.campanha || ''; });
+  const crmByCamp = {};
+  (M.creatives_daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
+    const cp = adCampMap[r.anuncio];
+    if (cp) crmByCamp[cp] = (crmByCamp[cp] || 0) + (r.leads || 0);
+  });
   const camps = Object.entries(campMap).filter(([, d]) => d.gasto > 0).sort((a, b) => b[1].gasto - a[1].gasto);
   document.getElementById('table-meta-campaigns').innerHTML = camps.map(([name, d]) => {
-    const lc = crmLeads(name), cpl = lc > 0 ? d.gasto / lc : 0;
+    const lc = crmByCamp[name] || 0, cpl = lc > 0 ? d.gasto / lc : 0;
     const cpc = d.cliques > 0 ? d.gasto / d.cliques : 0, ctr = d.impressoes > 0 ? d.cliques / d.impressoes * 100 : 0;
     return `<tr>
       <td>${stt(activeCamps.has(name))}</td>
@@ -4098,7 +4117,7 @@ function renderMeta() {
   });
   const adsets = Object.values(adsetMap).map(a => {
     a._cpl = a.leadsCRM > 0 ? a.gasto / a.leadsCRM : 0;
-    a.q = qualidadeAds(a._cpl, a.gasto, a.leadsCRM, T);
+    a.q = qualidadeAds(a._cpl, a.gasto, a.leadsCRM, TQ);
     return a;
   }).sort((x, y) => y.gasto - x.gasto);
   document.getElementById('table-meta-adsets').innerHTML = adsets.map(a => {
@@ -4123,7 +4142,7 @@ function renderMeta() {
     const cpl = d.leadsCRM > 0 ? d.gasto / d.leadsCRM : 0;
     return { anuncio, campanha: meta.campanha || '', conjunto: meta.conjunto || '', gasto: d.gasto, gasto7d: g7d[anuncio] || 0,
       leadsPlat: meta.leads || 0, leadsCRM: d.leadsCRM, _cpl: cpl, thumbnail: meta.thumbnail, permalink: meta.permalink,
-      ativo: activeCamps.has(meta.campanha), q: qualidadeAds(cpl, d.gasto, d.leadsCRM, T) };
+      ativo: activeCamps.has(meta.campanha), q: qualidadeAds(cpl, d.gasto, d.leadsCRM, TQ) };
   }).sort((x, y) => y.gasto - x.gasto);
   document.getElementById('table-meta-ads').innerHTML = ads.map(c => {
     const img = c.thumbnail
@@ -4145,7 +4164,7 @@ function renderMeta() {
   }).join('') || '<tr><td colspan="10" class="empty">Sem anúncios.</td></tr>';
 
   // ── 5. RESUMO E PRÓXIMOS PASSOS (automático) ──
-  document.getElementById('meta-resumo').innerHTML = buildAdsResumo('Meta Ads', { tGasto, tLeadsCRM, kCpl, T, adsets, ads });
+  document.getElementById('meta-resumo').innerHTML = buildAdsResumo('Meta Ads', { tGasto, tLeadsCRM, kCpl, kCtr, tImpr, tCliques, T, TQ, nCamps: camps.length, adsets, ads });
 }
 
 // ─── SECTION: GOOGLE ADS ──────────────────────────────────────────────────────
