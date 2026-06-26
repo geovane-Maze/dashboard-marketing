@@ -1,0 +1,76 @@
+name: ETL rapido (sem coleta) — atualiza Supabase
+
+# Roda SO o ETL (generate_dashboard_data.py): le o Google Sheets (ja populado pelo
+# ultimo cron) + monta o summary.json (incl. previsibilidade nativa v2) + sobe pro
+# Supabase. NAO roda o main.py (coleta de leads ~30 min). Use para refletir mudancas
+# de codigo/modelo no dashboard rapidamente, sem esperar a coleta completa.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  etl:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Criar arquivo .env
+        run: |
+          cat > .env << 'EOF'
+          RD_CLIENT_ID=${{ secrets.RD_CLIENT_ID }}
+          RD_CLIENT_SECRET=${{ secrets.RD_CLIENT_SECRET }}
+          RD_REFRESH_TOKEN=${{ secrets.RD_REFRESH_TOKEN }}
+          RD_CRM_TOKEN=${{ secrets.RD_CRM_TOKEN }}
+          GOOGLE_SHEET_ID=${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_ADS_DEVELOPER_TOKEN=${{ secrets.GOOGLE_ADS_DEVELOPER_TOKEN }}
+          GOOGLE_ADS_CLIENT_ID=${{ secrets.GOOGLE_ADS_CLIENT_ID }}
+          GOOGLE_ADS_CLIENT_SECRET=${{ secrets.GOOGLE_ADS_CLIENT_SECRET }}
+          GOOGLE_ADS_REFRESH_TOKEN=${{ secrets.GOOGLE_ADS_REFRESH_TOKEN }}
+          GOOGLE_ADS_CUSTOMER_ID=${{ secrets.GOOGLE_ADS_CUSTOMER_ID }}
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
+          EOF
+
+      - name: Validar credenciais Supabase
+        run: |
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_SERVICE_KEY }}" ]; then
+            echo "::error::Secrets SUPABASE_URL ou SUPABASE_SERVICE_KEY nao configurados! Pipeline ABORTADO."
+            exit 1
+          fi
+          echo "OK: credenciais Supabase definidas."
+
+      - name: Criar credenciais Google
+        run: |
+          mkdir -p credentials
+          echo '${{ secrets.GOOGLE_CREDENTIALS_JSON }}' > credentials/google_service_account.json
+          echo '${{ secrets.GA4_TOKEN_JSON }}' > credentials/ga4_token.json
+
+      - name: Gerar dados do dashboard (ETL) + upload Supabase
+        run: |
+          mkdir -p dashboard/data
+          python -u scripts/generate_dashboard_data.py
+        timeout-minutes: 10
+
+      - name: Publicar dashboard no GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dashboard/
+
+      - name: Deploy para GitHub Pages
+        uses: actions/deploy-pages@v4
