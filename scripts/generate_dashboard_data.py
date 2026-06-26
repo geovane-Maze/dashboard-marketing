@@ -2315,7 +2315,7 @@ def main():
     # Vai numa chave SEPARADA (`previsibilidade_nativa`) p/ não quebrar a produção,
     # que ainda renderiza o espelho legado em `previsibilidade`. Usa o investimento
     # mensal real (meta+google) p/ o CPL de Mai/Jun.
-    print("  Montando Previsibilidade 2026 (nativa: planilha + CRM real)...")
+    print("  Montando Previsibilidade 2026 (nativa v2: real Jan-Jun + projeção CPL)...")
     previsibilidade_nativa_data = None
     try:
         from collectors import previsibilidade_nativa
@@ -2324,12 +2324,15 @@ def main():
             google_monthly=google_agg.get("monthly"),
         )
         if previsibilidade_nativa_data:
-            mai = previsibilidade_nativa_data["linha"][4]
-            print(f"    OK: {len(previsibilidade_nativa_data['linha'])} meses · "
+            mai = previsibilidade_nativa_data["mensal"][4]   # Maio
+            print(f"    OK [{previsibilidade_nativa_data['modelo']}]: "
+                  f"{len(previsibilidade_nativa_data['mensal'])} meses · "
                   f"Maio real {mai['leads']} leads · "
-                  f"H2 real R$ {previsibilidade_nativa_data['cenarios']['real']['total_receita']:,.0f}")
+                  f"H2 base R$ {previsibilidade_nativa_data['cenarios']['base']['receita']:,.0f}")
     except Exception as e:
+        import traceback
         print(f"    AVISO: não consegui montar Previsibilidade nativa: {e}")
+        traceback.print_exc()
         previsibilidade_nativa_data = None
 
     summary = {
