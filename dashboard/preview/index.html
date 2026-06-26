@@ -1965,10 +1965,11 @@
       <!-- Cards KPI do ano (no cenário selecionado) -->
       <div id="prev-cards" class="prev-cards"></div>
 
-      <!-- Gráficos topo: Investimento + Leads -->
-      <div class="charts-row" style="margin-top:16px;">
-        <div class="card"><div class="card-title">💰 Investimento — Real × Projetado</div><div style="height:280px;"><canvas id="chartInvest"></canvas></div></div>
-        <div class="card"><div class="card-title">👥 Leads — Real × Projetado</div><div style="height:280px;"><canvas id="chartLeads"></canvas></div></div>
+      <!-- Gráficos volume: Investimento + Leads + Sessões -->
+      <div class="charts-row triple" style="margin-top:16px;">
+        <div class="card"><div class="card-title">💰 Investimento — Real × Projetado</div><div style="height:250px;"><canvas id="chartInvest"></canvas></div></div>
+        <div class="card"><div class="card-title">👥 Leads — Real × Projetado</div><div style="height:250px;"><canvas id="chartLeads"></canvas></div></div>
+        <div class="card"><div class="card-title">🌐 Sessões mensais (GA)</div><div style="height:250px;"><canvas id="chartSessoes"></canvas></div></div>
       </div>
 
       <!-- Gráficos eficiência: CPL + CPS + Conversão LP -->
@@ -5181,7 +5182,7 @@ function renderPrevisibilidade() {
   const P = DATA.previsibilidade_nativa;
   const $ = id => document.getElementById(id);
   const conteinerIds = ['prev-banner','prev-tab-consolidada','prev-tab-projecao','prev-tab-funil','prev-tab-meta','prev-funil-real','prev-resumo'];
-  const chartKeys = ['invest','leadsM','cpl','cps','convlp','negocios','receita','funil'];
+  const chartKeys = ['invest','leadsM','sessoes','cpl','cps','convlp','negocios','receita','funil'];
 
   if (!P || P.modelo !== 'nativo-v2' || !P.mensal) {
     if ($('prev-cards')) $('prev-cards').innerHTML =
@@ -5203,6 +5204,7 @@ function renderPrevisibilidade() {
   const leadsMensal  = M.map(m => m.status === 'real' ? m.leads : (cen.leads_mes[m.mes] ?? null));
   const cplReal      = M.map(m => m.status === 'real' ? m.cpl : null);
   const cplProj      = M.map(m => m.status === 'proj' ? cen.cpl : null);
+  const sessoesMensal = M.map(m => m.status === 'real' ? m.sessoes : null);
   const cpsMensal    = M.map(m => m.status === 'real' ? m.cps : null);
   const convMensal   = M.map(m => m.status === 'real' ? +(m.conv_lp * 100).toFixed(2) : null);
   const corPorStatus = M.map(m => m.status === 'real' ? PREV_AZUL : info.cor);
@@ -5233,6 +5235,11 @@ function renderPrevisibilidade() {
     type: 'bar',
     data: {labels: PREV_MES_ABREV, datasets: [{label: 'Leads', data: leadsMensal, backgroundColor: corPorStatus, borderRadius: 4}]},
     options: {plugins: {legend: {display: false}, tooltip: {callbacks: {label: c => _prevN1(c.parsed.y) + ' leads'}}}, scales: {y: {beginAtZero: true}}},
+  });
+  _prevChart('sessoes', 'chartSessoes', {
+    type: 'bar',
+    data: {labels: PREV_MES_ABREV, datasets: [{label: 'Sessões', data: sessoesMensal, backgroundColor: '#3fa9f5', borderRadius: 4}]},
+    options: {plugins: {legend: {display: false}, tooltip: {callbacks: {label: c => c.parsed.y == null ? 'n/d' : fmt.num(c.parsed.y) + ' sessões'}}}, scales: {y: {beginAtZero: true}}},
   });
   // CPL: real (azul) + projeção do cenário (tracejado)
   _prevChart('cpl', 'chartCPL', {
