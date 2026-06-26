@@ -44,21 +44,33 @@ MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho',
 KEYMES = ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06',
           '2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12']
 
-# Mapa funil CRM (12 etapas, índice) -> etapa da planilha (15, índice 0-14).
-# Etapas da planilha sem correspondência direta no CRM (Nutrição, Assinatura) ficam None.
-CRM_TO_PLAN = {
-    0: 0,    # Entrada de Lead          -> 1 Entrada de lead
-    1: 1,    # Tentativa de Contato     -> 2 Contato inicial
-    2: 4,    # Qualificação             -> 5 Pré-Qualificado
-    3: 4,    # Qualificado Não agendada -> 5 Pré-Qualificado
-    4: 5,    # 1ª Reunião Agendada      -> 6 Reunião Agendada
-    5: 6,    # 1ª Reunião Realizada     -> 7 Reunião Realizada
-    6: 7,    # Reunião de BP Agendada   -> 8 Reunião BP
-    7: 7,    # Reunião de BP Realizada  -> 8 Reunião BP
-    8: 8,    # Envio de COF             -> 9 Envio de COF
-    9: 10,   # Visita/Reunião com Jamil -> 11 Visita Técnica
-    10: 11,  # Análise Financeira/Jur.  -> 12 Análise Jurídica
-    11: 12,  # Comite Final             -> 13 Comitê
+# Funil EXIBIDO = as 14 etapas REAIS do CRM da Clínica (as que a equipe usa no dia a dia).
+# Os 12 primeiros são estágios do pipeline "Funil CDC"; "Assinatura do Contrato" e
+# "Negócio Fechado" não são estágios — são o desfecho (deal ganho), derivados de win.
+ETAPAS_CRM = [
+    'Entrada de Lead', 'Tentativa de Contato', 'Qualificação', 'Qualificado Não agendada',
+    '1ª Reunião Agendada', '1ª Reunião Realizada', 'Reunião de BP Agendada',
+    'Reunião de BP Realizada', 'Envio de COF', 'Visita / Reunião com Jamil',
+    'Análise Financeira/Jurídica', 'Comitê Final', 'Assinatura do Contrato', 'Negócio Fechado',
+]
+
+# Meta de cada etapa do CRM (14, índice) vem da etapa correspondente da planilha (15, índice).
+# A planilha agrupa diferente (Nutrição 1/2, Reunião Alinhamento) — mapa aproximado p/ referência.
+META_MAP = {
+    0: 0,    # Entrada de Lead          -> 1ª Entrada de lead
+    1: 1,    # Tentativa de Contato     -> 2º Contato inicial
+    2: 2,    # Qualificação             -> 3º Nutrição 1
+    3: 4,    # Qualificado Não agendada -> 5º Pré-Qualificado
+    4: 5,    # 1ª Reunião Agendada      -> 6º Reunião Agendada
+    5: 6,    # 1ª Reunião Realizada     -> 7º Reunião Realizada
+    6: 7,    # Reunião de BP Agendada   -> 8º Reunião BP
+    7: 7,    # Reunião de BP Realizada  -> 8º Reunião BP
+    8: 8,    # Envio de COF             -> 9º Envio de COF
+    9: 10,   # Visita/Reunião com Jamil -> 11º Visita Técnica
+    10: 11,  # Análise Financeira/Jur.  -> 12º Análise Jurídica
+    11: 12,  # Comite Final             -> 13º Comitê
+    12: 13,  # Assinatura do Contrato   -> 14º Assinatura do Contrato
+    13: 14,  # Negócio Fechado          -> 15º Negócio Fechado
 }
 
 
@@ -217,12 +229,18 @@ def funil_real():
     return out
 
 
-def _real_para_15(reached12):
-    """Mapeia o funil real do CRM (12 reached) para as 15 posições da planilha."""
-    out = [None] * 15
-    for crm_i, plan_i in CRM_TO_PLAN.items():
-        v = reached12[crm_i] if crm_i < len(reached12) else 0
-        out[plan_i] = v if out[plan_i] is None else max(out[plan_i], v)
+def _real_crm14(reached12, vendas):
+    """Real das 14 etapas do CRM: 12 estágios do pipeline + Assinatura/Negócio Fechado (=ganhos)."""
+    base = list(reached12[:12]) + [0] * max(0, 12 - len(reached12))
+    return base[:12] + [vendas, vendas]   # Assinatura e Negócio Fechado = deals ganhos
+
+
+def _conv_pcts(real14):
+    """Conversão real entre etapas (etapa N / etapa N-1, %). Primeira etapa fica None."""
+    out = [None]
+    for i in range(1, len(real14)):
+        prev = real14[i - 1]
+        out.append(round(real14[i] / prev * 100, 1) if prev else 0.0)
     return out
 
 
@@ -281,13 +299,16 @@ def get_previsibilidade_data(meta_monthly=None, google_monthly=None):
 
     cenarios = {'pessimista': cenario(0.7), 'real': cenario(1.0), 'otimista': cenario(1.3)}
 
+    # Funil nas 14 etapas REAIS do CRM. Meta = referência mapeada da planilha (col Maio).
+    real_maio = _real_crm14(real['2026-05']['funil'], real['2026-05']['vendas'])
+    real_junho = _real_crm14(real['2026-06']['funil'], real['2026-06']['vendas'])
+    meta_maio = [round(plan['funil'][META_MAP[i]]['valores'][4]) for i in range(len(ETAPAS_CRM))]
     funil = {
-        'etapas': [f['etapa'] for f in plan['funil']],
-        'meta_maio': [round(f['valores'][4]) for f in plan['funil']],
-        'pcts': [round(f['pcts'][4] * 100, 1) for f in plan['funil']],
-        'real_maio': _real_para_15(real['2026-05']['funil']),
-        'real_junho': _real_para_15(real['2026-06']['funil']),
-        'crm_etapas': real['2026-05']['order'],
+        'etapas': ETAPAS_CRM,
+        'meta_maio': meta_maio,
+        'pcts': _conv_pcts(real_maio),     # conversão REAL entre etapas do CRM (Maio)
+        'real_maio': real_maio,
+        'real_junho': real_junho,
     }
 
     return {

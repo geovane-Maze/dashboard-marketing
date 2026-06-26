@@ -5193,27 +5193,27 @@ function renderPrevisibilidade() {
       <tbody>${rows}</tbody>
     </table>`;
 
-  // ── Funil 15 etapas: meta (Maio) × real (Maio) ─────────────────────────────
+  // ── Funil das 14 etapas REAIS do CRM (Funil CDC): meta (referência) × real (Maio) ──
   const F = P.funil || {};
   let fr = '';
   (F.etapas || []).forEach((et, i) => {
     const meta = F.meta_maio[i], real = F.real_maio[i], pct = F.pcts[i];
-    const realTxt = real === null ? '<span style="color:#bbb;">—</span>' : real;
+    const realTxt = (real === null || real === undefined) ? '<span style="color:#bbb;">—</span>' : real;
     const bar = meta ? Math.min(100, (real || 0) / meta * 100) : 0;
     fr += `<tr>
       <td class="prev-fun-et">${et}</td>
       <td style="text-align:right;">${meta}</td>
       <td style="text-align:right;font-weight:600;">${realTxt}</td>
-      <td style="text-align:right;color:#888;">${pct ? String(pct).replace('.', ',') + '%' : ''}</td>
+      <td style="text-align:right;color:#888;">${(pct === null || pct === undefined) ? '' : String(pct).replace('.', ',') + '%'}</td>
       <td style="width:120px;"><div class="prev-fun-track"><div class="prev-fun-fill" style="width:${bar}%;"></div></div></td>
     </tr>`;
   });
   if (funEl) funEl.innerHTML = `
     <div class="card">
-      <div class="card-title">🔄 Funil de conversão — Meta × Real (Maio/2026)</div>
-      <p style="font-size:11px;color:#888;margin:2px 0 10px;">Meta = planilha · Real = CRM (etapas que o CRM não separa aparecem como “—”). O funil real para em <strong>Visita/Jamil</strong> — ninguém chegou ao Comitê ainda.</p>
+      <div class="card-title">🔄 Funil de conversão — etapas do CRM (Maio/2026)</div>
+      <p style="font-size:11px;color:#888;margin:2px 0 10px;">As 14 etapas reais do funil do CRM (Funil CDC). <strong>Meta</strong> = referência da planilha · <strong>Real</strong> = deals que alcançaram a etapa em Maio (sem importações) · <strong>% conv.</strong> = conversão real entre etapas. O funil real para em <strong>Visita/Jamil</strong> — ninguém chegou ao Comitê ainda.</p>
       <table class="prev-funil-tbl">
-        <thead><tr><th>Etapa</th><th style="text-align:right;">Meta</th><th style="text-align:right;">Real</th><th style="text-align:right;">% meta</th><th>Atingim.</th></tr></thead>
+        <thead><tr><th>Etapa</th><th style="text-align:right;">Meta</th><th style="text-align:right;">Real</th><th style="text-align:right;">% conv.</th><th>Atingim.</th></tr></thead>
         <tbody>${fr}</tbody>
       </table>
     </div>`;
@@ -5234,7 +5234,7 @@ function _prevResumoHtml(P, cen) {
       <div class="card-title">🧭 Resumo automático</div>
       <ul class="prev-resumo-list">
         <li><strong>Realizado (Mai–Jun):</strong> Maio teve <strong>${mai.leads} leads reais</strong> (sem importações), CPL ${fmt.currency(mai.cpl)} — ${leadsGap >= 0 ? 'acima' : Math.abs(leadsGap) + '% abaixo'} da meta de ${mai.meta.leads}. Junho ${jun.leads} leads (parcial). <strong>0 vendas fechadas</strong> nos dois meses.</li>
-        <li><strong>Gargalo do funil:</strong> o avanço real para em <strong>Visita/Jamil</strong> (Maio: ${P.funil.real_maio[10] ?? 0} deals). Nenhum deal chegou a Análise Jurídica/Comitê — por isso a receita realizada é R$ 0 e a projeção até o Comitê é <em>meta</em>, não histórico.</li>
+        <li><strong>Gargalo do funil:</strong> o avanço real para em <strong>Visita/Jamil</strong> (Maio: ${P.funil.real_maio[9] ?? 0} deals). Nenhum deal chegou a Análise Jurídica/Comitê — por isso a receita realizada é R$ 0 e a projeção até o Comitê é <em>meta</em>, não histórico.</li>
         <li><strong>Projeção H2 (Jul–Dez):</strong> 🔴 ${_prevMi(h2Pess)} · ⚪ ${_prevMi(h2Real)} · 🟢 ${_prevMi(h2Otim)} de receita, conforme cenário (±30%).</li>
         <li><strong>Próximo passo:</strong> destravar o trecho <em>Visita → Comitê</em> (hoje 0). Cada deal que fecha = R$ 1 mi. Acelerar COF → Visita e padronizar a etapa jurídica.</li>
       </ul>
