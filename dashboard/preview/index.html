@@ -58,6 +58,8 @@
   /* Títulos/realces que usavam a cor primária ficam claros no dark */
   html[data-theme="dark"] .section-title,
   html[data-theme="dark"] #topbar h1,
+  html[data-theme="dark"] #sidebar-toggle,
+  html[data-theme="dark"] #mob-menu-btn,
   html[data-theme="dark"] .chart-card h3,
   html[data-theme="dark"] .table-card h3,
   html[data-theme="dark"] thead th,
@@ -107,7 +109,21 @@
   }
 
   /* MAIN */
-  #main { margin-left: var(--sidebar-w); min-height: 100vh; }
+  #main { margin-left: var(--sidebar-w); min-height: 100vh; transition: margin-left .27s cubic-bezier(.4,0,.2,1); }
+
+  /* ── TOGGLE recolher/expandir sidebar (desktop/tablet) ───────────────── */
+  #sidebar { transition: transform .27s cubic-bezier(.4,0,.2,1); }
+  #sidebar-toggle {
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: none; cursor: pointer;
+    padding: 6px; border-radius: 8px; color: var(--primary);
+    flex-shrink: 0; transition: background .15s;
+  }
+  #sidebar-toggle:hover { background: var(--bg2); }
+  #sidebar-toggle svg { display: block; }
+  /* recolhida: sidebar desliza pra fora, main ocupa a largura toda */
+  html.sb-collapsed #sidebar { transform: translateX(-100%); }
+  html.sb-collapsed #main    { margin-left: 0; }
 
   /* TOP BAR */
   #topbar {
@@ -1044,8 +1060,9 @@
     /* Esconde sidebar desktop */
     #sidebar { display: none !important; }
 
-    /* Mostra botão hamburguer */
+    /* Mostra botão hamburguer (drawer); esconde o toggle de recolher desktop */
     #mob-menu-btn { display: flex; align-items: center; }
+    #sidebar-toggle { display: none !important; }
 
     /* Main ocupa largura total */
     #main { margin-left: 0 !important; }
@@ -1118,6 +1135,8 @@
 </style>
 </head>
 <body>
+<!-- aplica o estado recolhido da sidebar ANTES do paint (evita flash) -->
+<script>try{if(localStorage.getItem('sidebarCollapsed')==='1')document.documentElement.classList.add('sb-collapsed');}catch(e){}</script>
 
 <!-- ════════ BANNER DE AMBIENTE DE TESTE (PREVIEW) ════════ -->
 <style>
@@ -1233,6 +1252,14 @@
 <div id="main">
   <!-- TOP BAR -->
   <div id="topbar">
+    <!-- Toggle recolher/expandir menu (desktop/tablet) -->
+    <button id="sidebar-toggle" onclick="toggleSidebar()" aria-label="Recolher ou expandir menu" title="Recolher / expandir menu">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="2" y1="5"  x2="20" y2="5"/>
+        <line x1="2" y1="11" x2="20" y2="11"/>
+        <line x1="2" y1="17" x2="20" y2="17"/>
+      </svg>
+    </button>
     <!-- Botão hamburguer — só aparece no mobile -->
     <button id="mob-menu-btn" onclick="openMobDrawer()" aria-label="Menu">
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -5443,6 +5470,14 @@ loadData();
 </div>
 
 <script>
+// ── Recolher/expandir a sidebar (desktop/tablet) ─────────────────────────────
+function toggleSidebar() {
+  const collapsed = document.documentElement.classList.toggle('sb-collapsed');
+  try { localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0'); } catch (e) {}
+  // Após a transição da largura do #main, força os gráficos Chart.js a redimensionar
+  setTimeout(() => window.dispatchEvent(new Event('resize')), 300);
+}
+
 // ── Mobile Drawer ────────────────────────────────────────────────────────────
 function openMobDrawer() {
   document.getElementById('mob-drawer').classList.add('open');
