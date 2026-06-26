@@ -1,322 +1,261 @@
 # -*- coding: utf-8 -*-
 """
-Previsibilidade 2026 — modelo NATIVO (calculado no pipeline).
+Previsibilidade 2026 — modelo NATIVO v2 (auditado jun/2026).
 
-Substitui a antiga leitura "espelho" da planilha. Consolida 3 fontes:
-  - Jan-Abr : meta da planilha-base "Previsibilidade B2B - 2026" (1Bf5X...).
-  - Mai-Jun : REAL do CRM (deals + deal_stage_histories via API), sem importações.
-  - Jul-Dez : projeção replicando as premissas da planilha + 3 cenários (+-30%).
+Reconstruído após auditoria executiva (cálculo determinístico + revisão multi-lente).
+Regras-chave:
+  - Jan–Jun = REALIZADO (investimento, leads, sessões reais informados pelo diretor).
+  - Jul–Dez = PROJEÇÃO (investimento informado; leads = investimento / CPL do cenário).
+  - CPL = investimento / leads ; CPS = investimento / sessões ; ConvLP = leads / sessões.
+  - Funil = 14 etapas REAIS do CRM, por TAXA DE PASSAGEM etapa→etapa.
+  - Receita = negócios fechados × ticket (NUNCA × leads).
+  - Sem arredondar nas fórmulas (arredonda só na saída).
 
-Saída (vai pro summary.json em `previsibilidade`):
-  {
-    modelo: 'nativo', ticket, ultima_atualizacao, meses:[12],
-    linha:[12x {mes,key,fonte,investimento,leads,cpl,vendas,receita,meta:{...},importados?,parcial?}],
-    cenarios:{pessimista|real|otimista: {vendas:[12],receita:[12],total_vendas,total_receita}},
-    funil:{etapas:[15],meta_maio:[15],pcts:[15],real_maio:[15],real_junho:[15],crm_etapas:[12]},
-  }
+Fonte dos números reais: dados oficiais informados pelo diretor (jun/2026) — são meses
+fechados, por isso ficam fixos no código (o summary do ETL tinha junho parcial/errado).
+O funil REAL por etapa (camada de atingimento) é dinâmico, do CRM.
 """
-import re
 from datetime import datetime
 from collections import defaultdict, Counter
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
-import gspread
-from google.oauth2.service_account import Credentials
-
 import config
 
-SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive",
-]
-
-# Planilha-base nova (modelo completo de previsibilidade)
-PREVISIBILIDADE_SHEET_ID = "1Bf5XInjZ6e_fgqQ9wxDN9Cpb7KYEkFLV-wo6MY43hPA"
-PREVISIBILIDADE_TAB_NAME = "PREVISIBILIDADE "   # nota: tem espaço no fim
-
-CRM_API = "https://crm.rdstation.com/api/v1"
 TICKET = 1_000_000
-MAX_WORKERS = 4   # conservador (alinhado à cultura RD do projeto)
+CRM_API = "https://crm.rdstation.com/api/v1"
+MAX_WORKERS = 4
 
-MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho',
-         'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
-KEYMES = ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06',
-          '2026-07', '2026-08', '2026-09', '2026-10', '2026-11', '2026-12']
+MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+MES_NOME = {'Jan': 'Janeiro', 'Fev': 'Fevereiro', 'Mar': 'Março', 'Abr': 'Abril', 'Mai': 'Maio',
+            'Jun': 'Junho', 'Jul': 'Julho', 'Ago': 'Agosto', 'Set': 'Setembro', 'Out': 'Outubro',
+            'Nov': 'Novembro', 'Dez': 'Dezembro'}
+REAL = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun']
+PROJ = ['Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+KEYMES = {'Mai': '2026-05', 'Jun': '2026-06'}
 
-# Funil EXIBIDO = as 14 etapas REAIS do CRM da Clínica (as que a equipe usa no dia a dia).
-# Os 12 primeiros são estágios do pipeline "Funil CDC"; "Assinatura do Contrato" e
-# "Negócio Fechado" não são estágios — são o desfecho (deal ganho), derivados de win.
-ETAPAS_CRM = [
-    'Entrada de Lead', 'Tentativa de Contato', 'Qualificação', 'Qualificado Não agendada',
-    '1ª Reunião Agendada', '1ª Reunião Realizada', 'Reunião de BP Agendada',
-    'Reunião de BP Realizada', 'Envio de COF', 'Visita / Reunião com Jamil',
-    'Análise Financeira/Jurídica', 'Comitê Final', 'Assinatura do Contrato', 'Negócio Fechado',
+# ─────────── DADOS REAIS (Jan–Jun) — oficiais, meses fechados ───────────
+INVEST_REAL = {'Jan': 23634.45, 'Fev': 27362.87, 'Mar': 10373.57, 'Abr': 18182.95, 'Mai': 21897.03, 'Jun': 20954.55}
+INVEST_PROJ = {'Jul': 25000.00, 'Ago': 25000.00, 'Set': 30000.00, 'Out': 36000.00, 'Nov': 43200.00, 'Dez': 51840.00}
+LEADS_REAL = {'Jan': 244, 'Fev': 188, 'Mar': 35, 'Abr': 87, 'Mai': 146, 'Jun': 79}
+SESSOES = {'Jan': 6453, 'Fev': 7880, 'Mar': 3893, 'Abr': 5779, 'Mai': 6459, 'Jun': 4546}
+
+# Funil = 14 etapas REAIS do CRM. taxa = passagem da etapa anterior -> esta (Entrada = 100%).
+FUNIL = [
+    ('Entrada de Lead', 1.0000),
+    ('Tentativa de Contato', 0.8900),
+    ('Qualificação', 0.9000),
+    ('Qualificado Não Agendada', 0.3300),
+    ('1ª Reunião Agendada', 0.7950),
+    ('1ª Reunião Realizada', 0.5600),
+    ('Reunião de BP Agendada', 0.6700),
+    ('Reunião de BP Realizada', 0.4600),
+    ('Envio de COF', 0.6000),
+    ('Visita / Reunião com Jamil', 0.5900),
+    ('Análise Financeira/Jurídica', 0.2700),
+    ('Comitê Final', 0.9200),
+    ('Assinatura do Contrato', 0.9700),
+    ('Negócio Fechado', 0.9800),
 ]
-
-# Meta de cada etapa do CRM (14, índice) vem da etapa correspondente da planilha (15, índice).
-# A planilha agrupa diferente (Nutrição 1/2, Reunião Alinhamento) — mapa aproximado p/ referência.
-META_MAP = {
-    0: 0,    # Entrada de Lead          -> 1ª Entrada de lead
-    1: 1,    # Tentativa de Contato     -> 2º Contato inicial
-    2: 2,    # Qualificação             -> 3º Nutrição 1
-    3: 4,    # Qualificado Não agendada -> 5º Pré-Qualificado
-    4: 5,    # 1ª Reunião Agendada      -> 6º Reunião Agendada
-    5: 6,    # 1ª Reunião Realizada     -> 7º Reunião Realizada
-    6: 7,    # Reunião de BP Agendada   -> 8º Reunião BP
-    7: 7,    # Reunião de BP Realizada  -> 8º Reunião BP
-    8: 8,    # Envio de COF             -> 9º Envio de COF
-    9: 10,   # Visita/Reunião com Jamil -> 11º Visita Técnica
-    10: 11,  # Análise Financeira/Jur.  -> 12º Análise Jurídica
-    11: 12,  # Comite Final             -> 13º Comitê
-    12: 13,  # Assinatura do Contrato   -> 14º Assinatura do Contrato
-    13: 14,  # Negócio Fechado          -> 15º Negócio Fechado
-}
+IDX_1A_REUNIAO = 4   # índice de "1ª Reunião Agendada"
 
 
-# ─────────────────────────── helpers ───────────────────────────
-def parse_num(s):
-    """'R$ 1.001.032,54' -> 1001032.54 ; '0,29%' -> 0.0029 ; '340' -> 340."""
-    if s is None:
-        return 0.0
-    s = str(s).strip()
-    if not s or s in ('-', '%'):
-        return 0.0
-    pct = s.endswith('%')
-    s = s.replace('R$', '').replace('%', '').strip()
-    s = s.replace('.', '').replace(',', '.')
-    try:
-        v = float(s)
-    except ValueError:
-        return 0.0
-    return v / 100 if pct else v
-
-
-def _gspread_client():
-    creds = Credentials.from_service_account_file(config.GOOGLE_CREDENTIALS_FILE, scopes=SCOPES)
-    return gspread.authorize(creds)
-
-
-# ─────────────────────────── 1) planilha (meta + projeção) ───────────────────────────
-def ler_planilha():
-    gc = _gspread_client()
-    rows = gc.open_by_key(PREVISIBILIDADE_SHEET_ID).worksheet(PREVISIBILIDADE_TAB_NAME).get_all_values()
-    cols = [1 + i * 2 for i in range(12)]   # 12 meses: valor na col, %CRM na col+1
-
-    def linha(prefixo):
-        for r in rows[8:38]:
-            lab = (r[0] or '').strip().lower()
-            if lab.startswith(prefixo.lower()):
-                return [parse_num(r[c]) if c < len(r) else 0.0 for c in cols]
-        return [0.0] * 12
-
-    funil = []
-    for r in rows[8:38]:
-        lab = (r[0] or '').strip()
-        if re.match(r'^\d+[ºª]\s', lab):
-            vals = [parse_num(r[c]) if c < len(r) else 0.0 for c in cols]
-            pcts = [parse_num(r[c + 1]) if c + 1 < len(r) else 0.0 for c in cols]
-            funil.append({'etapa': lab, 'valores': vals, 'pcts': pcts})
-
-    return {
-        'investimento': linha('investimento'),
-        'leads': linha('leads'),
-        'cpl': linha('cpl'),
-        'vendas': linha('vendas'),
-        'receita': linha('receita faturada'),
-        'funil': funil,
+# ─────────── funil acumulado (taxa de passagem) ───────────
+def _funil_modelo():
+    vol = [1000.0]
+    acum = [1.0]
+    for i in range(1, len(FUNIL)):
+        vol.append(vol[-1] * FUNIL[i][1])
+        acum.append(acum[-1] * FUNIL[i][1])
+    etapas = []
+    for i, (nome, tx) in enumerate(FUNIL):
+        etapas.append({
+            'etapa': nome,
+            'passagem': tx,
+            'volume_por_1000': round(vol[i], 2),
+            'acumulada': acum[i],                       # precisão cheia
+            'acumulada_pct': round(acum[i] * 100, 4),
+            'perda_abs_por_1000': round(0.0 if i == 0 else vol[i-1] - vol[i], 2),
+            'perda_pct': round(0.0 if i == 0 else 1 - tx, 4),
+        })
+    # gargalos
+    tx_min_i = min(range(1, len(FUNIL)), key=lambda i: FUNIL[i][1])
+    perda_abs = [(FUNIL[i][0], vol[i-1] - vol[i]) for i in range(1, len(FUNIL))]
+    maior_perda = max(perda_abs, key=lambda x: x[1])
+    resumo = {
+        'aprov_ate_1a_reuniao': acum[IDX_1A_REUNIAO],
+        'entrada_ate_negocio_fechado': acum[-1],
+        'leads_por_venda': 1 / acum[-1] if acum[-1] else 0,
+        'gargalo_menor_taxa': FUNIL[tx_min_i][0],
+        'gargalo_menor_taxa_valor': FUNIL[tx_min_i][1],
+        'maior_perda_absoluta': maior_perda[0],
     }
+    return etapas, acum, resumo
 
 
-# ─────────────────────────── 2) CRM real (Mai-Jun) ───────────────────────────
+# ─────────── CRM real (atingimento Mai/Jun) ───────────
 def _crm_token():
     return {'token': config.RD_CRM_TOKEN}
 
 
-def _stage_order():
-    r = requests.get(f'{CRM_API}/deal_pipelines', params=_crm_token(), timeout=30)
-    r.raise_for_status()
-    d = r.json()
-    pipes = d if isinstance(d, list) else d.get('deal_pipelines', [])
-    smap, order = {}, []
-    for p in pipes:
-        for st in p.get('deal_stages', []):
-            smap[st['id']] = st['name']
-            order.append(st['name'])
-    return smap, order
-
-
-def _all_deals():
-    out, page = [], 1
-    while True:
-        r = requests.get(f'{CRM_API}/deals', params={**_crm_token(), 'limit': 200, 'page': page}, timeout=30)
-        r.raise_for_status()
-        j = r.json()
-        it = j.get('deals', [])
-        if not it:
-            break
-        out += it
-        if len(out) >= j.get('total', 0):
-            break
-        page += 1
-    return out
-
-
-def _hist(did):
+def _funil_real_crm():
     try:
-        r = requests.get(f'{CRM_API}/deals/{did}', params=_crm_token(), timeout=30)
-        if r.status_code != 200:
-            return did, []
-        return did, (r.json().get('deal_stage_histories') or [])
-    except Exception:
-        return did, []
+        r = requests.get(f'{CRM_API}/deal_pipelines', params=_crm_token(), timeout=30)
+        r.raise_for_status()
+        d = r.json()
+        pipes = d if isinstance(d, list) else d.get('deal_pipelines', [])
+        smap, order = {}, []
+        for p in pipes:
+            for st in p.get('deal_stages', []):
+                smap[st['id']] = st['name']; order.append(st['name'])
+        idx = {n: i for i, n in enumerate(order)}
+
+        deals, page = [], 1
+        while True:
+            rr = requests.get(f'{CRM_API}/deals', params={**_crm_token(), 'limit': 200, 'page': page}, timeout=30)
+            rr.raise_for_status()
+            j = rr.json(); it = j.get('deals', [])
+            if not it:
+                break
+            deals += it
+            if len(deals) >= j.get('total', 0):
+                break
+            page += 1
+        ids = [x['id'] for x in deals]
+
+        def hist(did):
+            try:
+                rh = requests.get(f'{CRM_API}/deals/{did}', params=_crm_token(), timeout=30)
+                return did, (rh.json().get('deal_stage_histories') or []) if rh.status_code == 200 else []
+            except Exception:
+                return did, []
+        hists = {}
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
+            for did, h in ex.map(hist, ids):
+                hists[did] = h
+        cur = {x['id']: (x.get('deal_stage') or {}).get('name') for x in deals}
+
+        def reached(d):
+            mx = -1
+            for e in hists.get(d['id'], []):
+                n = smap.get(e.get('deal_stage_id'))
+                if n in idx:
+                    mx = max(mx, idx[n])
+            if cur.get(d['id']) in idx:
+                mx = max(mx, idx[cur[d['id']]])
+            return mx
+
+        bymes = defaultdict(list)
+        for d in deals:
+            bymes[(d.get('created_at') or '')[:7]].append(d)
+
+        out = {}
+        alvo = idx.get('1ª Reunião Agendada', 4)
+        for sigla, ym in (('Mai', '2026-05'), ('Jun', '2026-06')):
+            ds = bymes.get(ym, [])
+            sec = Counter((d.get('created_at') or '')[:19] for d in ds)
+            impsec = {k for k, v in sec.items() if v >= 3}
+            reais = [d for d in ds if (d.get('created_at') or '')[:19] not in impsec]
+            ent = len(reais)
+            ra = sum(1 for d in reais if reached(d) >= alvo)
+            out[sigla] = {'entrada': ent, 'reuniao_agendada': ra,
+                          'aproveitamento': (ra / ent) if ent else 0.0,
+                          'parcial': sigla == 'Jun'}
+        return out
+    except Exception as e:
+        return {'erro': str(e)}
 
 
-def _import_secs(deals):
-    """Segundos com >=3 deals criados = assinatura de import em massa."""
-    sec = Counter((d.get('created_at') or '')[:19] for d in deals)
-    return {k for k, v in sec.items() if v >= 3}
-
-
-def funil_real():
-    """Retorna o funil real (12 etapas CRM) por mês p/ Mai e Jun, excluindo importações."""
-    smap, order = _stage_order()
-    idx = {n: i for i, n in enumerate(order)}
-    N = len(order)
-    deals = _all_deals()
-    ids = [d['id'] for d in deals]
-
-    hists = {}
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
-        for did, h in ex.map(_hist, ids):
-            hists[did] = h
-
-    cur_stage = {d['id']: (d.get('deal_stage') or {}).get('name') for d in deals}
-
-    def max_reached(d):
-        mx = -1
-        for e in hists.get(d['id'], []):
-            n = smap.get(e.get('deal_stage_id'))
-            if n in idx:
-                mx = max(mx, idx[n])
-        cs = cur_stage.get(d['id'])
-        if cs in idx:
-            mx = max(mx, idx[cs])
-        return mx
-
-    bymes = defaultdict(list)
-    for d in deals:
-        bymes[(d.get('created_at') or '')[:7]].append(d)
-
-    out = {}
-    for M in ('2026-05', '2026-06'):
-        ds = bymes.get(M, [])
-        imp = _import_secs(ds)
-        reais = [d for d in ds if (d.get('created_at') or '')[:19] not in imp]
-        reached = [0] * N
-        for d in reais:
-            mr = max_reached(d)
-            for i in range(N):
-                if mr >= i:
-                    reached[i] += 1
-        out[M] = {
-            'entradas': len(reais),
-            'importados': len(ds) - len(reais),
-            'funil': reached,
-            'vendas': sum(1 for d in reais if d.get('win') is True),
-            'order': order,
-        }
-    return out
-
-
-def _real_crm14(reached12, vendas):
-    """Real das 14 etapas do CRM: 12 estágios do pipeline + Assinatura/Negócio Fechado (=ganhos)."""
-    base = list(reached12[:12]) + [0] * max(0, 12 - len(reached12))
-    return base[:12] + [vendas, vendas]   # Assinatura e Negócio Fechado = deals ganhos
-
-
-def _conv_pcts(real14):
-    """Conversão real entre etapas (etapa N / etapa N-1, %). Primeira etapa fica None."""
-    out = [None]
-    for i in range(1, len(real14)):
-        prev = real14[i - 1]
-        out.append(round(real14[i] / prev * 100, 1) if prev else 0.0)
-    return out
-
-
-# ─────────────────────────── 3) builder ───────────────────────────
+# ─────────── builder principal ───────────
 def get_previsibilidade_data(meta_monthly=None, google_monthly=None):
-    """
-    Monta o bloco nativo. `meta_monthly`/`google_monthly` são as listas
-    `monthly` ([{mes, gasto, ...}]) já agregadas no ETL — usadas p/ o
-    investimento REAL de Mai/Jun. Se não vierem, investimento real fica 0.
-    """
-    plan = ler_planilha()
-    real = funil_real()
+    """Monta o bloco nativo v2. (meta/google_monthly mantidos por compatibilidade do ETL,
+    mas o investimento real Jan–Jun usa os valores oficiais fixos — meses fechados.)"""
+    etapas, acum, resumo = _funil_modelo()
+    acum_nf = acum[-1]
+    acum_ra = acum[IDX_1A_REUNIAO]
 
-    mm = {x['mes']: x.get('gasto', 0) for x in (meta_monthly or [])}
-    gm = {x['mes']: x.get('gasto', 0) for x in (google_monthly or [])}
-    invest_real = {m: round(mm.get(m, 0) + gm.get(m, 0), 2) for m in ('2026-05', '2026-06')}
+    # --- realizado Jan–Jun (com fórmulas) ---
+    cpl_real, cps_real, conv_lp = {}, {}, {}
+    for m in REAL:
+        cpl_real[m] = INVEST_REAL[m] / LEADS_REAL[m]
+        cps_real[m] = INVEST_REAL[m] / SESSOES[m]
+        conv_lp[m] = LEADS_REAL[m] / SESSOES[m]
+    tot_inv = sum(INVEST_REAL[m] for m in REAL)
+    tot_leads = sum(LEADS_REAL[m] for m in REAL)
+    tot_sess = sum(SESSOES[m] for m in REAL)
+    conv_lp_ponderada = tot_leads / tot_sess
 
-    linha = []
-    for i, km in enumerate(KEYMES):
-        meta = {
-            'investimento': round(plan['investimento'][i], 2),
-            'leads': round(plan['leads'][i]),
-            'cpl': round(plan['cpl'][i], 2),
-            'vendas': round(plan['vendas'][i], 2),
-            'receita': round(plan['receita'][i], 2),
+    # --- cenários de CPL ---
+    cpl_conserv = INVEST_REAL['Jun'] / LEADS_REAL['Jun']
+    cpl_base = tot_inv / tot_leads
+    melhores = sorted(REAL, key=lambda m: cpl_real[m])[:3]
+    cpl_otim = sum(INVEST_REAL[m] for m in melhores) / sum(LEADS_REAL[m] for m in melhores)
+    CEN = {'conservador': (cpl_conserv, 'CPL de Junho (mais recente/alto)'),
+           'base':        (cpl_base, 'CPL ponderado Jan–Jun'),
+           'otimista':    (cpl_otim, f'CPL ponderado dos 3 melhores meses ({", ".join(melhores)})')}
+
+    cenarios = {}
+    for c, (cplv, premissa) in CEN.items():
+        leads_mes = {m: INVEST_PROJ[m] / cplv for m in PROJ}
+        total_leads = sum(leads_mes.values())
+        nf = total_leads * acum_nf
+        cenarios[c] = {
+            'cpl': round(cplv, 2),
+            'premissa': premissa,
+            'leads_mes': {m: round(leads_mes[m], 1) for m in PROJ},
+            'total_leads': round(total_leads, 1),
+            'reunioes_agendadas': round(total_leads * acum_ra, 1),
+            'negocios_fechados': round(nf, 4),
+            'receita': round(nf * TICKET, 2),
         }
-        if i <= 3:                       # Jan-Abr: meta
-            linha.append({'mes': MESES[i], 'key': km, 'fonte': 'meta', **meta, 'meta': meta})
-        elif km in real:                 # Mai-Jun: real do CRM
-            ld = real[km]['entradas']
-            inv = invest_real.get(km, 0)
-            linha.append({
-                'mes': MESES[i], 'key': km, 'fonte': 'real',
-                'investimento': inv, 'leads': ld,
-                'cpl': round(inv / ld, 2) if ld else 0,
-                'vendas': real[km]['vendas'], 'receita': real[km]['vendas'] * TICKET,
-                'importados': real[km]['importados'],
-                'parcial': km == '2026-06',
-                'meta': meta,
+
+    # --- tabela mensal consolidada ---
+    mensal = []
+    for m in MESES:
+        if m in REAL:
+            mensal.append({
+                'mes': m, 'nome': MES_NOME[m], 'status': 'real',
+                'investimento': round(INVEST_REAL[m], 2), 'leads': LEADS_REAL[m],
+                'cpl': round(cpl_real[m], 2), 'sessoes': SESSOES[m],
+                'cps': round(cps_real[m], 2), 'conv_lp': round(conv_lp[m], 4),
             })
-        else:                            # Jul-Dez: projeção
-            linha.append({'mes': MESES[i], 'key': km, 'fonte': 'projecao', **meta, 'meta': meta})
-
-    def cenario(mult):
-        vendas, receita = [], []
-        for i, it in enumerate(linha):
-            if i >= 6:                   # projeção -> aplica ±30%
-                v = round(plan['vendas'][i] * mult, 2)
-                vendas.append(v)
-                receita.append(round(plan['vendas'][i] * mult * TICKET, 2))
-            else:                        # histórico (meta jan-abr / real mai-jun) fixo
-                vendas.append(it['vendas'])
-                receita.append(it['receita'])
-        return {'vendas': vendas, 'receita': receita,
-                'total_vendas': round(sum(vendas), 2), 'total_receita': round(sum(receita), 2)}
-
-    cenarios = {'pessimista': cenario(0.7), 'real': cenario(1.0), 'otimista': cenario(1.3)}
-
-    # Funil nas 14 etapas REAIS do CRM. Meta = referência mapeada da planilha (col Maio).
-    real_maio = _real_crm14(real['2026-05']['funil'], real['2026-05']['vendas'])
-    real_junho = _real_crm14(real['2026-06']['funil'], real['2026-06']['vendas'])
-    meta_maio = [round(plan['funil'][META_MAP[i]]['valores'][4]) for i in range(len(ETAPAS_CRM))]
-    funil = {
-        'etapas': ETAPAS_CRM,
-        'meta_maio': meta_maio,
-        'pcts': _conv_pcts(real_maio),     # conversão REAL entre etapas do CRM (Maio)
-        'real_maio': real_maio,
-        'real_junho': real_junho,
-    }
+        else:
+            mensal.append({
+                'mes': m, 'nome': MES_NOME[m], 'status': 'proj',
+                'investimento': round(INVEST_PROJ[m], 2),
+                'leads': None, 'cpl': None,         # dependem do cenário (ver bloco cenarios)
+                'sessoes': None, 'cps': None, 'conv_lp': None,  # n/d (não projetados)
+            })
 
     return {
-        'modelo': 'nativo',
+        'modelo': 'nativo-v2',
         'ticket': TICKET,
         'ultima_atualizacao': datetime.now().strftime('%d/%m/%Y %H:%M'),
         'meses': MESES,
-        'linha': linha,
+        'mensal': mensal,
+        'realizado_totais': {
+            'investimento': round(tot_inv, 2), 'leads': tot_leads, 'sessoes': tot_sess,
+            'conv_lp_ponderada': round(conv_lp_ponderada, 4),
+            'negocios_fechados_reais': 0, 'receita_real': 0,
+            'cpl_ponderado': round(cpl_base, 2),
+        },
         'cenarios': cenarios,
-        'funil': funil,
+        'funil': etapas,
+        'funil_resumo': {
+            'aprov_ate_1a_reuniao': round(resumo['aprov_ate_1a_reuniao'], 4),
+            'entrada_ate_negocio_fechado': round(resumo['entrada_ate_negocio_fechado'], 6),
+            'leads_por_venda': round(resumo['leads_por_venda'], 1),
+            'gargalo_menor_taxa': resumo['gargalo_menor_taxa'],
+            'gargalo_menor_taxa_valor': round(resumo['gargalo_menor_taxa_valor'], 4),
+            'maior_perda_absoluta': resumo['maior_perda_absoluta'],
+        },
+        'funil_real_crm': _funil_real_crm(),
+        'alertas': [
+            'Projeção de receita é TEÓRICA: 0 negócios fechados reais Jan–Jun (ninguém passou de Visita/Jamil no CRM).',
+            'Taxas das etapas finais (pós-Visita/Jamil) são premissas-meta, sem fechamento real validando.',
+            'Funil real por etapa só existe de Maio/2026 (CRM); Jan–Abr sem volumes por etapa.',
+            'Conversão por LP individual não localizada (só sessões gerais); sem split por URL.',
+            'Sessões Jul–Dez não projetadas (sem premissa de CPS futuro).',
+            'Recomendação dos auditores: planejar pelo Base, orçar pelo Conservador.',
+        ],
     }

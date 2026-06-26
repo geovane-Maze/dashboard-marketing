@@ -597,6 +597,18 @@
   /* Resumo */
   .prev-resumo-list { margin: 6px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.7; color: var(--text); }
   .prev-resumo-list li { margin-bottom: 6px; }
+  /* v2: banner, n/d, rodapés, alertas */
+  .prev-banner {
+    background: #FEF3C7; color: #92400e; border: 1px solid #FCD34D; border-radius: 8px;
+    padding: 10px 14px; font-size: 12.5px; line-height: 1.5; margin-bottom: 14px;
+  }
+  html[data-theme="dark"] .prev-banner { background: rgba(245,158,11,.13); color: #fcd34d; border-color: rgba(245,158,11,.35); }
+  .prev-nd { color: #b0b7c3; font-style: italic; font-size: 11px; }
+  .prev-nd-leg { font-size: 11px; color: #94a3b8; margin: 6px 2px 0; font-style: italic; }
+  .prev-table2 tfoot td, .prev-foot td { background: var(--bg2); border-top: 2px solid var(--border); }
+  .prev-tr-alerta { background: rgba(239,68,68,.06); }
+  .prev-table-funil td:first-child { min-width: 200px; }
+  .prev-table2 th[colspan], .prev-table2 th[rowspan] { background: var(--primary); }
 
   /* ═══ PREVISIBILIDADE 2026 (legado — espelho planilha) ═══ */
   .prev-tabs {
@@ -1934,36 +1946,61 @@
     <!-- PREVISIBILIDADE 2026 -->
     <div id="sec-previsibilidade" class="section">
       <div class="section-title">📈 Previsibilidade 2026</div>
-      <p style="font-size:12px;color:#666;margin:0 0 14px;">
-        <strong>Jan–Abr</strong>: meta · <strong>Mai–Jun</strong>: real do CRM (sem importações) ·
-        <strong>Jul–Dez</strong>: projeção · Ticket R$ 1.000.000 ·
-        <span id="prev-ultima-atualizacao" style="color:var(--primary);font-weight:600;"></span>
+      <p style="font-size:12px;color:#666;margin:0 0 12px;">
+        <strong>Jan–Jun</strong>: realizado (dados reais) · <strong>Jul–Dez</strong>: projeção (CPL × investimento) ·
+        Ticket R$ 1.000.000 · <span id="prev-ultima-atualizacao" style="color:var(--primary);font-weight:600;"></span>
       </p>
+
+      <!-- Banner: projeção teórica -->
+      <div id="prev-banner" class="prev-banner"></div>
 
       <!-- Seletor de cenário (afeta Jul–Dez) -->
       <div class="prev-cenario-bar">
-        <span class="prev-cenario-lbl">Cenário Jul–Dez:</span>
-        <button class="prev-cen-btn" data-cen="pessimista" onclick="setPrevCenario('pessimista')">🔴 Pessimista <small>−30%</small></button>
-        <button class="prev-cen-btn active" data-cen="real" onclick="setPrevCenario('real')">⚪ Real <small>base</small></button>
-        <button class="prev-cen-btn" data-cen="otimista" onclick="setPrevCenario('otimista')">🟢 Otimista <small>+30%</small></button>
+        <span class="prev-cenario-lbl">Cenário de projeção (Jul–Dez):</span>
+        <button class="prev-cen-btn" data-cen="conservador" onclick="setPrevCenario('conservador')">🔴 Conservador</button>
+        <button class="prev-cen-btn active" data-cen="base" onclick="setPrevCenario('base')">⚪ Base</button>
+        <button class="prev-cen-btn" data-cen="otimista" onclick="setPrevCenario('otimista')">🟢 Otimista</button>
       </div>
 
       <!-- Cards KPI do ano (no cenário selecionado) -->
       <div id="prev-cards" class="prev-cards"></div>
 
-      <!-- Gráfico Receita real + meta + projeção -->
-      <div class="card" style="margin-top:16px;">
-        <div class="card-title">💰 Receita mensal — Real × Meta × Projeção</div>
-        <div style="height:320px;"><canvas id="prevChart"></canvas></div>
+      <!-- Gráficos topo: Investimento + Leads -->
+      <div class="charts-row" style="margin-top:16px;">
+        <div class="card"><div class="card-title">💰 Investimento — Real × Projetado</div><div style="height:280px;"><canvas id="chartInvest"></canvas></div></div>
+        <div class="card"><div class="card-title">👥 Leads — Real × Projetado</div><div style="height:280px;"><canvas id="chartLeads"></canvas></div></div>
       </div>
 
-      <!-- Tabela mês a mês -->
-      <div id="prev-tabela" class="prev-table-wrap" style="margin-top:16px;"></div>
+      <!-- Gráficos eficiência: CPL + CPS + Conversão LP -->
+      <div class="charts-row triple" style="margin-top:14px;">
+        <div class="card"><div class="card-title">🎯 CPL mensal</div><div style="height:240px;"><canvas id="chartCPL"></canvas></div></div>
+        <div class="card"><div class="card-title">🖱️ CPS mensal</div><div style="height:240px;"><canvas id="chartCPS"></canvas></div></div>
+        <div class="card"><div class="card-title">🔄 Conversão LP (Leads/Sessões)</div><div style="height:240px;"><canvas id="chartConvLP"></canvas></div></div>
+      </div>
 
-      <!-- Funil 15 etapas: meta × real -->
-      <div id="prev-funil" style="margin-top:18px;"></div>
+      <!-- Tabela 1: consolidada mensal -->
+      <div id="prev-tab-consolidada" class="prev-table-wrap" style="margin-top:18px;"></div>
 
-      <!-- Resumo automático -->
+      <!-- Tabela 2: projeção 3 cenários -->
+      <div id="prev-tab-projecao" class="prev-table-wrap" style="margin-top:18px;"></div>
+
+      <!-- Gráficos comercial: Negócios + Receita por cenário -->
+      <div class="charts-row" style="margin-top:16px;">
+        <div class="card"><div class="card-title">🤝 Negócios fechados projetados (H2)</div><div style="height:260px;"><canvas id="chartNegocios"></canvas></div></div>
+        <div class="card"><div class="card-title">💵 Receita potencial projetada (H2)</div><div style="height:260px;"><canvas id="chartReceita"></canvas></div></div>
+      </div>
+
+      <!-- Funil: gráfico + tabela -->
+      <div class="card" style="margin-top:16px;"><div class="card-title">🔻 Funil de conversão — 14 etapas do CRM (taxa de passagem)</div><div style="height:360px;"><canvas id="chartFunil"></canvas></div></div>
+      <div id="prev-tab-funil" class="prev-table-wrap" style="margin-top:14px;"></div>
+
+      <!-- Tabela 4: meta comercial (volume por etapa no cenário) -->
+      <div id="prev-tab-meta" class="prev-table-wrap" style="margin-top:18px;"></div>
+
+      <!-- Funil real do CRM (atingimento) -->
+      <div id="prev-funil-real" style="margin-top:18px;"></div>
+
+      <!-- Resumo / alertas -->
       <div id="prev-resumo" style="margin-top:18px;"></div>
     </div>
 
@@ -4988,7 +5025,7 @@ function renderGA4() {
 }
 
 // ─── PREVISIBILIDADE 2026 ────────────────────────────────────────────────────
-let _prevCenario = 'real';   // pessimista | real | otimista (afeta Jul–Dez)
+let _prevCenario = 'base';   // conservador | base | otimista (afeta Jul–Dez)
 
 function setPrevCenario(c) {
   _prevCenario = c;
@@ -5117,182 +5154,261 @@ function _prevAttachTooltip(container) {
 }
 
 const PREV_MES_ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-function _prevMi(v) {                       // R$ 1.169.832 -> "R$ 1,17 mi"
+function _prevMi(v) {                       // R$ 4.071.819 -> "R$ 4,07 mi"
   if (!v) return 'R$ 0';
   if (v >= 1e6) return 'R$ ' + (v / 1e6).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' mi';
   if (v >= 1e3) return 'R$ ' + Math.round(v / 1e3) + 'k';
   return 'R$ ' + Math.round(v);
 }
+function _prevPct(v) { return (v * 100).toFixed(2).replace('.', ',') + '%'; }
+function _prevN1(v) { return (v == null ? '—' : (v).toLocaleString('pt-BR', {maximumFractionDigits: 1})); }
+const PREV_CEN_INFO = {
+  conservador: {nome: 'Conservador', cor: 'rgba(239,68,68,.80)', solid: '#ef4444'},
+  base:        {nome: 'Base',        cor: 'rgba(123,97,255,.80)', solid: '#7b61ff'},
+  otimista:    {nome: 'Otimista',    cor: 'rgba(34,197,94,.82)',  solid: '#22c55e'},
+};
+const PREV_AZUL = 'rgba(63,169,245,.85)';
+
+function _prevChart(key, ctxId, cfg) {
+  const ctx = document.getElementById(ctxId);
+  if (!ctx) return;
+  if (CHARTS[key]) CHARTS[key].destroy();
+  cfg.options = Object.assign({responsive: true, maintainAspectRatio: false, animation: false}, cfg.options || {});
+  CHARTS[key] = new Chart(ctx, cfg);
+}
 
 function renderPrevisibilidade() {
   const P = DATA.previsibilidade_nativa;
-  const cardsEl = document.getElementById('prev-cards');
-  const tabEl   = document.getElementById('prev-tabela');
-  const funEl   = document.getElementById('prev-funil');
-  const resEl   = document.getElementById('prev-resumo');
+  const $ = id => document.getElementById(id);
+  const conteinerIds = ['prev-banner','prev-tab-consolidada','prev-tab-projecao','prev-tab-funil','prev-tab-meta','prev-funil-real','prev-resumo'];
+  const chartKeys = ['invest','leadsM','cpl','cps','convlp','negocios','receita','funil'];
 
-  if (!P || P.modelo !== 'nativo' || !P.linha) {
-    if (cardsEl) cardsEl.innerHTML =
-      `<div style="padding:24px;color:#999;grid-column:1/-1;">⚠️ Previsibilidade nativa ainda não coletada (rode o ETL / próximo cron).</div>`;
-    [tabEl, funEl, resEl].forEach(e => e && (e.innerHTML = ''));
+  if (!P || P.modelo !== 'nativo-v2' || !P.mensal) {
+    if ($('prev-cards')) $('prev-cards').innerHTML =
+      `<div style="padding:24px;color:#999;grid-column:1/-1;">⚠️ Previsibilidade ainda não coletada nesta versão (rode o ETL / próximo cron).</div>`;
+    conteinerIds.forEach(id => { if ($(id)) $(id).innerHTML = ''; });
+    chartKeys.forEach(k => { if (CHARTS[k]) { CHARTS[k].destroy(); delete CHARTS[k]; } });
     return;
   }
 
-  const upd = document.getElementById('prev-ultima-atualizacao');
+  const upd = $('prev-ultima-atualizacao');
   if (upd && P.ultima_atualizacao) upd.textContent = `Atualizado: ${P.ultima_atualizacao}`;
 
-  const cen   = P.cenarios[_prevCenario] || P.cenarios.real;
-  const linha = P.linha;
+  const cen  = P.cenarios[_prevCenario] || P.cenarios.base;
+  const info = PREV_CEN_INFO[_prevCenario] || PREV_CEN_INFO.base;
+  const M = P.mensal, T = P.realizado_totais, R = P.funil_resumo;
+
+  // séries mensais (jan-jun real; jul-dez do cenário)
+  const investMensal = M.map(m => m.investimento);
+  const leadsMensal  = M.map(m => m.status === 'real' ? m.leads : (cen.leads_mes[m.mes] ?? null));
+  const cplReal      = M.map(m => m.status === 'real' ? m.cpl : null);
+  const cplProj      = M.map(m => m.status === 'proj' ? cen.cpl : null);
+  const cpsMensal    = M.map(m => m.status === 'real' ? m.cps : null);
+  const convMensal   = M.map(m => m.status === 'real' ? +(m.conv_lp * 100).toFixed(2) : null);
+  const corPorStatus = M.map(m => m.status === 'real' ? PREV_AZUL : info.cor);
+
+  // ── Banner: projeção teórica ───────────────────────────────────────────────
+  if ($('prev-banner')) $('prev-banner').innerHTML =
+    `⚠️ <strong>Projeção teórica.</strong> A receita projetada (${_prevMi(cen.receita)} no cenário ${info.nome}) vem do funil-meta —
+     há <strong>0 negócios fechados reais</strong> em Jan–Jun (ninguém passou de Visita/Jamil no CRM).
+     Use para planejamento; <strong>orce pelo Conservador</strong>, não como receita comprometida.`;
 
   // ── Cards do ano (no cenário) ──────────────────────────────────────────────
-  const invAno = linha.reduce((s, l) => s + (l.investimento || 0), 0);
-  const recAno = cen.total_receita;
-  const vendAno = cen.total_vendas;
-  const roas = invAno ? recAno / invAno : 0;
-  if (cardsEl) cardsEl.innerHTML = [
-    {lbl: 'Receita projetada (ano)', val: _prevMi(recAno), sub: `H2: ${_prevMi(cen.receita.slice(6).reduce((a,b)=>a+b,0))}`, cls: 'verde'},
-    {lbl: 'Investimento (ano)',      val: _prevMi(invAno), sub: 'Real até jun + projeção', cls: 'azul'},
-    {lbl: 'Vendas projetadas (ano)', val: vendAno.toLocaleString('pt-BR', {maximumFractionDigits: 1}), sub: 'chegam ao Negócio Fechado', cls: 'roxo'},
-    {lbl: 'ROAS médio',              val: roas.toFixed(1).replace('.', ',') + 'x', sub: `CAC ~ ${_prevMi(vendAno ? invAno / vendAno : 0)}`, cls: 'amarelo'},
-  ].map(c => `
-    <div class="prev-card ${c.cls}">
-      <div class="prev-card-lbl">${c.lbl}</div>
-      <div class="prev-card-val">${c.val}</div>
-      <div class="prev-card-sub">${c.sub}</div>
-    </div>`).join('');
+  const investAno = investMensal.reduce((a, b) => a + b, 0);
+  const leadsAno = T.leads + cen.total_leads;
+  $('prev-cards').innerHTML = [
+    {lbl: 'Investimento total 2026', val: _prevMi(investAno), sub: `Real ${_prevMi(T.investimento)} + projeção ${_prevMi(investAno - T.investimento)}`, cls: 'azul'},
+    {lbl: 'Leads 2026', val: Math.round(leadsAno).toLocaleString('pt-BR'), sub: `${T.leads} reais + ${_prevN1(cen.total_leads)} projetados`, cls: 'roxo'},
+    {lbl: 'Negócios fechados (H2)', val: _prevN1(cen.negocios_fechados), sub: `teórico · 1 venda a cada ${R.leads_por_venda} leads`, cls: 'amarelo'},
+    {lbl: 'Receita potencial (H2)', val: _prevMi(cen.receita), sub: `cenário ${info.nome} · ticket R$ 1 mi`, cls: 'verde'},
+  ].map(c => `<div class="prev-card ${c.cls}"><div class="prev-card-lbl">${c.lbl}</div><div class="prev-card-val">${c.val}</div><div class="prev-card-sub">${c.sub}</div></div>`).join('');
 
-  // ── Gráfico: barras (realizado/projeção) + linha meta ──────────────────────
-  const ctx = document.getElementById('prevChart');
-  if (ctx) {
-    if (CHARTS.prev) CHARTS.prev.destroy();
-    const barColors = linha.map((l, i) => i <= 5
-      ? 'rgba(63,169,245,.85)'                                  // realizado (azul)
-      : (_prevCenario === 'otimista' ? 'rgba(34,197,94,.80)'
-        : _prevCenario === 'pessimista' ? 'rgba(239,68,68,.70)'
-        : 'rgba(123,97,255,.75)'));                             // projeção
-    CHARTS.prev = new Chart(ctx, {
-      data: {
-        labels: PREV_MES_ABREV,
-        datasets: [
-          {type: 'bar', label: 'Receita (real até jun · projeção jul–dez)', data: cen.receita,
-           backgroundColor: barColors, borderRadius: 4, order: 2},
-          {type: 'line', label: 'Meta (planilha)', data: linha.map(l => l.meta.receita),
-           borderColor: '#94a3b8', borderDash: [6, 4], borderWidth: 2, pointRadius: 2,
-           backgroundColor: 'transparent', tension: .3, order: 1},
-        ],
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false, animation: false,
-        plugins: {
-          legend: {labels: {boxWidth: 12, font: {size: 11}}},
-          tooltip: {callbacks: {label: c => `${c.dataset.label}: ${fmt.currency(c.parsed.y)}`}},
-        },
-        scales: {y: {ticks: {callback: v => _prevMi(v)}}},
-      },
-    });
+  // ── Gráficos: investimento e leads ─────────────────────────────────────────
+  _prevChart('invest', 'chartInvest', {
+    type: 'bar',
+    data: {labels: PREV_MES_ABREV, datasets: [{label: 'Investimento', data: investMensal, backgroundColor: corPorStatus, borderRadius: 4}]},
+    options: {plugins: {legend: {display: false}, tooltip: {callbacks: {label: c => fmt.currency(c.parsed.y)}}}, scales: {y: {ticks: {callback: v => _prevMi(v)}}}},
+  });
+  _prevChart('leadsM', 'chartLeads', {
+    type: 'bar',
+    data: {labels: PREV_MES_ABREV, datasets: [{label: 'Leads', data: leadsMensal, backgroundColor: corPorStatus, borderRadius: 4}]},
+    options: {plugins: {legend: {display: false}, tooltip: {callbacks: {label: c => _prevN1(c.parsed.y) + ' leads'}}}, scales: {y: {beginAtZero: true}}},
+  });
+  // CPL: real (azul) + projeção do cenário (tracejado)
+  _prevChart('cpl', 'chartCPL', {
+    type: 'line',
+    data: {labels: PREV_MES_ABREV, datasets: [
+      {label: 'CPL real', data: cplReal, borderColor: PREV_AZUL, backgroundColor: PREV_AZUL, tension: .25, spanGaps: false, pointRadius: 3},
+      {label: `CPL proj. (${info.nome})`, data: cplProj, borderColor: info.solid, borderDash: [6, 4], backgroundColor: 'transparent', tension: 0, pointRadius: 2},
+    ]},
+    options: {plugins: {legend: {labels: {boxWidth: 10, font: {size: 10}}}, tooltip: {callbacks: {label: c => c.parsed.y == null ? '' : c.dataset.label + ': ' + fmt.currency(c.parsed.y)}}}, scales: {y: {ticks: {callback: v => 'R$ ' + v}}}},
+  });
+  _prevChart('cps', 'chartCPS', {
+    type: 'line',
+    data: {labels: PREV_MES_ABREV, datasets: [{label: 'CPS', data: cpsMensal, borderColor: '#14b8a6', backgroundColor: '#14b8a6', tension: .25, pointRadius: 3}]},
+    options: {plugins: {legend: {display: false}, tooltip: {callbacks: {label: c => c.parsed.y == null ? 'n/d' : fmt.currency(c.parsed.y)}}}, scales: {y: {ticks: {callback: v => 'R$ ' + v}}}},
+  });
+  _prevChart('convlp', 'chartConvLP', {
+    type: 'line',
+    data: {labels: PREV_MES_ABREV, datasets: [{label: 'Conversão LP', data: convMensal, borderColor: '#f59e0b', backgroundColor: '#f59e0b', tension: .25, pointRadius: 3}]},
+    options: {plugins: {legend: {display: false}, tooltip: {callbacks: {label: c => c.parsed.y == null ? 'n/d' : c.parsed.y.toString().replace('.', ',') + '%'}}}, scales: {y: {ticks: {callback: v => v + '%'}}}},
+  });
+
+  // ── Gráficos comerciais: negócios e receita por cenário ────────────────────
+  const cenOrdem = ['conservador', 'base', 'otimista'];
+  const corCen = cenOrdem.map(c => c === _prevCenario ? PREV_CEN_INFO[c].solid : PREV_CEN_INFO[c].cor);
+  _prevChart('negocios', 'chartNegocios', {
+    type: 'bar',
+    data: {labels: cenOrdem.map(c => PREV_CEN_INFO[c].nome), datasets: [{label: 'Negócios', data: cenOrdem.map(c => P.cenarios[c].negocios_fechados), backgroundColor: corCen, borderRadius: 5}]},
+    options: {plugins: {legend: {display: false}, tooltip: {callbacks: {label: c => _prevN1(c.parsed.y) + ' negócios'}}}, scales: {y: {beginAtZero: true}}},
+  });
+  _prevChart('receita', 'chartReceita', {
+    type: 'bar',
+    data: {labels: cenOrdem.map(c => PREV_CEN_INFO[c].nome), datasets: [{label: 'Receita', data: cenOrdem.map(c => P.cenarios[c].receita), backgroundColor: corCen, borderRadius: 5}]},
+    options: {plugins: {legend: {display: false}, tooltip: {callbacks: {label: c => fmt.currency(c.parsed.y)}}}, scales: {y: {ticks: {callback: v => _prevMi(v)}}}},
+  });
+
+  // ── Gráfico do funil (volume por 1.000 leads) ──────────────────────────────
+  _prevChart('funil', 'chartFunil', {
+    type: 'bar',
+    data: {labels: P.funil.map(e => e.etapa), datasets: [{label: 'Volume por 1.000 leads', data: P.funil.map(e => e.volume_por_1000),
+      backgroundColor: P.funil.map(e => e.etapa === R.gargalo_menor_taxa ? '#ef4444' : e.etapa === R.maior_perda_absoluta ? '#f59e0b' : 'rgba(63,169,245,.80)'), borderRadius: 3}]},
+    options: {indexAxis: 'y', plugins: {legend: {display: false}, tooltip: {callbacks: {label: c => _prevN1(c.parsed.x) + ' de 1.000 (' + _prevPct(P.funil[c.dataIndex].acumulada_pct / 100) + ' acum.)'}}}, scales: {x: {beginAtZero: true}, y: {ticks: {font: {size: 10}}}}},
+  });
+
+  // ── Tabela 1: consolidada mensal ───────────────────────────────────────────
+  const badge = s => s === 'real' ? '<span class="prev-badge real">Realizado</span>' : '<span class="prev-badge proj">Projeção</span>';
+  let rc = '';
+  M.forEach(m => {
+    const isR = m.status === 'real';
+    const leads = isR ? m.leads : cen.leads_mes[m.mes];
+    const cplv = isR ? m.cpl : cen.cpl;
+    rc += `<tr class="${isR ? 'prev-tr-real' : ''}">
+      <td><strong>${m.nome}</strong></td><td>${badge(m.status)}</td>
+      <td>${fmt.currency(m.investimento)}</td>
+      <td>${_prevN1(leads)}</td>
+      <td>${fmt.currency(cplv)}</td>
+      <td>${isR ? fmt.num(m.sessoes) : '<span class="prev-nd">n/d</span>'}</td>
+      <td>${isR ? fmt.currency(m.cps) : '<span class="prev-nd">n/d</span>'}</td>
+      <td>${isR ? _prevPct(m.conv_lp) : '<span class="prev-nd">n/d</span>'}</td>
+    </tr>`;
+  });
+  $('prev-tab-consolidada').innerHTML = `
+    <div class="card-title" style="margin-bottom:8px;">📋 Tabela consolidada mensal <span style="font-weight:400;color:#888;font-size:11px;">(Jul–Dez no cenário ${info.nome})</span></div>
+    <table class="prev-table2">
+      <thead><tr><th>Mês</th><th>Status</th><th>Investim.</th><th>Leads</th><th>CPL</th><th>Sessões</th><th>CPS</th><th>Conv. LP</th></tr></thead>
+      <tbody>${rc}</tbody>
+      <tfoot><tr class="prev-foot"><td><strong>Real Jan–Jun</strong></td><td></td><td><strong>${fmt.currency(T.investimento)}</strong></td><td><strong>${T.leads}</strong></td><td><strong>${fmt.currency(T.cpl_ponderado)}</strong></td><td><strong>${fmt.num(T.sessoes)}</strong></td><td></td><td><strong>${_prevPct(T.conv_lp_ponderada)}</strong></td></tr></tfoot>
+    </table>
+    <p class="prev-nd-leg">n/d = sessões/CPS/conversão LP de Jul–Dez não projetados (dado não localizado).</p>`;
+
+  // ── Tabela 2: projeção 3 cenários ──────────────────────────────────────────
+  let rp = '';
+  P.meses.slice(6).forEach(mes => {
+    const inv = M.find(x => x.mes === mes).investimento;
+    rp += `<tr><td><strong>${mes}</strong></td><td>${fmt.currency(inv)}</td>` +
+      cenOrdem.map(c => `<td>${fmt.currency(P.cenarios[c].cpl)}</td><td>${_prevN1(P.cenarios[c].leads_mes[mes])}</td>`).join('') + `</tr>`;
+  });
+  $('prev-tab-projecao').innerHTML = `
+    <div class="card-title" style="margin-bottom:8px;">🔮 Projeção de leads — 3 cenários (Jul–Dez)</div>
+    <table class="prev-table2">
+      <thead>
+        <tr><th rowspan="2">Mês</th><th rowspan="2">Investim.</th><th colspan="2" style="text-align:center;">🔴 Conservador</th><th colspan="2" style="text-align:center;">⚪ Base</th><th colspan="2" style="text-align:center;">🟢 Otimista</th></tr>
+        <tr><th>CPL</th><th>Leads</th><th>CPL</th><th>Leads</th><th>CPL</th><th>Leads</th></tr>
+      </thead>
+      <tbody>${rp}</tbody>
+      <tfoot><tr class="prev-foot"><td><strong>Total H2</strong></td><td></td>` +
+        cenOrdem.map(c => `<td>${fmt.currency(P.cenarios[c].cpl)}</td><td><strong>${_prevN1(P.cenarios[c].total_leads)}</strong></td>`).join('') + `</tr></tfoot>
+    </table>
+    <p class="prev-nd-leg">Leads = Investimento projetado ÷ CPL do cenário. Conservador = CPL de junho · Base = CPL ponderado Jan–Jun · Otimista = 3 melhores meses.</p>`;
+
+  // ── Tabela 3: funil (taxa de passagem) ─────────────────────────────────────
+  let rf = '';
+  P.funil.forEach((e, i) => {
+    const obs = e.etapa === R.gargalo_menor_taxa ? '🔴 menor taxa (gargalo)' : e.etapa === R.maior_perda_absoluta ? '🟠 maior perda de volume' : '';
+    rf += `<tr class="${obs ? 'prev-tr-alerta' : ''}">
+      <td class="prev-fun-et">${i === 0 ? '' : (i) + '. '}${e.etapa}</td>
+      <td style="text-align:right;">${i === 0 ? '—' : _prevPct(e.passagem)}</td>
+      <td style="text-align:right;font-weight:600;">${_prevN1(e.volume_por_1000)}</td>
+      <td style="text-align:right;">${_prevPct(e.acumulada_pct / 100)}</td>
+      <td style="text-align:right;color:#ef4444;">${i === 0 ? '—' : _prevN1(e.perda_abs_por_1000)}</td>
+      <td style="text-align:right;color:#888;">${i === 0 ? '—' : _prevPct(e.perda_pct)}</td>
+      <td style="font-size:11px;">${obs}</td>
+    </tr>`;
+  });
+  $('prev-tab-funil').innerHTML = `
+    <div class="card-title" style="margin-bottom:6px;">🔻 Funil — taxa de passagem, acumulada e perdas <span style="font-weight:400;color:#888;font-size:11px;">(base 1.000 leads de entrada)</span></div>
+    <table class="prev-table2 prev-table-funil">
+      <thead><tr><th>Etapa</th><th>Passagem</th><th>Volume</th><th>Acumulada</th><th>Perda abs.</th><th>Perda %</th><th>Observação</th></tr></thead>
+      <tbody>${rf}</tbody>
+    </table>
+    <p class="prev-nd-leg">Aproveitamento Entrada→1ª Reunião Agendada = <strong>${_prevPct(R.aprov_ate_1a_reuniao)}</strong> · Entrada→Negócio Fechado = <strong>${_prevPct(R.entrada_ate_negocio_fechado)}</strong> (1 venda a cada ${R.leads_por_venda} leads).</p>`;
+
+  // ── Tabela 4: meta comercial (volume por etapa no cenário) ─────────────────
+  let rm = '';
+  P.funil.forEach(e => {
+    const vol = cen.total_leads * e.acumulada;
+    rm += `<tr><td class="prev-fun-et">${e.etapa}</td><td style="text-align:right;font-weight:600;">${_prevN1(vol)}</td><td style="text-align:right;color:#888;">${_prevPct(e.acumulada_pct / 100)}</td></tr>`;
+  });
+  $('prev-tab-meta').innerHTML = `
+    <div class="card-title" style="margin-bottom:6px;">🎯 Meta comercial — volume por etapa (H2, cenário ${info.nome})</div>
+    <table class="prev-table2">
+      <thead><tr><th>Etapa</th><th style="text-align:right;">Volume esperado</th><th style="text-align:right;">% acum.</th></tr></thead>
+      <tbody>${rm}</tbody>
+      <tfoot><tr class="prev-foot"><td><strong>Receita potencial</strong></td><td colspan="2" style="text-align:right;"><strong>${_prevMi(cen.receita)}</strong> = ${_prevN1(cen.negocios_fechados)} × R$ 1 mi</td></tr></tfoot>
+    </table>
+    <p class="prev-nd-leg">${_prevN1(cen.total_leads)} leads projetados no semestre × a taxa acumulada de cada etapa.</p>`;
+
+  // ── Funil real do CRM (atingimento) ────────────────────────────────────────
+  const FR = P.funil_real_crm || {};
+  if ($('prev-funil-real')) {
+    if (FR.erro || (!FR.Mai && !FR.Jun)) {
+      $('prev-funil-real').innerHTML = `<div class="card"><div class="card-title">📭 Atingimento real (CRM)</div><p style="color:#888;font-size:12px;">Dado não localizado / CRM indisponível.</p></div>`;
+    } else {
+      const linhaR = (lbl, d) => d ? `<tr><td><strong>${lbl}${d.parcial ? ' <span class="prev-nd">(parcial)</span>' : ''}</strong></td><td style="text-align:right;">${d.entrada}</td><td style="text-align:right;">${d.reuniao_agendada}</td><td style="text-align:right;font-weight:600;">${_prevPct(d.aproveitamento)}</td></tr>` : '';
+      $('prev-funil-real').innerHTML = `
+        <div class="card">
+          <div class="card-title">✅ Atingimento real do funil (CRM) — até 1ª Reunião Agendada</div>
+          <p style="font-size:11px;color:#888;margin:2px 0 8px;">Camada de realidade (deals do CRM, sem importações). Difere dos leads de mídia da tabela acima — bases distintas. Meta de aproveitamento = <strong>${_prevPct(R.aprov_ate_1a_reuniao)}</strong>.</p>
+          <table class="prev-table2" style="max-width:520px;">
+            <thead><tr><th>Mês</th><th style="text-align:right;">Entrada</th><th style="text-align:right;">1ª Reun. Agend.</th><th style="text-align:right;">Aproveitamento</th></tr></thead>
+            <tbody>${linhaR('Maio', FR.Mai)}${linhaR('Junho', FR.Jun)}</tbody>
+          </table>
+        </div>`;
+    }
   }
 
-  // ── Tabela mês a mês ───────────────────────────────────────────────────────
-  const fonteBadge = {meta: '<span class="prev-badge meta">meta</span>',
-                      real: '<span class="prev-badge real">real CRM</span>',
-                      projecao: '<span class="prev-badge proj">projeção</span>'};
-  let rows = '';
-  linha.forEach((l, i) => {
-    const rec = cen.receita[i], vd = cen.vendas[i];
-    const isReal = l.fonte === 'real';
-    const sub = isReal
-      ? `<div class="prev-meta-sub">meta: ${l.meta.leads} lds · ${l.meta.vendas} vd · ${_prevMi(l.meta.receita)}${l.importados ? ` · −${l.importados} imports` : ''}${l.parcial ? ' · parcial' : ''}</div>`
-      : '';
-    rows += `<tr class="${isReal ? 'prev-tr-real' : ''}">
-      <td><strong>${l.mes}</strong>${sub}</td>
-      <td>${fonteBadge[l.fonte] || l.fonte}</td>
-      <td>${fmt.currency(l.investimento)}</td>
-      <td>${l.leads.toLocaleString('pt-BR')}</td>
-      <td>${l.cpl ? fmt.currency(l.cpl) : '—'}</td>
-      <td>${vd.toLocaleString('pt-BR', {maximumFractionDigits: 1})}</td>
-      <td><strong>${_prevMi(rec)}</strong></td>
-    </tr>`;
-  });
-  if (tabEl) tabEl.innerHTML = `
-    <div class="card-title" style="margin-bottom:8px;">📋 Mês a mês <span style="font-weight:400;color:#888;font-size:11px;">(cenário: ${_prevCenario})</span></div>
-    <table class="prev-table2">
-      <thead><tr><th>Mês</th><th>Fonte</th><th>Investim.</th><th>Leads</th><th>CPL</th><th>Vendas</th><th>Receita</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
-
-  // ── Funil das 14 etapas REAIS do CRM (Funil CDC): meta (referência) × real (Maio) ──
-  const F = P.funil || {};
-  let fr = '';
-  (F.etapas || []).forEach((et, i) => {
-    const meta = F.meta_maio[i], real = F.real_maio[i], pct = F.pcts[i];
-    const realTxt = (real === null || real === undefined) ? '<span style="color:#bbb;">—</span>' : real;
-    const bar = meta ? Math.min(100, (real || 0) / meta * 100) : 0;
-    fr += `<tr>
-      <td class="prev-fun-et">${et}</td>
-      <td style="text-align:right;">${meta}</td>
-      <td style="text-align:right;font-weight:600;">${realTxt}</td>
-      <td style="text-align:right;color:#888;">${(pct === null || pct === undefined) ? '' : String(pct).replace('.', ',') + '%'}</td>
-      <td style="width:120px;"><div class="prev-fun-track"><div class="prev-fun-fill" style="width:${bar}%;"></div></div></td>
-    </tr>`;
-  });
-  if (funEl) funEl.innerHTML = `
+  // ── Resumo / alertas ───────────────────────────────────────────────────────
+  if ($('prev-resumo')) $('prev-resumo').innerHTML = `
     <div class="card">
-      <div class="card-title">🔄 Funil de conversão — etapas do CRM (Maio/2026)</div>
-      <p style="font-size:11px;color:#888;margin:2px 0 10px;">As 14 etapas reais do funil do CRM (Funil CDC). <strong>Meta</strong> = referência da planilha · <strong>Real</strong> = deals que alcançaram a etapa em Maio (sem importações) · <strong>% conv.</strong> = conversão real entre etapas. O funil real para em <strong>Visita/Jamil</strong> — ninguém chegou ao Comitê ainda.</p>
-      <table class="prev-funil-tbl">
-        <thead><tr><th>Etapa</th><th style="text-align:right;">Meta</th><th style="text-align:right;">Real</th><th style="text-align:right;">% conv.</th><th>Atingim.</th></tr></thead>
-        <tbody>${fr}</tbody>
-      </table>
-    </div>`;
-
-  // ── Resumo automático ──────────────────────────────────────────────────────
-  if (resEl) resEl.innerHTML = _prevResumoHtml(P, cen);
-}
-
-function _prevResumoHtml(P, cen) {
-  const linha = P.linha;
-  const mai = linha[4], jun = linha[5];
-  const h2Pess = P.cenarios.pessimista.receita.slice(6).reduce((a,b)=>a+b,0);
-  const h2Real = P.cenarios.real.receita.slice(6).reduce((a,b)=>a+b,0);
-  const h2Otim = P.cenarios.otimista.receita.slice(6).reduce((a,b)=>a+b,0);
-  const leadsGap = mai.meta.leads ? ((mai.leads - mai.meta.leads) / mai.meta.leads * 100).toFixed(0) : 0;
-  return `
-    <div class="card">
-      <div class="card-title">🧭 Resumo automático</div>
+      <div class="card-title">🧭 Resumo & alertas de confiabilidade</div>
       <ul class="prev-resumo-list">
-        <li><strong>Realizado (Mai–Jun):</strong> Maio teve <strong>${mai.leads} leads reais</strong> (sem importações), CPL ${fmt.currency(mai.cpl)} — ${leadsGap >= 0 ? 'acima' : Math.abs(leadsGap) + '% abaixo'} da meta de ${mai.meta.leads}. Junho ${jun.leads} leads (parcial). <strong>0 vendas fechadas</strong> nos dois meses.</li>
-        <li><strong>Gargalo do funil:</strong> o avanço real para em <strong>Visita/Jamil</strong> (Maio: ${P.funil.real_maio[9] ?? 0} deals). Nenhum deal chegou a Análise Jurídica/Comitê — por isso a receita realizada é R$ 0 e a projeção até o Comitê é <em>meta</em>, não histórico.</li>
-        <li><strong>Projeção H2 (Jul–Dez):</strong> 🔴 ${_prevMi(h2Pess)} · ⚪ ${_prevMi(h2Real)} · 🟢 ${_prevMi(h2Otim)} de receita, conforme cenário (±30%).</li>
-        <li><strong>Próximo passo:</strong> destravar o trecho <em>Visita → Comitê</em> (hoje 0). Cada deal que fecha = R$ 1 mi. Acelerar COF → Visita e padronizar a etapa jurídica.</li>
+        ${(P.alertas || []).map(a => `<li>${a}</li>`).join('')}
       </ul>
     </div>`;
 }
 
-// ── Análise Real vs Meta do último mês fechado (compartilhada tela + PDF) ─────
+// ── Análise do último mês real vs a média ponderada do semestre (Visão Executiva) ─────
 function _prevAnalyze() {
   const P = DATA.previsibilidade_nativa;
-  if (!P || P.modelo !== 'nativo' || !P.linha) return null;
+  if (!P || P.modelo !== 'nativo-v2' || !P.mensal) return null;
 
-  // último mês com resultado REAL fechado (não parcial)
-  let idx = -1;
-  for (let i = P.linha.length - 1; i >= 0; i--) {
-    if (P.linha[i].fonte === 'real' && !P.linha[i].parcial) { idx = i; break; }
-  }
-  if (idx < 0) return { mesNome: null, bons: [], ruins: [], passos: [], mesIdx: -1 };
+  const reais = P.mensal.filter(m => m.status === 'real');
+  if (!reais.length) return { mesNome: null, bons: [], ruins: [], passos: [], mesIdx: -1 };
+  const l = reais[reais.length - 1];                  // último mês real (Junho)
+  const T = P.realizado_totais;
+  const cpsPond = T.investimento / T.sessoes;          // CPS ponderado do semestre
 
-  const l = P.linha[idx];
+  // compara o mês contra a média ponderada Jan–Jun (referência)
   const metricas = [
-    { label: 'Leads',   dir: 'up',   real: l.leads,   meta: l.meta.leads,   key: 'leads' },
-    { label: 'CPL',     dir: 'down', real: l.cpl,     meta: l.meta.cpl,     key: 'cpl',              moeda: true },
-    { label: 'Vendas',  dir: 'up',   real: l.vendas,  meta: l.meta.vendas,  key: 'vendas' },
-    { label: 'Receita', dir: 'up',   real: l.receita, meta: l.meta.receita, key: 'receita faturada', moeda: true },
+    { label: 'CPL',          dir: 'down', real: fmt.currency(l.cpl),               ref: fmt.currency(T.cpl_ponderado),  key: 'cpl' },
+    { label: 'CPS',          dir: 'down', real: fmt.currency(l.cps),               ref: fmt.currency(cpsPond),          key: 'cps (geral)' },
+    { label: 'Conversão LP', dir: 'up',   real: (l.conv_lp * 100).toFixed(2) + '%', ref: (T.conv_lp_ponderada * 100).toFixed(2) + '%', key: 'taxa de conversao lp' },
   ];
 
   const bons = [], ruins = [], passos = [], passosSet = new Set();
   metricas.forEach(m => {
-    const realStr = m.moeda ? fmt.currency(m.real) : String(m.real);
-    const metaStr = m.moeda ? fmt.currency(m.meta) : String(m.meta);
-    const cmp = _prevCompare(realStr, metaStr, m.dir);   // null se ainda não realizado (real 0)
+    const cmp = _prevCompare(m.real, m.ref, m.dir);
     if (!cmp) return;
     const cfg = PREV_KPI[m.key] || { bom: '', ruim: '' };
     const item = { label: m.label, cmp, cfg };
@@ -5302,7 +5418,7 @@ function _prevAnalyze() {
       if (cfg.ruim && !passosSet.has(cfg.ruim)) { passosSet.add(cfg.ruim); passos.push(cfg.ruim); }
     }
   });
-  return { mesNome: l.mes, bons, ruins, passos, mesIdx: idx };
+  return { mesNome: l.nome + ' (vs média do semestre)', bons, ruins, passos, mesIdx: 0 };
 }
 
 // (Relatório/PDF da previsibilidade removidos — o Plano de Ação Real×Meta vive na Visão Executiva via _prevAnalyze.)
