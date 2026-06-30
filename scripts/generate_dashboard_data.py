@@ -741,8 +741,11 @@ def aggregate_crm(deals, leads=None):
         etapa = normalize_etapa(etapa_raw)          # nome normalizado
         ganho_raw = str(deal.get("ganho") or "").lower()
         ganho = ganho_raw in ("true", "1", "sim", "yes")
-        motivo = deal.get("motivo_perda")
-        perdido = bool(motivo)
+        # win=False conta como PERDA mesmo SEM motivo registrado. Antes "perdido" vinha
+        # só do motivo_perda, então 6 deals fechados-perdidos sem motivo eram contados
+        # como ABERTOS e poluíam o funil ativo. A verdade é o flag ganho/win do RD.
+        perdeu_flag = ganho_raw in ("false", "0", "nao", "não", "no")
+        perdido = bool(deal.get("motivo_perda")) or perdeu_flag
         valor = parse_num(deal.get("valor_total"))
 
         by_stage[etapa]["total"] += 1
@@ -765,9 +768,10 @@ def aggregate_crm(deals, leads=None):
                 monthly_won[mes]["valor"] += valor
 
         motivo = clean_loss_reason(deal.get("motivo_perda"))
-        if motivo:
-            by_loss_reason[motivo] += 1
-            by_loss_reason_stage[motivo][etapa] += 1
+        if perdido:
+            motivo_lbl = motivo or "não informado"   # ghosts win=False sem motivo
+            by_loss_reason[motivo_lbl] += 1
+            by_loss_reason_stage[motivo_lbl][etapa] += 1
             by_loss_stage[etapa] += 1
             total_lost += 1
 
@@ -795,7 +799,7 @@ def aggregate_crm(deals, leads=None):
                 losses_daily.append({
                     "data": dia_perda,
                     "criado": dia_criado,
-                    "motivo": motivo,
+                    "motivo": motivo_lbl,
                     "etapa": etapa,
                     "utm_source": src,
                     "utm_campaign": camp,
@@ -816,7 +820,7 @@ def aggregate_crm(deals, leads=None):
                 monthly_stages[mes_criado]["reuniao_agendada"] += 1
             if "reunião realizada" in etapa_lower or "reuniao realizada" in etapa_lower:
                 monthly_stages[mes_criado]["reuniao_realizada"] += 1
-            if motivo:
+            if perdido:
                 monthly_stages[mes_criado]["perdidos"] += 1
 
         resp = deal.get("responsavel") or "sem responsável"
@@ -974,6 +978,14 @@ def aggregate_meta_ads(rows, leads_daily_map=None):
         "gasto": 0.0, "leads_plat": 0.0, "impressoes": 0.0, "cliques": 0.0, "leads_crm": 0.0,
     }))
     ad_camp_day = {}  # (anuncio, dia) -> campanha (p/ atribuir leads CRM à campanha certa)
+    # Diário por CONJUNTO (atribuição correta: cada linha bruta tem seu conjunto+campanha
+    # reais). Resolve a inflação da tabela "Qualidade dos públicos", que antes somava por
+    # NOME de anúncio (creatives_daily) e despejava TODO o gasto de um anúncio multi-conjunto
+    # num único conjunto (FEIRA aparecia R$3.461 sendo que a campanha-mãe gastou R$477).
+    adset_daily = defaultdict(lambda: defaultdict(lambda: {
+        "gasto": 0.0, "leads_plat": 0.0, "impressoes": 0.0, "cliques": 0.0, "leads_crm": 0.0,
+    }))
+    ad_conj_spend = defaultdict(lambda: defaultdict(float))  # (anuncio,dia) -> {(camp,conj): gasto}
 
     for row in rows:
         mes = parse_date_to_month(row.get("data"))
@@ -1045,6 +1057,14 @@ def aggregate_meta_ads(rows, leads_daily_map=None):
                 creatives_daily[anuncio][dia]["impressoes"] += impressoes
                 creatives_daily[anuncio][dia]["cliques"] += cliques
                 ad_camp_day[(anuncio, dia)] = campanha   # campanha real do anúncio nesse dia
+
+                conjunto = row.get("conjunto") or ""
+                if conjunto:
+                    ak = (campanha, conjunto)
+                    ad_s = adset_daily[ak][dia]
+                    ad_s["gasto"] += gasto;      ad_s["leads_plat"] += leads
+                    ad_s["impressoes"] += impressoes; ad_s["cliques"] += cliques
+                    ad_conj_spend[(anuncio, dia)][ak] += gasto
 
     monthly_list = []
     for mes, d in sorted(monthly.items()):
@@ -1151,6 +1171,34 @@ def aggregate_meta_ads(rows, leads_daily_map=None):
                 "cliques": int(v["cliques"]),
             })
 
+    # Diário por CONJUNTO: atribui os leads CRM (matching, por nome de anúncio) ao(s)
+    # conjunto(s) reais onde o anúncio rodou naquele dia, PROPORCIONAL ao gasto (um anúncio
+    # multi-conjunto divide seus leads entre os conjuntos onde gastou). Gasto/impr/cliques
+    # já são exatos (cada linha bruta tem seu conjunto). Resolve o bug FEIRA.
+    for nome, dias in leads_daily_map.items():
+        for dia, n in dias.items():
+            spends = ad_conj_spend.get((nome, dia))
+            if not spends:
+                continue
+            tot = sum(spends.values())
+            if tot <= 0:
+                continue
+            for ak, sp in spends.items():
+                adset_daily[ak][dia]["leads_crm"] += n * (sp / tot)
+    adset_daily_list = []
+    for (campanha, conjunto), dias in adset_daily.items():
+        for dia, v in sorted(dias.items()):
+            if v["gasto"] == 0 and v["leads_crm"] == 0 and v["leads_plat"] == 0:
+                continue
+            adset_daily_list.append({
+                "data": dia, "campanha": campanha, "conjunto": conjunto,
+                "gasto": round(v["gasto"], 2),
+                "leads": round(v["leads_crm"], 2),          # CRM proporcional ao gasto
+                "leads_plat": int(round(v["leads_plat"])),  # plataforma
+                "impressoes": int(v["impressoes"]),
+                "cliques": int(v["cliques"]),
+            })
+
     return {
         "total_gasto": round(total_gasto, 2),
         "total_leads": int(round(total_leads)),
@@ -1160,6 +1208,7 @@ def aggregate_meta_ads(rows, leads_daily_map=None):
         "campaigns": campaigns_list,
         "campaign_monthly": campaign_monthly_list,
         "campaign_daily": campaign_daily_list,
+        "adset_daily": adset_daily_list,
         "campaign_names": sorted(camp_monthly.keys()),
         "creatives": creatives_list,
         "creatives_daily": creatives_daily_list,
@@ -2205,6 +2254,14 @@ def build_leads_scoring_closer(crm_deals, leads, tarefas, atividades):
     out = []
     for d in crm_deals:
         if stage_pos(d.get('etapa')) < from_pos:
+            continue
+        # Pula deals JÁ FECHADOS (ganhos ou perdidos). Antes o filtro era só por etapa,
+        # então deals PERDIDOS (que permanecem na etapa onde morreram) entravam na lista
+        # de "prioridade do closer" — 8 de 15 estavam perdidos, incl. o rank #1. A lista
+        # do closer só pode ter deals VIVOS (em aberto).
+        _ganho = str(d.get('ganho') or '').lower()
+        if _ganho in ('true', '1', 'sim', 'yes') or bool(d.get('motivo_perda')) \
+                or _ganho in ('false', '0', 'nao', 'não', 'no'):
             continue
         email = (d.get('contato_email') or '').strip().lower()
         lead = leads_by_email.get(email, {})

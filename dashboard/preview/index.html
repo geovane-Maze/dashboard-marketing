@@ -4253,15 +4253,18 @@ function renderMeta() {
   const g7d = {}; cdaily.forEach(r => { if (cut7 && r.data >= cut7) g7d[r.anuncio] = (g7d[r.anuncio] || 0) + (r.gasto || 0); });
 
   // ── 3. QUALIDADE DOS PÚBLICOS (conjuntos ativos no período) ──
+  // Fonte: adset_daily (dimensão REAL de conjunto por linha, atribuição correta) — NÃO
+  // byAd[nome].conjunto, que inflava: despejava TODO o gasto de um anúncio multi-conjunto
+  // num único conjunto (FEIRA aparecia R$3.461 sendo que a campanha-mãe gastou R$477).
+  // Agrupa por (campanha, conjunto) — um conjunto nunca aparece maior que sua campanha.
   const adsetMap = {};
-  activeAds.forEach(([anuncio, d]) => {
-    const meta = byAd[anuncio] || {};
-    const key = meta.conjunto || '(sem conjunto)';
-    const a = adsetMap[key] || (adsetMap[key] = { conjunto: key, campanha: meta.campanha || '', gasto: 0, leadsCRM: 0, impressoes: 0, cliques: 0 });
-    a.gasto += d.gasto; a.leadsCRM += d.leadsCRM; a.impressoes += d.impressoes; a.cliques += d.cliques;
-    if (!a.campanha && meta.campanha) a.campanha = meta.campanha;
+  (M.adset_daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
+    const conj = r.conjunto || '(sem conjunto)';
+    const key = (r.campanha || '') + '|||' + conj;
+    const a = adsetMap[key] || (adsetMap[key] = { conjunto: conj, campanha: r.campanha || '', gasto: 0, leadsCRM: 0, impressoes: 0, cliques: 0 });
+    a.gasto += r.gasto || 0; a.leadsCRM += r.leads || 0; a.impressoes += r.impressoes || 0; a.cliques += r.cliques || 0;
   });
-  const adsets = Object.values(adsetMap).map(a => {
+  const adsets = Object.values(adsetMap).filter(a => a.gasto > 0).map(a => {
     a._cpl = a.leadsCRM > 0 ? a.gasto / a.leadsCRM : 0;
     a.q = qualidadeAds(a._cpl, a.gasto, a.leadsCRM, TQ);
     return a;
@@ -4272,7 +4275,7 @@ function renderMeta() {
       <td>${stt(activeCamps.has(a.campanha))}</td>
       <td>${ell(a.campanha, 160)}</td>
       <td>${ell(a.conjunto, 190)}</td>
-      <td><strong>${fmt.num(a.leadsCRM)}</strong></td>
+      <td><strong>${fmt.num(Math.round(a.leadsCRM))}</strong></td>
       <td>${a.leadsCRM > 0 ? fmt.currency(a._cpl) : '—'}</td>
       <td>${cpm > 0 ? fmt.currency(cpm) : '—'}</td>
       <td>${a.cliques > 0 ? fmt.k(a.cliques) : '—'}</td>

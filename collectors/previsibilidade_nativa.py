@@ -174,22 +174,40 @@ def get_previsibilidade_data(meta_monthly=None, google_monthly=None):
     acum_nf = acum[-1]
     acum_ra = acum[IDX_1A_REUNIAO]
 
+    # Investimento REAL Jan–Jun: deriva do summary (meta+google monthly) quando disponível,
+    # em vez do valor hardcoded. Junho ficava congelado num snapshot PARCIAL de meio de mês
+    # (R$ 20.954 vs R$ 26.172 real). Jan–Mai já batiam ao centavo; isso conserta junho e
+    # blinda meses futuros conforme fecham. Fallback p/ o hardcode se o monthly faltar.
+    invest_real = dict(INVEST_REAL)
+    _by_key = defaultdict(float)
+    for _row in (meta_monthly or []):
+        if _row.get('mes'):
+            _by_key[_row['mes']] += float(_row.get('gasto') or 0)
+    for _row in (google_monthly or []):
+        if _row.get('mes'):
+            _by_key[_row['mes']] += float(_row.get('gasto') or 0)
+    _MES2KEY = {'Jan': '2026-01', 'Fev': '2026-02', 'Mar': '2026-03',
+                'Abr': '2026-04', 'Mai': '2026-05', 'Jun': '2026-06'}
+    for _m, _k in _MES2KEY.items():
+        if _by_key.get(_k, 0) > 0:
+            invest_real[_m] = round(_by_key[_k], 2)
+
     # --- realizado Jan–Jun (com fórmulas) ---
     cpl_real, cps_real, conv_lp = {}, {}, {}
     for m in REAL:
-        cpl_real[m] = INVEST_REAL[m] / LEADS_REAL[m]
-        cps_real[m] = INVEST_REAL[m] / SESSOES[m]
+        cpl_real[m] = invest_real[m] / LEADS_REAL[m]
+        cps_real[m] = invest_real[m] / SESSOES[m]
         conv_lp[m] = LEADS_REAL[m] / SESSOES[m]
-    tot_inv = sum(INVEST_REAL[m] for m in REAL)
+    tot_inv = sum(invest_real[m] for m in REAL)
     tot_leads = sum(LEADS_REAL[m] for m in REAL)
     tot_sess = sum(SESSOES[m] for m in REAL)
     conv_lp_ponderada = tot_leads / tot_sess
 
     # --- cenários de CPL ---
-    cpl_conserv = INVEST_REAL['Jun'] / LEADS_REAL['Jun']
+    cpl_conserv = invest_real['Jun'] / LEADS_REAL['Jun']
     cpl_base = tot_inv / tot_leads
     melhores = sorted(REAL, key=lambda m: cpl_real[m])[:3]
-    cpl_otim = sum(INVEST_REAL[m] for m in melhores) / sum(LEADS_REAL[m] for m in melhores)
+    cpl_otim = sum(invest_real[m] for m in melhores) / sum(LEADS_REAL[m] for m in melhores)
     CEN = {'conservador': (cpl_conserv, 'CPL de Junho (mais recente/alto)'),
            'base':        (cpl_base, 'CPL ponderado Jan–Jun'),
            'otimista':    (cpl_otim, f'CPL ponderado dos 3 melhores meses ({", ".join(melhores)})')}
@@ -215,7 +233,7 @@ def get_previsibilidade_data(meta_monthly=None, google_monthly=None):
         if m in REAL:
             mensal.append({
                 'mes': m, 'nome': MES_NOME[m], 'status': 'real',
-                'investimento': round(INVEST_REAL[m], 2), 'leads': LEADS_REAL[m],
+                'investimento': round(invest_real[m], 2), 'leads': LEADS_REAL[m],
                 'cpl': round(cpl_real[m], 2), 'sessoes': SESSOES[m],
                 'cps': round(cps_real[m], 2), 'conv_lp': round(conv_lp[m], 4),
             })
