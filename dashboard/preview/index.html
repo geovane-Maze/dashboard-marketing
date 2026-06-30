@@ -4313,11 +4313,9 @@ function renderGoogle() {
   const ell = (s, w) => `<div style="max-width:${w}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s)}">${esc(s) || '—'}</div>`;
   const stt = ativo => `<span class="${ativo ? 'tag-ativo' : 'tag-pausado'}">${ativo ? 'Ativo' : 'Pausado'}</span>`;
 
-  // Campanhas ativas Google = com gasto nos últimos 2 meses disponíveis
-  const gMon = G.campaign_monthly || [];
-  const allM = [...new Set(gMon.map(r => r.mes))].sort();
-  const last2 = allM.slice(-2);
-  const activeCamps = new Set(gMon.filter(r => last2.includes(r.mes) && r.gasto > 0).map(r => r.campanha));
+  // Campanhas ativas Google = STATUS REAL da API (campaign.status ENABLED).
+  // Fallback (sem o status no summary): heurística de gasto nos últimos 2 meses.
+  const activeCamps = getActiveGoogleCampaigns();
 
   // ── KPIs (CPL via CRM — regra de ouro) ──
   let tGasto = 0, tImpr = 0, tCliques = 0;
@@ -4339,8 +4337,11 @@ function renderGoogle() {
   ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
 
   // ── 1. CAMPANHAS ATIVAS ──
+  // Derivado de campaign_daily (DIÁRIO, atribuição correta POR CAMPANHA) → respeita o
+  // filtro de DIA. Antes usava campaign_monthly (filtro de mês), então filtrar por dia
+  // mostrava o gasto do mês inteiro ("gasto fantasma", mesmo bug corrigido no Meta).
   const campMap = {};
-  (G.campaign_monthly || []).filter(r => !pred || pred(r.mes)).forEach(r => {
+  (G.campaign_daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
     const c = campMap[r.campanha] || (campMap[r.campanha] = { gasto: 0, impressoes: 0, cliques: 0, conv: 0 });
     c.gasto += r.gasto || 0; c.impressoes += r.impressoes || 0; c.cliques += r.cliques || 0; c.conv += r.conversoes || 0;
   });
@@ -4511,6 +4512,20 @@ function getActiveCampaigns() {
   const allMonths = [...new Set(campMonthly.map(r => r.mes))].sort();
   const last2 = allMonths.slice(-2);  // últimos 2 meses
   return new Set(campMonthly.filter(r => last2.includes(r.mes) && r.gasto > 0).map(r => r.campanha));
+}
+
+// Campanhas ativas Google. Preferência: STATUS REAL da API (google_ads.campaign_status,
+// campaign.status ENABLED). Fallback (sem o status): heurística de gasto recente.
+function getActiveGoogleCampaigns() {
+  const status = (DATA.google_ads || {}).campaign_status;
+  if (status && Object.keys(status).length) {
+    return new Set(Object.entries(status).filter(([, s]) => s === 'ENABLED').map(([n]) => n));
+  }
+  const gMon = (DATA.google_ads || {}).campaign_monthly || [];
+  if (!gMon.length) return new Set();
+  const allM = [...new Set(gMon.map(r => r.mes))].sort();
+  const last2 = allM.slice(-2);  // últimos 2 meses
+  return new Set(gMon.filter(r => last2.includes(r.mes) && r.gasto > 0).map(r => r.campanha));
 }
 
 // Campanhas do período selecionado (para o dropdown)

@@ -66,6 +66,45 @@ def get_campaign_data(days_back=90):
     return rows
 
 
+def get_campaign_status():
+    """
+    Mapa {nome_da_campanha: 'ENABLED'|'PAUSED'|...} de TODAS as campanhas (exceto
+    REMOVED) da conta — STATUS REAL via API. Espelha meta_ads_api.get_campaign_status().
+
+    Resolve o bug "Ativo/Pausado": o dashboard antes adivinhava o status pelo gasto
+    recente (heurística), marcando campanhas pausadas como ativas. Diferente de
+    get_campaign_data(), NÃO filtra por custo/data — então pega pausadas sem gasto.
+
+    Em caso de erro/credenciais ausentes, retorna {} (o front cai no fallback heurístico).
+    """
+    query = """
+        SELECT campaign.name, campaign.status
+        FROM campaign
+        WHERE campaign.status != 'REMOVED'
+    """
+    out = {}
+    print("Coletando status real das campanhas do Google Ads (API)...")
+    try:
+        client = get_client()
+        service = client.get_service("GoogleAdsService")
+        customer_id = config.GOOGLE_ADS_CUSTOMER_ID.replace("-", "")
+        for row in service.search(customer_id=customer_id, query=query):
+            nome = (row.campaign.name or "").strip()
+            if not nome:
+                continue
+            status = row.campaign.status.name  # ENABLED / PAUSED / ...
+            # Campanhas com nome repetido: marca ENABLED se QUALQUER uma estiver ativa
+            # (o dashboard agrupa por nome, então o status é o "melhor" do grupo).
+            if status == "ENABLED" or nome not in out:
+                out[nome] = status
+    except GoogleAdsException as ex:
+        print(f"  AVISO status Google: {ex.error.code().name}")
+    except Exception as e:
+        print(f"  AVISO status Google: {e}")
+    print(f"  Status Google: {len(out)} campanhas.")
+    return out
+
+
 def get_creative_thumbnails():
     """
     Mapa {nome_do_anuncio: thumbnail_url} via API Google Ads.

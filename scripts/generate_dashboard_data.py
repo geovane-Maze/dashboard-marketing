@@ -1177,6 +1177,9 @@ def aggregate_google_ads(rows):
     camp_monthly = defaultdict(lambda: defaultdict(lambda: {
         "gasto": 0.0, "conversoes": 0.0, "impressoes": 0.0, "cliques": 0.0,
     }))
+    camp_daily = defaultdict(lambda: defaultdict(lambda: {
+        "gasto": 0.0, "conversoes": 0.0, "impressoes": 0.0, "cliques": 0.0,
+    }))
 
     for row in rows:
         mes = parse_date_to_month(row.get("data"))
@@ -1212,6 +1215,12 @@ def aggregate_google_ads(rows):
             camp_monthly[campanha][mes]["impressoes"] += impressoes
             camp_monthly[campanha][mes]["cliques"] += cliques
 
+            if dia:
+                camp_daily[campanha][dia]["gasto"] += gasto
+                camp_daily[campanha][dia]["conversoes"] += conversoes
+                camp_daily[campanha][dia]["impressoes"] += impressoes
+                camp_daily[campanha][dia]["cliques"] += cliques
+
     monthly_list = []
     for mes, d in sorted(monthly.items()):
         cpl = round(d["gasto"] / d["conversoes"], 2) if d["conversoes"] > 0 else 0
@@ -1246,6 +1255,20 @@ def aggregate_google_ads(rows):
                 "impressoes": int(round(d["impressoes"])), "cliques": int(round(d["cliques"])),
             })
 
+    # Diário por CAMPANHA (cada linha bruta já tem sua campanha → atribuição correta).
+    # A tabela de campanhas do front usa ele p/ respeitar o filtro de DIA, em vez de
+    # somar o mês inteiro (corrige o "gasto fantasma", igual ao Meta/campaign_daily).
+    campaign_daily_list = []
+    for camp, dias in camp_daily.items():
+        for dia, d in sorted(dias.items()):
+            if d["gasto"] == 0 and d["conversoes"] == 0:
+                continue
+            campaign_daily_list.append({
+                "campanha": camp, "data": dia,
+                "gasto": round(d["gasto"], 2), "conversoes": int(round(d["conversoes"])),
+                "impressoes": int(round(d["impressoes"])), "cliques": int(round(d["cliques"])),
+            })
+
     total_gasto = sum(d["gasto"] for d in monthly.values())
     total_conversoes = sum(d["conversoes"] for d in monthly.values())
 
@@ -1263,6 +1286,7 @@ def aggregate_google_ads(rows):
         "daily": daily_list,
         "campaigns": campaigns_list,
         "campaign_monthly": campaign_monthly_list,
+        "campaign_daily": campaign_daily_list,
         "campaign_names": sorted(camp_monthly.keys()),
     }
 
@@ -2371,6 +2395,20 @@ def main():
     meetings_agg = aggregate_meetings(crm_deals)
     meta_agg    = meta_aggregated
     google_agg  = aggregate_google_ads(google_ads)
+
+    # Status REAL das campanhas Google (campaign.status via API) — mesma correção do
+    # Meta: o dashboard antes "adivinhava" o status pelo gasto recente, marcando
+    # campanhas pausadas como Ativas. Vai em google_ads.campaign_status.
+    try:
+        from collectors import google_ads as google_ads_collector
+        google_status = google_ads_collector.get_campaign_status()
+        if google_status:
+            google_agg["campaign_status"] = google_status
+            n_act = sum(1 for v in google_status.values() if v == "ENABLED")
+            print(f"    Status Google (API): {len(google_status)} campanhas · {n_act} ativas")
+    except Exception as e:
+        print(f"    AVISO: status Google (API) indisponível: {e}")
+
     utm_agg     = aggregate_utm(leads)
     leads_agg   = aggregate_leads(leads)
 
