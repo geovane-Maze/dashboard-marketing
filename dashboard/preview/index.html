@@ -352,6 +352,8 @@
   .criat-camp-item .camp-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tag-ativo   { background: #DCFCE7; color: #15803D; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; }
   .tag-pausado { background: #FEE2E2; color: #B91C1C; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; }
+  .tag-desconhecido { background: #F1F5F9; color: #64748B; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; }
+  .status-warn { background: #FEF3C7; color: #92400E; font-size: 12px; font-weight: 600; padding: 8px 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #FCD34D; }
   .badge.open { background: #F1F5F9; color: #475569; }
 
   /* FUNNEL */
@@ -1698,6 +1700,7 @@
       <!-- 1. Campanhas ativas -->
       <div class="table-card">
         <h3>Campanhas ativas</h3>
+        <div id="meta-status-warn"></div>
         <table>
           <thead><tr>
             <th>Status</th><th>Campanha</th><th>Leads Plataforma</th><th>Leads CRM</th>
@@ -1752,6 +1755,7 @@
       <!-- 1. Campanhas ativas -->
       <div class="table-card">
         <h3>Campanhas ativas</h3>
+        <div id="google-status-warn"></div>
         <table>
           <thead><tr>
             <th>Status</th><th>Campanha</th><th>Conversões Plat.</th><th>Leads CRM</th>
@@ -4144,9 +4148,16 @@ function renderMeta() {
   const M = DATA.meta_ads || {};
   const creatives = M.creatives || [];
   const activeCamps = getActiveCampaigns();
+  // Status REAL disponível? (meta_ads.campaign_status preenchido pela API). Se NÃO,
+  // o front NÃO inventa "Ativo" pelo gasto — mostra "—" honesto, pra nunca afirmar
+  // ao cliente que uma campanha pausada está ativa.
+  const statusReal = !!(M.campaign_status && Object.keys(M.campaign_status).length);
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const ell = (s, w) => `<div style="max-width:${w}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s)}">${esc(s) || '—'}</div>`;
-  const stt = ativo => `<span class="${ativo ? 'tag-ativo' : 'tag-pausado'}">${ativo ? 'Ativo' : 'Pausado'}</span>`;
+  const stt = ativo => statusReal
+    ? `<span class="${ativo ? 'tag-ativo' : 'tag-pausado'}">${ativo ? 'Ativo' : 'Pausado'}</span>`
+    : `<span class="tag-desconhecido" title="Status real indisponível — os dados ainda não trazem o status da Meta. Rode o workflow 'ETL rapido' com o token configurado.">—</span>`;
+  const statusWarn = statusReal ? '' : `<div class="status-warn">⚠️ Status real das campanhas indisponível neste dado — exibindo "—" em vez de adivinhar. Rode o workflow <strong>"ETL rapido"</strong> com o token da Meta configurado pra mostrar Ativo/Pausado de verdade.</div>`;
 
   // ── KPIs (CPL via CRM — regra de ouro) ──
   let tGasto = 0, tImpr = 0, tCliques = 0;
@@ -4196,6 +4207,7 @@ function renderMeta() {
       <td>${fmt.currency(d.gasto)}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="10" class="empty">Sem dados no período selecionado.</td></tr>';
+  document.getElementById('meta-status-warn').innerHTML = statusWarn;
 
   // ── 2. INVESTIMENTO × LEADS CRM (mensal, mesmo gráfico) ──
   const meses = [...new Set([
@@ -4311,7 +4323,13 @@ function renderGoogle() {
   const GC = DATA.google_ads_creatives || {};
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const ell = (s, w) => `<div style="max-width:${w}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s)}">${esc(s) || '—'}</div>`;
-  const stt = ativo => `<span class="${ativo ? 'tag-ativo' : 'tag-pausado'}">${ativo ? 'Ativo' : 'Pausado'}</span>`;
+  // Status REAL disponível? (google_ads.campaign_status preenchido pela API). Se NÃO,
+  // mostra "—" honesto em vez de adivinhar "Ativo" pelo gasto (mesma regra do Meta).
+  const statusReal = !!(G.campaign_status && Object.keys(G.campaign_status).length);
+  const stt = ativo => statusReal
+    ? `<span class="${ativo ? 'tag-ativo' : 'tag-pausado'}">${ativo ? 'Ativo' : 'Pausado'}</span>`
+    : `<span class="tag-desconhecido" title="Status real indisponível — os dados ainda não trazem o status do Google. Rode o workflow 'ETL rapido'.">—</span>`;
+  const statusWarn = statusReal ? '' : `<div class="status-warn">⚠️ Status real das campanhas indisponível neste dado — exibindo "—" em vez de adivinhar. Rode o workflow <strong>"ETL rapido"</strong> pra mostrar Ativo/Pausado de verdade.</div>`;
 
   // Campanhas ativas Google = STATUS REAL da API (campaign.status ENABLED).
   // Fallback (sem o status no summary): heurística de gasto nos últimos 2 meses.
@@ -4379,6 +4397,7 @@ function renderGoogle() {
       <td>${fmt.currency(d.gasto)}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="10" class="empty">Sem dados no período selecionado.</td></tr>';
+  document.getElementById('google-status-warn').innerHTML = statusWarn;
 
   // ── 2. INVESTIMENTO × LEADS CRM (mensal, mesmo gráfico) ──
   const meses = [...new Set([

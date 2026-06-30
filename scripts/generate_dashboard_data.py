@@ -2378,8 +2378,15 @@ def main():
             meta_aggregated["campaign_status"] = meta_status
             n_act = sum(1 for v in meta_status.values() if v == "ACTIVE")
             print(f"    Status Meta (API): {len(meta_status)} campanhas · {n_act} ativas")
+        else:
+            # NÃO falha em silêncio: token inválido/ausente => campaign_status vazio =>
+            # o front mostraria status errado. Anota erro VISÍVEL no GitHub Actions
+            # (sem abortar o ETL — o front cai no "—" honesto). Ver get_campaign_status.
+            print("::error::Status Meta (API) VAZIO — META_ACCESS_TOKEN invalido/ausente ou sem "
+                  "permissao ads_read. campaign_status NAO foi gravado; o dashboard vai mostrar "
+                  "'-' (status indisponivel) em vez de Ativo/Pausado. Confira o secret META_ACCESS_TOKEN.")
     except Exception as e:
-        print(f"    AVISO: status Meta (API) indisponível: {e}")
+        print(f"::error::Status Meta (API) FALHOU: {e}")
 
     # Mantém agregação total no creatives (já existente — para legacy compatibility)
     attach_rd_leads_to_creatives(meta_aggregated["creatives"], meta_ads, leads)
@@ -2406,8 +2413,12 @@ def main():
             google_agg["campaign_status"] = google_status
             n_act = sum(1 for v in google_status.values() if v == "ENABLED")
             print(f"    Status Google (API): {len(google_status)} campanhas · {n_act} ativas")
+        else:
+            print("::error::Status Google (API) VAZIO — credenciais Google Ads invalidas/ausentes. "
+                  "campaign_status NAO foi gravado; o dashboard vai mostrar '-' (status indisponivel) "
+                  "em vez de Ativo/Pausado.")
     except Exception as e:
-        print(f"    AVISO: status Google (API) indisponível: {e}")
+        print(f"::error::Status Google (API) FALHOU: {e}")
 
     utm_agg     = aggregate_utm(leads)
     leads_agg   = aggregate_leads(leads)
