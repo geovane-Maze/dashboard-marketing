@@ -986,6 +986,13 @@ def aggregate_meta_ads(rows, leads_daily_map=None):
         "gasto": 0.0, "leads_plat": 0.0, "impressoes": 0.0, "cliques": 0.0, "leads_crm": 0.0,
     }))
     ad_conj_spend = defaultdict(lambda: defaultdict(float))  # (anuncio,dia) -> {(camp,conj): gasto}
+    # Diário por (ANÚNCIO, campanha, conjunto): a tabela "Qualidade dos anúncios" quebra por
+    # conjunto real — um criativo que roda em N conjuntos vira N linhas com o gasto certo de
+    # cada, em vez de 1 linha com o total dele rotulado num conjunto só (Vídeo Institucional
+    # aparecia R$3.283 sob FEIRA, sendo que só R$300 foram da FEIRA).
+    creative_adset_daily = defaultdict(lambda: defaultdict(lambda: {
+        "gasto": 0.0, "leads_plat": 0.0, "leads_crm": 0.0,
+    }))
 
     for row in rows:
         mes = parse_date_to_month(row.get("data"))
@@ -1065,6 +1072,8 @@ def aggregate_meta_ads(rows, leads_daily_map=None):
                     ad_s["gasto"] += gasto;      ad_s["leads_plat"] += leads
                     ad_s["impressoes"] += impressoes; ad_s["cliques"] += cliques
                     ad_conj_spend[(anuncio, dia)][ak] += gasto
+                    cad = creative_adset_daily[(anuncio, campanha, conjunto)][dia]
+                    cad["gasto"] += gasto; cad["leads_plat"] += leads
 
     monthly_list = []
     for mes, d in sorted(monthly.items()):
@@ -1184,7 +1193,9 @@ def aggregate_meta_ads(rows, leads_daily_map=None):
             if tot <= 0:
                 continue
             for ak, sp in spends.items():
-                adset_daily[ak][dia]["leads_crm"] += n * (sp / tot)
+                frac = n * (sp / tot)
+                adset_daily[ak][dia]["leads_crm"] += frac
+                creative_adset_daily[(nome, ak[0], ak[1])][dia]["leads_crm"] += frac
     adset_daily_list = []
     for (campanha, conjunto), dias in adset_daily.items():
         for dia, v in sorted(dias.items()):
@@ -1198,6 +1209,17 @@ def aggregate_meta_ads(rows, leads_daily_map=None):
                 "impressoes": int(v["impressoes"]),
                 "cliques": int(v["cliques"]),
             })
+    creative_adset_daily_list = []
+    for (anuncio, campanha, conjunto), dias in creative_adset_daily.items():
+        for dia, v in sorted(dias.items()):
+            if v["gasto"] == 0 and v["leads_crm"] == 0 and v["leads_plat"] == 0:
+                continue
+            creative_adset_daily_list.append({
+                "data": dia, "anuncio": anuncio, "campanha": campanha, "conjunto": conjunto,
+                "gasto": round(v["gasto"], 2),
+                "leads": round(v["leads_crm"], 2),          # CRM proporcional ao gasto
+                "leads_plat": int(round(v["leads_plat"])),
+            })
 
     return {
         "total_gasto": round(total_gasto, 2),
@@ -1209,6 +1231,7 @@ def aggregate_meta_ads(rows, leads_daily_map=None):
         "campaign_monthly": campaign_monthly_list,
         "campaign_daily": campaign_daily_list,
         "adset_daily": adset_daily_list,
+        "creative_adset_daily": creative_adset_daily_list,
         "campaign_names": sorted(camp_monthly.keys()),
         "creatives": creatives_list,
         "creatives_daily": creatives_daily_list,

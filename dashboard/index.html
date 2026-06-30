@@ -4241,12 +4241,29 @@ function renderMeta() {
   }).join('') || '<tr><td colspan="10" class="empty">Sem conjuntos ativos no período.</td></tr>';
 
   // ── 4. QUALIDADE DOS ANÚNCIOS (criativos ativos no período) ──
-  const ads = activeAds.map(([anuncio, d]) => {
-    const meta = byAd[anuncio] || {};
-    const cpl = d.leadsCRM > 0 ? d.gasto / d.leadsCRM : 0;
-    return { anuncio, campanha: meta.campanha || '', conjunto: meta.conjunto || '', gasto: d.gasto, gasto7d: g7d[anuncio] || 0,
-      leadsPlat: meta.leads || 0, leadsCRM: d.leadsCRM, _cpl: cpl, thumbnail: meta.thumbnail, permalink: meta.permalink,
-      ativo: activeCamps.has(meta.campanha), q: qualidadeAds(cpl, d.gasto, d.leadsCRM, TQ) };
+  // Fonte: creative_adset_daily (gasto por ANÚNCIO×conjunto REAIS). Um criativo que roda em
+  // N conjuntos vira N linhas com o gasto certo de cada — antes virava 1 linha com o TOTAL
+  // dele rotulado num conjunto só (Vídeo Institucional aparecia R$3.283 sob FEIRA, sendo que
+  // só R$300 foram da FEIRA). Cada linha = (anúncio, campanha, conjunto).
+  const cadAll = M.creative_adset_daily || [];
+  const cadMax = cadAll.reduce((mx, r) => r.data > mx ? r.data : mx, '');
+  let cadCut7 = '';
+  if (cadMax) { const dd = new Date(cadMax + 'T00:00:00'); dd.setDate(dd.getDate() - 6); cadCut7 = dd.toISOString().slice(0, 10); }
+  const adMap = {}, g7dConj = {};
+  cadAll.forEach(r => {
+    const key = r.anuncio + '|||' + r.campanha + '|||' + r.conjunto;
+    if (cadCut7 && r.data >= cadCut7) g7dConj[key] = (g7dConj[key] || 0) + (r.gasto || 0);
+    if (datePred && !datePred(r.data)) return;
+    const a = adMap[key] || (adMap[key] = { anuncio: r.anuncio, campanha: r.campanha || '', conjunto: r.conjunto || '', gasto: 0, leadsCRM: 0, leadsPlat: 0 });
+    a.gasto += r.gasto || 0; a.leadsCRM += r.leads || 0; a.leadsPlat += r.leads_plat || 0;
+  });
+  const ads = Object.values(adMap).filter(a => a.gasto > 0).map(a => {
+    const meta = byAd[a.anuncio] || {};
+    const cpl = a.leadsCRM > 0 ? a.gasto / a.leadsCRM : 0;
+    return { anuncio: a.anuncio, campanha: a.campanha, conjunto: a.conjunto, gasto: a.gasto,
+      gasto7d: g7dConj[a.anuncio + '|||' + a.campanha + '|||' + a.conjunto] || 0,
+      leadsPlat: a.leadsPlat, leadsCRM: a.leadsCRM, _cpl: cpl, thumbnail: meta.thumbnail, permalink: meta.permalink,
+      ativo: activeCamps.has(a.campanha), q: qualidadeAds(cpl, a.gasto, a.leadsCRM, TQ) };
   }).sort((x, y) => y.gasto - x.gasto);
   document.getElementById('table-meta-ads').innerHTML = ads.map(c => {
     const img = c.thumbnail
@@ -4261,7 +4278,7 @@ function renderMeta() {
       <td>${fmt.currency(c.gasto)}</td>
       <td>${fmt.currency(c.gasto7d)}</td>
       <td>${fmt.num(c.leadsPlat)}</td>
-      <td><strong>${fmt.num(c.leadsCRM)}</strong></td>
+      <td><strong>${fmt.num(Math.round(c.leadsCRM))}</strong></td>
       <td>${c.leadsCRM > 0 ? fmt.currency(c._cpl) : '—'}</td>
       <td><span class="q-badge ${c.q.cls}">${c.q.acao}</span></td>
     </tr>`;
