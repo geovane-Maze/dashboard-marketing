@@ -67,7 +67,7 @@ jobs:
         run: |
           mkdir -p dashboard/data
           python -u scripts/generate_dashboard_data.py
-        timeout-minutes: 10
+        timeout-minutes: 25
 
       - name: Publicar dashboard no GitHub Pages
         uses: actions/upload-pages-artifact@v3

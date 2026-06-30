@@ -967,6 +967,13 @@ def aggregate_meta_ads(rows, leads_daily_map=None):
     creatives_daily = defaultdict(lambda: defaultdict(lambda: {
         "gasto": 0.0, "leads": 0.0, "impressoes": 0.0, "cliques": 0.0,
     }))
+    # Diário por CAMPANHA — atribuição correta (cada linha bruta tem sua campanha),
+    # permite a tabela de campanhas respeitar o filtro de DIA sem o problema do
+    # creatives_daily (que agrega por nome de anúncio reusado entre campanhas).
+    camp_daily = defaultdict(lambda: defaultdict(lambda: {
+        "gasto": 0.0, "leads_plat": 0.0, "impressoes": 0.0, "cliques": 0.0, "leads_crm": 0.0,
+    }))
+    ad_camp_day = {}  # (anuncio, dia) -> campanha (p/ atribuir leads CRM à campanha certa)
 
     for row in rows:
         mes = parse_date_to_month(row.get("data"))
@@ -1011,6 +1018,11 @@ def aggregate_meta_ads(rows, leads_daily_map=None):
             camp_monthly[campanha][mes]["impressoes"] += impressoes
             camp_monthly[campanha][mes]["cliques"] += cliques
 
+            if dia:
+                cd = camp_daily[campanha][dia]
+                cd["gasto"] += gasto; cd["leads_plat"] += leads
+                cd["impressoes"] += impressoes; cd["cliques"] += cliques
+
         anuncio = row.get("anuncio") or ""
         if anuncio:
             creatives[anuncio]["gasto"] += gasto
@@ -1032,6 +1044,7 @@ def aggregate_meta_ads(rows, leads_daily_map=None):
                 creatives_daily[anuncio][dia]["leads"] += leads
                 creatives_daily[anuncio][dia]["impressoes"] += impressoes
                 creatives_daily[anuncio][dia]["cliques"] += cliques
+                ad_camp_day[(anuncio, dia)] = campanha   # campanha real do anúncio nesse dia
 
     monthly_list = []
     for mes, d in sorted(monthly.items()):
@@ -1117,6 +1130,27 @@ def aggregate_meta_ads(rows, leads_daily_map=None):
                 "cliques":    int(v["cliques"]),
             })
 
+    # Diário por CAMPANHA: atribui os leads CRM (matching) à campanha real do anúncio
+    # naquele dia (ad_camp_day) e monta a lista. Atribuição correta + filtro de dia.
+    for nome, dias in leads_daily_map.items():
+        for dia, n in dias.items():
+            cp = ad_camp_day.get((nome, dia))
+            if cp:
+                camp_daily[cp][dia]["leads_crm"] += n
+    campaign_daily_list = []
+    for camp, dias in camp_daily.items():
+        for dia, v in sorted(dias.items()):
+            if v["gasto"] == 0 and v["leads_crm"] == 0 and v["leads_plat"] == 0:
+                continue
+            campaign_daily_list.append({
+                "data": dia, "campanha": camp,
+                "gasto": round(v["gasto"], 2),
+                "leads": int(round(v["leads_crm"])),       # CRM (matching)
+                "leads_plat": int(round(v["leads_plat"])),  # plataforma
+                "impressoes": int(v["impressoes"]),
+                "cliques": int(v["cliques"]),
+            })
+
     return {
         "total_gasto": round(total_gasto, 2),
         "total_leads": int(round(total_leads)),
@@ -1125,6 +1159,7 @@ def aggregate_meta_ads(rows, leads_daily_map=None):
         "daily": daily_list,
         "campaigns": campaigns_list,
         "campaign_monthly": campaign_monthly_list,
+        "campaign_daily": campaign_daily_list,
         "campaign_names": sorted(camp_monthly.keys()),
         "creatives": creatives_list,
         "creatives_daily": creatives_daily_list,
@@ -2251,8 +2286,21 @@ def main():
         print(f"  AVISO: crm_atividades indisponível: {e}"); crm_atividades = []
 
 
-    print("  Lendo Meta Ads...")
-    meta_ads = read_sheet(gc, "meta_ads")
+    print("  Lendo Meta Ads (API — substitui o Adveronix)...")
+    meta_ads = None
+    try:
+        from collectors import meta_ads_api
+        meta_ads = meta_ads_api.get_ad_insights_daily(since="2025-01-01")
+        if meta_ads:
+            print(f"    Meta Ads via API: {len(meta_ads)} linhas (anúncio/dia)")
+        else:
+            meta_ads = None
+    except Exception as e:
+        print(f"    AVISO: Meta API falhou ({e}) — caindo na planilha Adveronix.")
+        meta_ads = None
+    if not meta_ads:
+        meta_ads = read_sheet(gc, "meta_ads")  # fallback: planilha Adveronix
+        print(f"    (fallback Adveronix: {len(meta_ads)} linhas)")
 
     print("  Lendo Google Ads...")
     google_ads = read_sheet(gc, "google_ads")

@@ -4168,16 +4168,14 @@ function renderMeta() {
   ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
 
   // ── 1. CAMPANHAS ATIVAS ──
-  // TUDO derivado de creatives_daily (DIÁRIO) agrupado por campanha, respeitando o
-  // filtro de DIA. Antes o gasto/impressões/leads-plataforma vinham de campaign_monthly
-  // (MENSAL), o que fazia uma campanha aparecer com gasto em dias em que nem existia
-  // (bug "FEIRA ABF": criada 23/06 mas mostrava gasto 01–22/06). leads = CRM (matching);
-  // leads_plat = leads reportados pela plataforma. Ambos por dia.
-  const adCampMap = {}; (M.creatives || []).forEach(c => { adCampMap[c.anuncio] = c.campanha || ''; });
+  // Derivado de campaign_daily (DIÁRIO, atribuição correta POR CAMPANHA — cada linha
+  // bruta tem sua campanha). Respeita o filtro de DIA e NÃO tem o problema de atribuição
+  // do creatives_daily (que agrega por nome de anúncio reusado entre campanhas, o que
+  // inflava o gasto). Corrige o bug "FEIRA ABF" (criada 23/06 mostrava gasto 01–22/06)
+  // sem inflar (FEIRA ABF = R$ 477,77, não R$ 5.768).
   const campMap = {};
-  (M.creatives_daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
-    const cp = adCampMap[r.anuncio]; if (!cp) return;
-    const c = campMap[cp] || (campMap[cp] = { gasto: 0, impressoes: 0, cliques: 0, leadsPlat: 0, leadsCRM: 0 });
+  (M.campaign_daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
+    const c = campMap[r.campanha] || (campMap[r.campanha] = { gasto: 0, impressoes: 0, cliques: 0, leadsPlat: 0, leadsCRM: 0 });
     c.gasto += r.gasto || 0; c.impressoes += r.impressoes || 0; c.cliques += r.cliques || 0;
     c.leadsPlat += r.leads_plat || 0; c.leadsCRM += r.leads || 0;
   });
