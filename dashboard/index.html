@@ -58,6 +58,8 @@
   /* Títulos/realces que usavam a cor primária ficam claros no dark */
   html[data-theme="dark"] .section-title,
   html[data-theme="dark"] #topbar h1,
+  html[data-theme="dark"] #sidebar-toggle,
+  html[data-theme="dark"] #mob-menu-btn,
   html[data-theme="dark"] .chart-card h3,
   html[data-theme="dark"] .table-card h3,
   html[data-theme="dark"] thead th,
@@ -107,7 +109,21 @@
   }
 
   /* MAIN */
-  #main { margin-left: var(--sidebar-w); min-height: 100vh; }
+  #main { margin-left: var(--sidebar-w); min-height: 100vh; transition: margin-left .27s cubic-bezier(.4,0,.2,1); }
+
+  /* ── TOGGLE recolher/expandir sidebar (desktop/tablet) ───────────────── */
+  #sidebar { transition: transform .27s cubic-bezier(.4,0,.2,1); }
+  #sidebar-toggle {
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: none; cursor: pointer;
+    padding: 6px; border-radius: 8px; color: var(--primary);
+    flex-shrink: 0; transition: background .15s;
+  }
+  #sidebar-toggle:hover { background: var(--bg2); }
+  #sidebar-toggle svg { display: block; }
+  /* recolhida: sidebar desliza pra fora, main ocupa a largura toda */
+  html.sb-collapsed #sidebar { transform: translateX(-100%); }
+  html.sb-collapsed #main    { margin-left: 0; }
 
   /* TOP BAR */
   #topbar {
@@ -237,19 +253,24 @@
     gap: 16px; margin-bottom: 28px;
   }
   .kpi-card {
-    background: var(--bg); border-radius: 12px;
-    padding: 20px 16px 16px; border: 1px solid var(--border);
-    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    background: var(--bg); border-radius: 14px;
+    padding: 18px 14px 16px; border: 1px solid var(--border);
+    box-shadow: 0 4px 14px rgba(13,59,102,0.08), 0 1px 3px rgba(0,0,0,0.05);
     display: flex; flex-direction: column; align-items: center;
-    text-align: center; gap: 6px;
+    text-align: center; gap: 5px;
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 24px rgba(13,59,102,0.14), 0 2px 6px rgba(0,0,0,0.06);
   }
   .kpi-card .kpi-label {
     font-size: 11px; color: #888; text-transform: uppercase;
     letter-spacing: 0.6px; font-weight: 600; line-height: 1.3;
   }
   .kpi-card .kpi-value {
-    font-size: 32px; font-weight: 700; color: var(--primary);
-    line-height: 1; margin: 4px 0;
+    font-size: 24px; font-weight: 800; color: var(--primary);
+    line-height: 1.15; margin: 3px 0; white-space: nowrap; letter-spacing: -0.4px;
   }
   .kpi-card .kpi-sub {
     font-size: 11px; color: #aaa; line-height: 1.3;
@@ -331,6 +352,8 @@
   .criat-camp-item .camp-name-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tag-ativo   { background: #DCFCE7; color: #15803D; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; }
   .tag-pausado { background: #FEE2E2; color: #B91C1C; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; }
+  .tag-desconhecido { background: #F1F5F9; color: #64748B; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 10px; flex-shrink: 0; }
+  .status-warn { background: #FEF3C7; color: #92400E; font-size: 12px; font-weight: 600; padding: 8px 12px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #FCD34D; }
   .badge.open { background: #F1F5F9; color: #475569; }
 
   /* FUNNEL */
@@ -525,7 +548,71 @@
   .ga4-bar-fill.pablo      { background: #F59E0B; }
   .ga4-mini-chart { position: relative; height: 160px; }
 
-  /* ═══ PREVISIBILIDADE 2026 ═══ */
+  /* ═══ PREVISIBILIDADE 2026 — modelo nativo ═══ */
+  .prev-cenario-bar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;
+  }
+  .prev-cenario-lbl { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+  .prev-cen-btn {
+    padding: 7px 14px; border: 2px solid var(--border); background: var(--card);
+    border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 12.5px;
+    color: var(--text-secondary); transition: all .15s;
+  }
+  .prev-cen-btn small { font-weight: 400; opacity: .7; margin-left: 3px; }
+  .prev-cen-btn:hover { border-color: var(--primary); }
+  .prev-cen-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  /* Cards do ano */
+  .prev-cards {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;
+  }
+  .prev-card {
+    background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--primary);
+    border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  .prev-card.verde   { border-left-color: #22c55e; }
+  .prev-card.azul    { border-left-color: #3fa9f5; }
+  .prev-card.roxo    { border-left-color: #7b61ff; }
+  .prev-card.amarelo { border-left-color: #f59e0b; }
+  .prev-card-lbl { font-size: 11.5px; color: var(--text-secondary); font-weight: 600; }
+  .prev-card-val { font-size: 24px; font-weight: 800; color: var(--text); margin: 4px 0 2px; }
+  .prev-card-sub { font-size: 11px; color: #94a3b8; }
+  /* Tabela mês a mês */
+  .prev-table2 { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .prev-table2 th, .prev-table2 td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; }
+  .prev-table2 th { background: var(--primary); color: #fff; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; }
+  .prev-table2 th:first-child, .prev-table2 td:first-child { text-align: left; }
+  .prev-table2 tbody tr:hover { background: rgba(63,169,245,.06); }
+  .prev-tr-real { background: rgba(245,158,11,.07); }
+  .prev-meta-sub { font-size: 10px; color: #94a3b8; font-weight: 400; margin-top: 2px; }
+  .prev-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; }
+  .prev-badge.meta { background: #FEF3C7; color: #92400e; }
+  .prev-badge.real { background: #DBEAFE; color: #1e40af; }
+  .prev-badge.proj { background: #ede9fe; color: #6d28d9; }
+  /* Funil meta × real */
+  .prev-funil-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .prev-funil-tbl th, .prev-funil-tbl td { padding: 6px 9px; border-bottom: 1px solid var(--border); }
+  .prev-funil-tbl th { color: var(--text-secondary); font-size: 10.5px; text-transform: uppercase; text-align: right; }
+  .prev-funil-tbl th:first-child { text-align: left; }
+  .prev-fun-et { color: var(--text); font-weight: 500; }
+  .prev-fun-track { background: var(--border); border-radius: 6px; height: 9px; overflow: hidden; }
+  .prev-fun-fill { background: linear-gradient(90deg, #3fa9f5, #22c55e); height: 100%; border-radius: 6px; }
+  /* Resumo */
+  .prev-resumo-list { margin: 6px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.7; color: var(--text); }
+  .prev-resumo-list li { margin-bottom: 6px; }
+  /* v2: banner, n/d, rodapés, alertas */
+  .prev-banner {
+    background: #FEF3C7; color: #92400e; border: 1px solid #FCD34D; border-radius: 8px;
+    padding: 10px 14px; font-size: 12.5px; line-height: 1.5; margin-bottom: 14px;
+  }
+  html[data-theme="dark"] .prev-banner { background: rgba(245,158,11,.13); color: #fcd34d; border-color: rgba(245,158,11,.35); }
+  .prev-nd { color: #b0b7c3; font-style: italic; font-size: 11px; }
+  .prev-nd-leg { font-size: 11px; color: #94a3b8; margin: 6px 2px 0; font-style: italic; }
+  .prev-table2 tfoot td, .prev-foot td { background: var(--bg2); border-top: 2px solid var(--border); }
+  .prev-tr-alerta { background: rgba(239,68,68,.06); }
+  .prev-table-funil td:first-child { min-width: 200px; }
+  .prev-table2 th[colspan], .prev-table2 th[rowspan] { background: var(--primary); }
+
+  /* ═══ PREVISIBILIDADE 2026 (legado — espelho planilha) ═══ */
   .prev-tabs {
     display: flex; gap: 8px; margin-bottom: 16px;
   }
@@ -784,6 +871,15 @@
     display: flex; align-items: center; justify-content: center;
   }
   .gc-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* Qualidade / Ação de Ads (régua CPL vs meta) */
+  .q-badge { display:inline-block; font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px; white-space:nowrap; }
+  .q-good { background:#DCFCE7; color:#15803D; }
+  .q-warn { background:#FEF9C3; color:#A16207; }
+  .q-bad  { background:#FEE2E2; color:#B91C1C; }
+  .q-acao { font-size:10px; color:#94A3B8; margin-top:3px; }
+  .ad-thumb { width:46px; height:46px; border-radius:6px; object-fit:cover; background:#F1F5F9; display:block; }
+  #meta-resumo p, #google-resumo p { margin:0 0 10px; }
+  #meta-resumo strong, #google-resumo strong { color:var(--primary); }
   .gc-header {
     display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
     margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
@@ -978,8 +1074,9 @@
     /* Esconde sidebar desktop */
     #sidebar { display: none !important; }
 
-    /* Mostra botão hamburguer */
+    /* Mostra botão hamburguer (drawer); esconde o toggle de recolher desktop */
     #mob-menu-btn { display: flex; align-items: center; }
+    #sidebar-toggle { display: none !important; }
 
     /* Main ocupa largura total */
     #main { margin-left: 0 !important; }
@@ -1052,8 +1149,8 @@
 </style>
 </head>
 <body>
-
-
+<!-- aplica o estado recolhido da sidebar ANTES do paint (evita flash) -->
+<script>try{if(localStorage.getItem('sidebarCollapsed')==='1')document.documentElement.classList.add('sb-collapsed');}catch(e){}</script>
 
 <!-- TELA DE LOGIN (oculta por padrão; mostrada apenas se dados estiverem criptografados) -->
 <div id="login-screen" class="hidden">
@@ -1124,6 +1221,14 @@
 <div id="main">
   <!-- TOP BAR -->
   <div id="topbar">
+    <!-- Toggle recolher/expandir menu (desktop/tablet) -->
+    <button id="sidebar-toggle" onclick="toggleSidebar()" aria-label="Recolher ou expandir menu" title="Recolher / expandir menu">
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="2" y1="5"  x2="20" y2="5"/>
+        <line x1="2" y1="11" x2="20" y2="11"/>
+        <line x1="2" y1="17" x2="20" y2="17"/>
+      </svg>
+    </button>
     <!-- Botão hamburguer — só aparece no mobile -->
     <button id="mob-menu-btn" onclick="openMobDrawer()" aria-label="Menu">
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -1308,6 +1413,12 @@
         <div class="chart-card">
           <h3>Leads Captados por Mês</h3>
           <div class="chart-wrap tall"><canvas id="chart-leads-monthly"></canvas></div>
+        </div>
+      </div>
+      <div class="charts-row full">
+        <div class="chart-card">
+          <h3>Leads por Fonte — Mês a Mês <span style="font-size:11px;color:#999;font-weight:400;">— Pago (Google/Meta) vs Orgânico · inclui bases importadas com fonte recuperada</span></h3>
+          <div class="chart-wrap tall"><canvas id="chart-leads-fonte-mes"></canvas></div>
         </div>
       </div>
       <div class="charts-row">
@@ -1540,27 +1651,54 @@
     <div id="sec-meta" class="section">
       <div class="section-title">Meta Ads</div>
       <div class="kpi-grid" id="kpi-meta"></div>
-      <div class="charts-row">
-        <div class="chart-card">
-          <h3>Investimento Mensal</h3>
-          <div class="chart-wrap tall"><canvas id="chart-meta-expansao"></canvas></div>
-        </div>
-        <div class="chart-card">
-          <h3>Leads Mensal</h3>
-          <div class="chart-wrap tall"><canvas id="chart-meta-leads-tipo"></canvas></div>
-        </div>
-      </div>
+
+      <!-- 1. Campanhas ativas -->
       <div class="table-card">
-        <h3>Campanhas — Performance Consolidada</h3>
+        <h3>Campanhas ativas</h3>
+        <div id="meta-status-warn"></div>
         <table>
-          <thead>
-            <tr>
-              <th>Campanha</th><th>Tipo</th><th>Gasto</th><th>Leads</th>
-              <th>CPL</th><th>Impressões</th><th>Cliques</th><th>CTR</th>
-            </tr>
-          </thead>
+          <thead><tr>
+            <th>Status</th><th>Campanha</th><th>Leads Plataforma</th><th>Leads CRM</th>
+            <th>CPL (CRM)</th><th>Impressões</th><th>Cliques</th><th>CPC</th><th>CTR</th><th>Gasto</th>
+          </tr></thead>
           <tbody id="table-meta-campaigns"></tbody>
         </table>
+      </div>
+
+      <!-- 2. Investimento x Leads CRM -->
+      <div class="chart-card">
+        <h3>Investimento mensal × Leads CRM mensal</h3>
+        <div class="chart-wrap tall"><canvas id="chart-meta-invest-leads"></canvas></div>
+      </div>
+
+      <!-- 3. Qualidade dos públicos (conjuntos) -->
+      <div class="table-card">
+        <h3>Qualidade dos públicos <span style="font-size:11px;color:#94a3b8;font-weight:400;">· conjuntos · bom até CPL R$ 360</span></h3>
+        <table>
+          <thead><tr>
+            <th>Status</th><th>Campanha</th><th>Conjunto</th><th>Leads CRM</th><th>CPL</th>
+            <th>CPM</th><th>Cliques</th><th>CPC</th><th>Qualidade</th><th>Gasto</th>
+          </tr></thead>
+          <tbody id="table-meta-adsets"></tbody>
+        </table>
+      </div>
+
+      <!-- 4. Qualidade dos anúncios (criativos) -->
+      <div class="table-card">
+        <h3>Qualidade dos anúncios <span style="font-size:11px;color:#94a3b8;font-weight:400;">· bom até CPL R$ 360 · clique na imagem p/ ver o criativo</span></h3>
+        <table>
+          <thead><tr>
+            <th>Criativo</th><th>Anúncio</th><th>Campanha</th><th>Conjunto</th><th>Gasto</th>
+            <th>Gasto 7D</th><th>Leads Plat.</th><th>Leads CRM</th><th>CPL</th><th>Ação</th>
+          </tr></thead>
+          <tbody id="table-meta-ads"></tbody>
+        </table>
+      </div>
+
+      <!-- 5. Resumo e Próximos Passos -->
+      <div class="table-card">
+        <h3>Resumo e Próximos Passos</h3>
+        <div id="meta-resumo" style="font-size:13px;line-height:1.6;color:var(--text);padding:4px 2px;"></div>
       </div>
     </div>
 
@@ -1568,27 +1706,54 @@
     <div id="sec-google" class="section">
       <div class="section-title">Google Ads</div>
       <div class="kpi-grid" id="kpi-google"></div>
-      <div class="charts-row">
-        <div class="chart-card">
-          <h3>Gasto vs Conversões por Mês</h3>
-          <div class="chart-wrap tall"><canvas id="chart-google-perf"></canvas></div>
-        </div>
-        <div class="chart-card">
-          <h3>CTR por Mês</h3>
-          <div class="chart-wrap tall"><canvas id="chart-google-ctr"></canvas></div>
-        </div>
-      </div>
+
+      <!-- 1. Campanhas ativas -->
       <div class="table-card">
-        <h3>Campanhas — Performance Consolidada</h3>
+        <h3>Campanhas ativas</h3>
+        <div id="google-status-warn"></div>
         <table>
-          <thead>
-            <tr>
-              <th>Campanha</th><th>Gasto</th><th>Conversões</th>
-              <th>CPL</th><th>Impressões</th><th>Cliques</th><th>CTR</th>
-            </tr>
-          </thead>
+          <thead><tr>
+            <th>Status</th><th>Campanha</th><th>Conversões Plat.</th><th>Leads CRM</th>
+            <th>CPL (CRM)</th><th>Impressões</th><th>Cliques</th><th>CPC</th><th>CTR</th><th>Gasto</th>
+          </tr></thead>
           <tbody id="table-google-campaigns"></tbody>
         </table>
+      </div>
+
+      <!-- 2. Investimento x Leads CRM -->
+      <div class="chart-card">
+        <h3>Investimento mensal × Leads CRM mensal</h3>
+        <div class="chart-wrap tall"><canvas id="chart-google-invest-leads"></canvas></div>
+      </div>
+
+      <!-- 3. Qualidade dos grupos de anúncios -->
+      <div class="table-card">
+        <h3>Qualidade dos grupos de anúncios <span style="font-size:11px;color:#94a3b8;font-weight:400;">· bom até CPL R$ 360</span></h3>
+        <table>
+          <thead><tr>
+            <th>Status</th><th>Campanha</th><th>Grupo de anúncios</th><th>Leads CRM</th><th>CPL</th><th>Qualidade</th><th>Gasto</th>
+          </tr></thead>
+          <tbody id="table-google-grupos"></tbody>
+        </table>
+        <p style="font-size:11px;color:#94a3b8;margin:8px 2px 0;">Impressões/CPC por grupo ainda não disponíveis no Google Ads (dependem da query de <em>ad_group</em> na API). A régua aqui usa CPL, leads e gasto.</p>
+      </div>
+
+      <!-- 4. Qualidade dos anúncios (criativos) -->
+      <div class="table-card">
+        <h3>Qualidade dos anúncios <span style="font-size:11px;color:#94a3b8;font-weight:400;">· bom até CPL R$ 360 · clique p/ ver a página do anúncio</span></h3>
+        <table>
+          <thead><tr>
+            <th>Criativo</th><th>Anúncio</th><th>Campanha</th><th>Grupo</th><th>Gasto</th>
+            <th>Gasto 7D</th><th>Conv. Plat.</th><th>Leads CRM</th><th>CPL</th><th>Ação</th>
+          </tr></thead>
+          <tbody id="table-google-ads"></tbody>
+        </table>
+      </div>
+
+      <!-- 5. Resumo e Próximos Passos -->
+      <div class="table-card">
+        <h3>Resumo e Próximos Passos</h3>
+        <div id="google-resumo" style="font-size:13px;line-height:1.6;color:var(--text);padding:4px 2px;"></div>
       </div>
     </div>
 
@@ -1766,39 +1931,63 @@
     <!-- PREVISIBILIDADE 2026 -->
     <div id="sec-previsibilidade" class="section">
       <div class="section-title">📈 Previsibilidade 2026</div>
-      <p style="font-size:12px;color:#666;margin:0 0 16px;">
-        Espelho da planilha <strong>PREVISIBILIDADE IA</strong> · Atualização automática a cada coleta (3x/dia) ·
-        <span id="prev-ultima-atualizacao" style="color:var(--primary);font-weight:600;"></span>
+      <p style="font-size:12px;color:#666;margin:0 0 12px;">
+        <strong>Jan–Jun</strong>: realizado (dados reais) · <strong>Jul–Dez</strong>: projeção (CPL × investimento) ·
+        Ticket R$ 1.000.000 · <span id="prev-ultima-atualizacao" style="color:var(--primary);font-weight:600;"></span>
       </p>
 
-      <!-- Tabs PREVISIBILIDADE vs ATINGIMENTO vs RELATÓRIO -->
-      <div class="prev-tabs">
-        <button class="prev-tab active" id="prev-tab-prev" onclick="switchPrevTab('previsibilidade')">
-          📊 PREVISIBILIDADE (Meta)
-        </button>
-        <button class="prev-tab" id="prev-tab-real" onclick="switchPrevTab('atingimento')">
-          ✅ ATINGIMENTO (Real)
-        </button>
-        <button class="prev-tab" id="prev-tab-relatorio" onclick="switchPrevTab('relatorio')">
-          📝 Relatório / Próximos Passos
-        </button>
+      <!-- Banner: projeção teórica -->
+      <div id="prev-banner" class="prev-banner"></div>
+
+      <!-- Seletor de cenário (afeta Jul–Dez) -->
+      <div class="prev-cenario-bar">
+        <span class="prev-cenario-lbl">Cenário de projeção (Jul–Dez):</span>
+        <button class="prev-cen-btn" data-cen="conservador" onclick="setPrevCenario('conservador')">🔴 Conservador</button>
+        <button class="prev-cen-btn active" data-cen="base" onclick="setPrevCenario('base')">⚪ Base</button>
+        <button class="prev-cen-btn" data-cen="otimista" onclick="setPrevCenario('otimista')">🟢 Otimista</button>
       </div>
 
-      <p id="prev-hint-real" style="display:none;font-size:11px;color:#888;margin:0 0 10px;">
-        🟢 Verde = bateu/superou a meta · 🔴 Vermelho = abaixo da meta. Passe o mouse nas células
-        coloridas para ver o diagnóstico e a sugestão. Meses ainda não fechados não são coloridos.
-      </p>
+      <!-- Cards KPI do ano (no cenário selecionado) -->
+      <div id="prev-cards" class="prev-cards"></div>
 
-      <div id="prev-table-container" class="prev-table-wrap">
-        <p style="color:#999;padding:20px;">Carregando dados de previsibilidade...</p>
+      <!-- Gráficos volume: Investimento + Leads + Sessões -->
+      <div class="charts-row triple" style="margin-top:16px;">
+        <div class="card"><div class="card-title">💰 Investimento — Real × Projetado</div><div style="height:250px;"><canvas id="chartInvest"></canvas></div></div>
+        <div class="card"><div class="card-title">👥 Leads — Real × Projetado</div><div style="height:250px;"><canvas id="chartLeads"></canvas></div></div>
+        <div class="card"><div class="card-title">🌐 Sessões mensais (GA)</div><div style="height:250px;"><canvas id="chartSessoes"></canvas></div></div>
       </div>
 
-      <div id="prev-report-container" style="display:none;"></div>
+      <!-- Gráficos eficiência: CPL + CPS + Conversão LP -->
+      <div class="charts-row triple" style="margin-top:14px;">
+        <div class="card"><div class="card-title">🎯 CPL mensal</div><div style="height:240px;"><canvas id="chartCPL"></canvas></div></div>
+        <div class="card"><div class="card-title">🖱️ CPS mensal</div><div style="height:240px;"><canvas id="chartCPS"></canvas></div></div>
+        <div class="card"><div class="card-title">🔄 Conversão LP (Leads/Sessões)</div><div style="height:240px;"><canvas id="chartConvLP"></canvas></div></div>
+      </div>
 
-      <p style="font-size:11px;color:#999;margin-top:16px;font-style:italic;">
-        💡 Pra editar os dados, abre a planilha <a href="https://docs.google.com/spreadsheets/d/1f_G15gb637rTU7JfO1lWt7lYuYJBmrM3lvMezNuj0-U/edit#gid=593567545" target="_blank" rel="noopener" style="color:var(--primary);">PREVISIBILIDADE IA</a>.
-        Esta página atualiza no próximo cron (07:30 / 13:30 / 16:00 BRT).
-      </p>
+      <!-- Tabela 1: consolidada mensal -->
+      <div id="prev-tab-consolidada" class="prev-table-wrap" style="margin-top:18px;"></div>
+
+      <!-- Tabela 2: projeção 3 cenários -->
+      <div id="prev-tab-projecao" class="prev-table-wrap" style="margin-top:18px;"></div>
+
+      <!-- Gráficos comercial: Negócios + Receita por cenário -->
+      <div class="charts-row" style="margin-top:16px;">
+        <div class="card"><div class="card-title">🤝 Negócios fechados projetados (H2)</div><div style="height:260px;"><canvas id="chartNegocios"></canvas></div></div>
+        <div class="card"><div class="card-title">💵 Receita potencial projetada (H2)</div><div style="height:260px;"><canvas id="chartReceita"></canvas></div></div>
+      </div>
+
+      <!-- Funil: gráfico + tabela -->
+      <div class="card" style="margin-top:16px;"><div class="card-title">🔻 Funil de conversão — 14 etapas do CRM (taxa de passagem)</div><div style="height:360px;"><canvas id="chartFunil"></canvas></div></div>
+      <div id="prev-tab-funil" class="prev-table-wrap" style="margin-top:14px;"></div>
+
+      <!-- Tabela 4: meta comercial (volume por etapa no cenário) -->
+      <div id="prev-tab-meta" class="prev-table-wrap" style="margin-top:18px;"></div>
+
+      <!-- Funil real do CRM (atingimento) -->
+      <div id="prev-funil-real" style="margin-top:18px;"></div>
+
+      <!-- Resumo / alertas -->
+      <div id="prev-resumo" style="margin-top:18px;"></div>
     </div>
 
   </div><!-- /content -->
@@ -2760,6 +2949,7 @@ function renderExecutivo() {
     .filter(r => !datePred || datePred(r.data))
     .reduce((s, r) => s + r.total, 0);
 
+
   // ── Dados UTM filtrados por dia ──────────────────────────────────────────────
   const filtSources = {};
   (DATA.utm.sources_daily || []).filter(r => !datePred || datePred(r.data))
@@ -3176,6 +3366,36 @@ function renderEvolucao() {
       ]
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }
+  });
+
+  // ── Leads por Fonte — Mês a Mês (empilhado: Pago Google / Pago Meta / Orgânico) ──
+  makeChart('chart-leads-fonte-mes', {
+    type: 'bar',
+    data: {
+      labels: allMesesEvo.map(mesLabel),
+      datasets: [
+        {
+          label: 'Pago — Google',
+          data: allMesesEvo.map(m => (leadsMonthMap[m] || {}).googlecpc || 0),
+          backgroundColor: COLORS.primary + 'CC', borderRadius: 4, stack: 'fonte'
+        },
+        {
+          label: 'Pago — Meta',
+          data: allMesesEvo.map(m => (leadsMonthMap[m] || {}).metaads || 0),
+          backgroundColor: COLORS.orange + 'CC', borderRadius: 4, stack: 'fonte'
+        },
+        {
+          label: 'Orgânico / Outros',
+          data: allMesesEvo.map(m => (leadsMonthMap[m] || {}).organico || 0),
+          backgroundColor: COLORS.secondary + '99', borderRadius: 4, stack: 'fonte'
+        },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+    }
   });
 
   const metaData = getMetaMonthly(pred);
@@ -3823,219 +4043,413 @@ function renderPerdas() {
 }
 
 // ─── SECTION: META ADS ────────────────────────────────────────────────────────
-function renderMeta() {
-  const pred     = getFilteredMonths();
-  const datePred = getDateFilter();   // filtro dia a dia — mesma fonte da Visão Executiva
-  const monthly  = getMetaMonthly(pred);
-
-  // Gasto / Impressões / Cliques → planilha Meta Ads (dados da plataforma)
-  let totalGasto = 0, totalImpr = 0, totalCliques = 0;
-  (DATA.meta_ads.daily || [])
-    .filter(r => !datePred || datePred(r.data))
-    .forEach(r => {
-      totalGasto   += r.gasto      || 0;
-      totalImpr    += r.impressoes || 0;
-      totalCliques += r.cliques    || 0;
-    });
-
-  // Leads → aba "leads" RD Station com utm_source = 'metaads' (bate com CRM)
-  const totalLeads = (DATA.utm.sources_daily || [])
-    .filter(r => r.source === 'metaads' && (!datePred || datePred(r.data)))
-    .reduce((s, r) => s + r.total, 0);
-
-  const cpl = totalLeads > 0 ? totalGasto / totalLeads : 0;
-  const ctr = totalImpr  > 0 ? totalCliques / totalImpr * 100 : 0;
-
-  document.getElementById('kpi-meta').innerHTML = [
-    { label: 'Gasto Total', value: fmt.currency(totalGasto), sub: 'período', cls: '' },
-    { label: 'Leads Gerados', value: fmt.num(totalLeads), sub: 'período', cls: 'blue' },
-    { label: 'CPL Médio', value: fmt.currency(cpl), sub: 'custo por lead', cls: 'orange' },
-    { label: 'Impressões', value: fmt.k(totalImpr), sub: 'período', cls: '' },
-    { label: 'Cliques no Link', value: fmt.k(totalCliques), sub: 'período', cls: '' },
-    { label: 'CTR Médio', value: fmt.pct(ctr), sub: 'cliques/impressões', cls: 'green' },
-  ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
-
-  // Últimos 3 meses disponíveis (union meta + leads)
-  const allMesesMeta = [...new Set([
-    ...(DATA.meta_ads.monthly || []).map(r => r.mes),
-    ...(DATA.leads.monthly    || []).map(r => r.mes),
-    ...(DATA.utm.sources_monthly || []).map(r => r.mes),
-  ])].sort().slice(-3);
-
-  // Gasto mensal por mês (últimos 3)
-  const gastoByMes = {};
-  (DATA.meta_ads.monthly || []).forEach(r => { gastoByMes[r.mes] = r.gasto; });
-
-  makeChart('chart-meta-expansao', {
-    type: 'bar',
-    data: {
-      labels: allMesesMeta.map(mesLabel),
-      datasets: [{
-        label: 'Investimento (R$)',
-        data: allMesesMeta.map(m => gastoByMes[m] || 0),
-        backgroundColor: COLORS.secondary + 'CC',
-        borderRadius: 6,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true } }
-    }
+// ─── Régua de qualidade de Ads (CPL vs meta) — compartilhada Meta/Google ──────
+// CPL_TARGET = meta de CPL a NÍVEL DE CONTA (KPI). CPL_QUALIDADE = limiar a nível
+// de conjunto/anúncio, naturalmente mais alto (granular). Acima de QUALIDADE = ruim.
+const CPL_TARGET = { meta: 175, google: 160 };
+const CPL_QUALIDADE = { meta: 360, google: 360 };
+function qualidadeAds(cpl, gasto, leadsCRM, target) {
+  // Sem leads: se gastou menos que o valor de 1 lead (a meta), ainda não dá pra
+  // julgar (dados insuf.); se já gastou mais que isso e não trouxe lead, é ruim.
+  if (!leadsCRM) return (gasto || 0) < target
+    ? { nivel: 'Dados insuf.', acao: 'Observar', cls: 'q-warn' }
+    : { nivel: 'Ruim',         acao: 'Pausar',   cls: 'q-bad' };
+  // Com leads: julga pelo CPL (independe do volume gasto).
+  if (cpl <= target)       return { nivel: 'Bom',     acao: 'Manter ativo', cls: 'q-good' };
+  if (cpl <= target * 1.3) return { nivel: 'Atenção', acao: 'Observar',     cls: 'q-warn' };
+  return { nivel: 'Ruim', acao: 'Pausar', cls: 'q-bad' };
+}
+function buildAdsResumo(plataforma, ctx) {
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const { tGasto, tLeadsCRM, kCpl, kCtr, tImpr, tCliques, T, TQ, nCamps, adsets, ads } = ctx;
+  const unid = ctx.unidade || 'Públicos', unidS = ctx.unidadeS || 'público';
+  const c = v => v > 0 ? fmt.currency(v) : '—';
+  const cpc = tCliques > 0 ? tGasto / tCliques : 0;
+  const cont = arr => ({
+    bom:   arr.filter(a => a.q.nivel === 'Bom').length,
+    aten:  arr.filter(a => a.q.nivel === 'Atenção').length,
+    ruim:  arr.filter(a => a.q.nivel === 'Ruim').length,
+    insuf: arr.filter(a => a.q.nivel === 'Dados insuf.').length,
   });
+  const cj = cont(adsets), an = cont(ads);
+  const pausar   = ads.filter(a => a.q.acao === 'Pausar');
+  const observar = ads.filter(a => a.q.acao === 'Observar');
+  const manter   = ads.filter(a => a.q.acao === 'Manter ativo');
+  const topPausar = pausar.slice().sort((a, b) => b.gasto - a.gasto).slice(0, 3);
+  const topManter = manter.filter(a => a.leadsCRM > 0).sort((a, b) => a._cpl - b._cpl).slice(0, 3);
+  const adsetsRuins = adsets.filter(a => a.q.acao === 'Pausar').sort((a, b) => b.gasto - a.gasto);
+  const gastoPausar = pausar.reduce((s, a) => s + a.gasto, 0);
 
-  // Leads mensais por mês (últimos 3) — fonte: utm.sources_monthly utm_source='metaads'
-  const leadsByMesMeta = {};
-  (DATA.utm.sources_monthly || [])
-    .filter(r => r.source === 'metaads')
-    .forEach(r => { leadsByMesMeta[r.mes] = (leadsByMesMeta[r.mes] || 0) + r.total; });
+  const p = [];
+  p.push(`<p><strong>📊 Panorama ${plataforma}:</strong> ${fmt.currency(tGasto)} investidos · <strong>${fmt.num(tLeadsCRM)} leads CRM</strong> · CPL <strong>${c(kCpl)}</strong> (meta de conta R$ ${T}) · ${fmt.k(tImpr)} impressões · ${fmt.k(tCliques)} cliques · CTR ${fmt.pct(kCtr)} · CPC ${c(cpc)}.</p>`);
+  p.push(`<p><strong>🩺 Saúde:</strong> ${nCamps} campanha(s) ativa(s) · <strong>${unid}:</strong> ${cj.bom} bom / ${cj.aten} atenção / ${cj.ruim} ruim${cj.insuf ? ` / ${cj.insuf} s/ dados` : ''} · <strong>Anúncios:</strong> ${an.bom} bom / ${an.aten} atenção / ${an.ruim} ruim${an.insuf ? ` / ${an.insuf} s/ dados` : ''} <span style="color:#94a3b8;">(limiar ${unidS}/anúncio R$ ${TQ})</span>.</p>`);
 
-  makeChart('chart-meta-leads-tipo', {
-    type: 'bar',
-    data: {
-      labels: allMesesMeta.map(mesLabel),
-      datasets: [{
-        label: 'Leads',
-        data: allMesesMeta.map(m => leadsByMesMeta[m] || 0),
-        backgroundColor: COLORS.green + 'CC',
-        borderRadius: 6,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
-    }
-  });
-
-  // ── Tabela de campanhas filtrada por período ─────────────────────────────
-  // Gasto/impressões/cliques: campaign_monthly filtrado pelo mês selecionado
-  const campSpendMap = {};
-  (DATA.meta_ads.campaign_monthly || [])
-    .filter(r => !pred || pred(r.mes))
-    .forEach(r => {
-      if (!campSpendMap[r.campanha]) {
-        campSpendMap[r.campanha] = { gasto: 0, impressoes: 0, cliques: 0, tipo: r.tipo };
-      }
-      campSpendMap[r.campanha].gasto      += r.gasto      || 0;
-      campSpendMap[r.campanha].impressoes += r.impressoes || 0;
-      campSpendMap[r.campanha].cliques    += r.cliques    || 0;
-    });
-
-  // Leads: utm.campaigns_daily filtrado por data + source='metaads'
-  const utmLeadsMap = {};
-  (DATA.utm.campaigns_daily || [])
-    .filter(r => r.source === 'metaads' && (!datePred || datePred(r.data)))
-    .forEach(r => {
-      const key = (r.campaign || '').toLowerCase().trim();
-      utmLeadsMap[key] = (utmLeadsMap[key] || 0) + r.total;
-    });
-
-  function findUtmLeads(campName) {
-    const key = (campName || '').toLowerCase().trim();
-    if (utmLeadsMap[key] !== undefined) return utmLeadsMap[key];
-    // partial match fallback: find utm campaign that contains or is contained in camp name
-    for (const [k, v] of Object.entries(utmLeadsMap)) {
-      if (key.includes(k) || k.includes(key)) return v;
-    }
-    return 0;
-  }
-
-  const activeCampaigns = Object.entries(campSpendMap)
-    .filter(([, d]) => d.gasto > 0)
-    .sort((a, b) => b[1].gasto - a[1].gasto)
-    .slice(0, 30);
-
-  document.getElementById('table-meta-campaigns').innerHTML = activeCampaigns.map(([campName, d]) => {
-    const leads = findUtmLeads(campName);
-    const cpl   = leads > 0 ? d.gasto / leads : 0;
-    const ctr   = d.impressoes > 0 ? d.cliques / d.impressoes : 0;
-    const tipo  = d.tipo || (isRepasse(campName) ? 'Repasse' : 'Expansão');
-    return `<tr>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${campName}">${campName}</td>
-      <td><span class="badge ${tipo === 'Repasse' ? 'repasse' : 'expansao'}">${tipo}</span></td>
-      <td>${fmt.currency(d.gasto)}</td>
-      <td>${fmt.num(leads)}</td>
-      <td>${fmt.currency(cpl)}</td>
-      <td>${fmt.k(d.impressoes)}</td>
-      <td>${fmt.k(d.cliques)}</td>
-      <td>${fmt.pct(ctr)}</td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="8" class="empty">Sem dados no período selecionado</td></tr>';
+  const steps = [];
+  if (pausar.length)      steps.push(`🔴 <strong>Pausar ${pausar.length} anúncio(s)</strong> — ${fmt.currency(gastoPausar)} em gasto, CPL acima de R$ ${TQ} ou sem leads: ${topPausar.map(a => esc(a.anuncio) + ' (' + c(a._cpl) + ')').join(', ')}${pausar.length > 3 ? '…' : ''}.`);
+  if (adsetsRuins.length) steps.push(`👥 <strong>Revisar ${adsetsRuins.length} ${unidS}(s)</strong> ruins: ${adsetsRuins.slice(0, 3).map(a => esc(a.conjunto)).join(', ')}${adsetsRuins.length > 3 ? '…' : ''}.`);
+  if (observar.length)    steps.push(`🟡 <strong>Observar ${observar.length} anúncio(s)</strong> com CPL entre R$ ${TQ} e R$ ${Math.round(TQ * 1.3)} — acompanhar antes de pausar.`);
+  if (topManter.length)   steps.push(`🟢 <strong>Escalar:</strong> ${topManter.map(a => esc(a.anuncio) + ' (' + c(a._cpl) + ')').join(', ')} — melhor CPL, candidatos a mais verba.`);
+  if (kCpl > T)           steps.push(`⚠️ CPL geral (${c(kCpl)}) acima da meta de conta (R$ ${T}) — concentrar verba nos públicos/anúncios "Bom".`);
+  if (steps.length) p.push('<p style="margin-bottom:4px;"><strong>✅ Próximos passos:</strong></p><ul style="margin:0;padding-left:20px;">' + steps.map(s => `<li style="margin-bottom:5px;">${s}</li>`).join('') + '</ul>');
+  if (!ads.length) p.push('<p>Sem anúncios com dados no período selecionado.</p>');
+  return p.join('');
 }
 
-// ─── SECTION: GOOGLE ADS ──────────────────────────────────────────────────────
-function renderGoogle() {
-  const pred     = getFilteredMonths();
+function renderMeta() {
+  const T = CPL_TARGET.meta;          // meta de CPL a nível de conta (KPI)
+  const TQ = CPL_QUALIDADE.meta;      // limiar de qualidade conjunto/anúncio
+  const pred = getFilteredMonths();
   const datePred = getDateFilter();
-  const monthly  = getGoogleMonthly(pred);
+  const M = DATA.meta_ads || {};
+  const creatives = M.creatives || [];
+  const activeCamps = getActiveCampaigns();
+  // Status REAL disponível? (meta_ads.campaign_status preenchido pela API). Se NÃO,
+  // o front NÃO inventa "Ativo" pelo gasto — mostra "—" honesto, pra nunca afirmar
+  // ao cliente que uma campanha pausada está ativa.
+  const statusReal = !!(M.campaign_status && Object.keys(M.campaign_status).length);
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const ell = (s, w) => `<div style="max-width:${w}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s)}">${esc(s) || '—'}</div>`;
+  const stt = ativo => statusReal
+    ? `<span class="${ativo ? 'tag-ativo' : 'tag-pausado'}">${ativo ? 'Ativo' : 'Pausado'}</span>`
+    : `<span class="tag-desconhecido" title="Status real indisponível — os dados ainda não trazem o status da Meta. Rode o workflow 'ETL rapido' com o token configurado.">—</span>`;
+  const statusWarn = statusReal ? '' : `<div class="status-warn">⚠️ Status real das campanhas indisponível neste dado — exibindo "—" em vez de adivinhar. Rode o workflow <strong>"ETL rapido"</strong> com o token da Meta configurado pra mostrar Ativo/Pausado de verdade.</div>`;
 
-  // Gasto / Impressões / Cliques → planilha Google Ads (dados da plataforma)
-  let totalGasto = 0, totalImpr = 0, totalCliques = 0;
-  (DATA.google_ads.daily || [])
-    .filter(r => !datePred || datePred(r.data))
-    .forEach(r => {
-      totalGasto   += r.gasto      || 0;
-      totalImpr    += r.impressoes || 0;
-      totalCliques += r.cliques    || 0;
-    });
-
-  // Leads → aba "leads" RD Station com utm_source = 'googlecpc' (bate com CRM)
-  const totalLeads = (DATA.utm.sources_daily || [])
-    .filter(r => r.source === 'googlecpc' && (!datePred || datePred(r.data)))
+  // ── KPIs (CPL via CRM — regra de ouro) ──
+  let tGasto = 0, tImpr = 0, tCliques = 0;
+  (M.daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
+    tGasto += r.gasto || 0; tImpr += r.impressoes || 0; tCliques += r.cliques || 0;
+  });
+  const tLeadsCRM = (DATA.utm.sources_daily || [])
+    .filter(r => r.source === 'metaads' && (!datePred || datePred(r.data)))
     .reduce((s, r) => s + r.total, 0);
-
-  const cpl = totalLeads > 0 ? totalGasto / totalLeads : 0;
-  const ctr = totalImpr  > 0 ? totalCliques / totalImpr * 100 : 0;
-
-  document.getElementById('kpi-google').innerHTML = [
-    { label: 'Gasto Total', value: fmt.currency(totalGasto), sub: 'período', cls: '' },
-    { label: 'Leads Gerados', value: fmt.num(totalLeads), sub: 'utm_source: googlecpc', cls: 'blue' },
-    { label: 'CPL Médio', value: fmt.currency(cpl), sub: 'custo por lead', cls: 'orange' },
-    { label: 'Impressões', value: fmt.k(totalImpr), sub: 'período', cls: '' },
-    { label: 'Cliques', value: fmt.k(totalCliques), sub: 'período', cls: '' },
-    { label: 'CTR Médio', value: fmt.pct(ctr), sub: 'cliques/impressões', cls: 'green' },
+  const kCpl = tLeadsCRM > 0 ? tGasto / tLeadsCRM : 0;
+  const kCtr = tImpr > 0 ? tCliques / tImpr * 100 : 0;
+  document.getElementById('kpi-meta').innerHTML = [
+    { label: 'Gasto Total', value: fmt.currency(tGasto), sub: 'período', cls: '' },
+    { label: 'Leads CRM', value: fmt.num(tLeadsCRM), sub: 'entraram no CRM', cls: 'blue' },
+    { label: 'CPL (CRM)', value: fmt.currency(kCpl), sub: 'meta R$ ' + T, cls: 'orange' },
+    { label: 'Impressões', value: fmt.k(tImpr), sub: 'período', cls: '' },
+    { label: 'Cliques', value: fmt.k(tCliques), sub: 'período', cls: '' },
+    { label: 'CTR', value: fmt.pct(kCtr), sub: 'cliques/impressões', cls: 'green' },
   ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
 
-  makeChart('chart-google-perf', {
+  // ── 1. CAMPANHAS ATIVAS ──
+  // Derivado de campaign_daily (DIÁRIO, atribuição correta POR CAMPANHA — cada linha
+  // bruta tem sua campanha). Respeita o filtro de DIA e NÃO tem o problema de atribuição
+  // do creatives_daily (que agrega por nome de anúncio reusado entre campanhas, o que
+  // inflava o gasto). Corrige o bug "FEIRA ABF" (criada 23/06 mostrava gasto 01–22/06)
+  // sem inflar (FEIRA ABF = R$ 477,77, não R$ 5.768).
+  const campMap = {};
+  (M.campaign_daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
+    const c = campMap[r.campanha] || (campMap[r.campanha] = { gasto: 0, impressoes: 0, cliques: 0, leadsPlat: 0, leadsCRM: 0 });
+    c.gasto += r.gasto || 0; c.impressoes += r.impressoes || 0; c.cliques += r.cliques || 0;
+    c.leadsPlat += r.leads_plat || 0; c.leadsCRM += r.leads || 0;
+  });
+  const camps = Object.entries(campMap).filter(([, d]) => d.gasto > 0 || d.leadsCRM > 0).sort((a, b) => b[1].gasto - a[1].gasto);
+  document.getElementById('table-meta-campaigns').innerHTML = camps.map(([name, d]) => {
+    const lc = d.leadsCRM, cpl = lc > 0 ? d.gasto / lc : 0;
+    const cpc = d.cliques > 0 ? d.gasto / d.cliques : 0, ctr = d.impressoes > 0 ? d.cliques / d.impressoes * 100 : 0;
+    return `<tr>
+      <td>${stt(activeCamps.has(name))}</td>
+      <td>${ell(name, 220)}</td>
+      <td>${fmt.num(d.leadsPlat)}</td>
+      <td><strong>${fmt.num(lc)}</strong></td>
+      <td>${lc > 0 ? fmt.currency(cpl) : '—'}</td>
+      <td>${fmt.k(d.impressoes)}</td>
+      <td>${fmt.k(d.cliques)}</td>
+      <td>${cpc > 0 ? fmt.currency(cpc) : '—'}</td>
+      <td>${fmt.pct(ctr)}</td>
+      <td>${fmt.currency(d.gasto)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="10" class="empty">Sem dados no período selecionado.</td></tr>';
+  document.getElementById('meta-status-warn').innerHTML = statusWarn;
+
+  // ── 2. INVESTIMENTO × LEADS CRM (mensal, mesmo gráfico) ──
+  const meses = [...new Set([
+    ...(M.monthly || []).map(r => r.mes),
+    ...(DATA.utm.sources_monthly || []).filter(r => r.source === 'metaads').map(r => r.mes),
+  ])].sort().slice(-12);
+  const gastoMes = {}; (M.monthly || []).forEach(r => { gastoMes[r.mes] = r.gasto; });
+  const leadsMes = {}; (DATA.utm.sources_monthly || []).filter(r => r.source === 'metaads').forEach(r => { leadsMes[r.mes] = (leadsMes[r.mes] || 0) + r.total; });
+  makeChart('chart-meta-invest-leads', {
     type: 'bar',
     data: {
-      labels: monthly.map(r => mesLabel(r.mes)),
+      labels: meses.map(mesLabel),
       datasets: [
-        { label: 'Gasto (R$)', data: monthly.map(r => r.gasto), backgroundColor: COLORS.primary + 'CC', borderRadius: 4, yAxisID: 'y' },
-        { type: 'line', label: 'Conversões', data: monthly.map(r => r.conversoes), borderColor: COLORS.green, backgroundColor: COLORS.green + '22', tension: 0.3, yAxisID: 'y2' },
+        { label: 'Investimento (R$)', data: meses.map(m => gastoMes[m] || 0), backgroundColor: COLORS.secondary + 'CC', borderRadius: 6, yAxisID: 'y' },
+        { label: 'Leads CRM', data: meses.map(m => leadsMes[m] || 0), backgroundColor: COLORS.green + 'CC', borderRadius: 6, yAxisID: 'y1' },
       ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom' } },
+      plugins: { legend: { display: true, position: 'top' } },
       scales: {
-        y: { beginAtZero: true, position: 'left' },
-        y2: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false } }
+        y:  { beginAtZero: true, position: 'left',  title: { display: true, text: 'Investimento (R$)' } },
+        y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { precision: 0 }, title: { display: true, text: 'Leads CRM' } },
       }
     }
   });
 
-  makeChart('chart-google-ctr', {
-    type: 'line',
+  // Mapas por anúncio NO PERÍODO (creatives_daily filtrado) — só o que rodou no período.
+  // `leads` no creatives_daily já é CRM; impressoes/cliques vêm do ETL (após coleta nova).
+  const byAd = {}; creatives.forEach(c => { byAd[c.anuncio] = c; });
+  const perAd = {};
+  (M.creatives_daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
+    const a = perAd[r.anuncio] || (perAd[r.anuncio] = { gasto: 0, leadsCRM: 0, impressoes: 0, cliques: 0 });
+    a.gasto += r.gasto || 0; a.leadsCRM += r.leads || 0; a.impressoes += r.impressoes || 0; a.cliques += r.cliques || 0;
+  });
+  const activeAds = Object.entries(perAd).filter(([, d]) => d.gasto > 0);
+
+  // Gasto 7D — sempre os últimos 7 dias com dados (independe do filtro de período)
+  const cdaily = M.creatives_daily || [];
+  const maxData = cdaily.reduce((mx, r) => r.data > mx ? r.data : mx, '');
+  let cut7 = '';
+  if (maxData) { const d = new Date(maxData + 'T00:00:00'); d.setDate(d.getDate() - 6); cut7 = d.toISOString().slice(0, 10); }
+  const g7d = {}; cdaily.forEach(r => { if (cut7 && r.data >= cut7) g7d[r.anuncio] = (g7d[r.anuncio] || 0) + (r.gasto || 0); });
+
+  // ── 3. QUALIDADE DOS PÚBLICOS (conjuntos ativos no período) ──
+  const adsetMap = {};
+  activeAds.forEach(([anuncio, d]) => {
+    const meta = byAd[anuncio] || {};
+    const key = meta.conjunto || '(sem conjunto)';
+    const a = adsetMap[key] || (adsetMap[key] = { conjunto: key, campanha: meta.campanha || '', gasto: 0, leadsCRM: 0, impressoes: 0, cliques: 0 });
+    a.gasto += d.gasto; a.leadsCRM += d.leadsCRM; a.impressoes += d.impressoes; a.cliques += d.cliques;
+    if (!a.campanha && meta.campanha) a.campanha = meta.campanha;
+  });
+  const adsets = Object.values(adsetMap).map(a => {
+    a._cpl = a.leadsCRM > 0 ? a.gasto / a.leadsCRM : 0;
+    a.q = qualidadeAds(a._cpl, a.gasto, a.leadsCRM, TQ);
+    return a;
+  }).sort((x, y) => y.gasto - x.gasto);
+  document.getElementById('table-meta-adsets').innerHTML = adsets.map(a => {
+    const cpm = a.impressoes > 0 ? a.gasto / a.impressoes * 1000 : 0, cpc = a.cliques > 0 ? a.gasto / a.cliques : 0;
+    return `<tr>
+      <td>${stt(activeCamps.has(a.campanha))}</td>
+      <td>${ell(a.campanha, 160)}</td>
+      <td>${ell(a.conjunto, 190)}</td>
+      <td><strong>${fmt.num(a.leadsCRM)}</strong></td>
+      <td>${a.leadsCRM > 0 ? fmt.currency(a._cpl) : '—'}</td>
+      <td>${cpm > 0 ? fmt.currency(cpm) : '—'}</td>
+      <td>${a.cliques > 0 ? fmt.k(a.cliques) : '—'}</td>
+      <td>${cpc > 0 ? fmt.currency(cpc) : '—'}</td>
+      <td><span class="q-badge ${a.q.cls}">${a.q.nivel}</span><div class="q-acao">${a.q.acao}</div></td>
+      <td>${fmt.currency(a.gasto)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="10" class="empty">Sem conjuntos ativos no período.</td></tr>';
+
+  // ── 4. QUALIDADE DOS ANÚNCIOS (criativos ativos no período) ──
+  const ads = activeAds.map(([anuncio, d]) => {
+    const meta = byAd[anuncio] || {};
+    const cpl = d.leadsCRM > 0 ? d.gasto / d.leadsCRM : 0;
+    return { anuncio, campanha: meta.campanha || '', conjunto: meta.conjunto || '', gasto: d.gasto, gasto7d: g7d[anuncio] || 0,
+      leadsPlat: meta.leads || 0, leadsCRM: d.leadsCRM, _cpl: cpl, thumbnail: meta.thumbnail, permalink: meta.permalink,
+      ativo: activeCamps.has(meta.campanha), q: qualidadeAds(cpl, d.gasto, d.leadsCRM, TQ) };
+  }).sort((x, y) => y.gasto - x.gasto);
+  document.getElementById('table-meta-ads').innerHTML = ads.map(c => {
+    const img = c.thumbnail
+      ? `<img class="ad-thumb" src="${c.thumbnail}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`
+      : `<div class="ad-thumb" style="display:flex;align-items:center;justify-content:center;">🖼️</div>`;
+    const cell = c.permalink ? `<a href="${c.permalink}" target="_blank" rel="noopener" title="Ver criativo">${img}</a>` : img;
+    return `<tr>
+      <td>${cell}</td>
+      <td>${ell(c.anuncio, 160)}${stt(c.ativo)}</td>
+      <td>${ell(c.campanha, 150)}</td>
+      <td>${ell(c.conjunto, 150)}</td>
+      <td>${fmt.currency(c.gasto)}</td>
+      <td>${fmt.currency(c.gasto7d)}</td>
+      <td>${fmt.num(c.leadsPlat)}</td>
+      <td><strong>${fmt.num(c.leadsCRM)}</strong></td>
+      <td>${c.leadsCRM > 0 ? fmt.currency(c._cpl) : '—'}</td>
+      <td><span class="q-badge ${c.q.cls}">${c.q.acao}</span></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="10" class="empty">Sem anúncios.</td></tr>';
+
+  // ── 5. RESUMO E PRÓXIMOS PASSOS (automático) ──
+  document.getElementById('meta-resumo').innerHTML = buildAdsResumo('Meta Ads', { tGasto, tLeadsCRM, kCpl, kCtr, tImpr, tCliques, T, TQ, nCamps: camps.length, adsets, ads });
+}
+
+// ─── SECTION: GOOGLE ADS ──────────────────────────────────────────────────────
+function renderGoogle() {
+  const T = CPL_TARGET.google;        // meta de CPL a nível de conta (KPI)
+  const TQ = CPL_QUALIDADE.google;    // limiar de qualidade grupo/anúncio
+  const pred = getFilteredMonths();
+  const datePred = getDateFilter();
+  const G = DATA.google_ads || {};
+  const GC = DATA.google_ads_creatives || {};
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const ell = (s, w) => `<div style="max-width:${w}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s)}">${esc(s) || '—'}</div>`;
+  // Status REAL disponível? (google_ads.campaign_status preenchido pela API). Se NÃO,
+  // mostra "—" honesto em vez de adivinhar "Ativo" pelo gasto (mesma regra do Meta).
+  const statusReal = !!(G.campaign_status && Object.keys(G.campaign_status).length);
+  const stt = ativo => statusReal
+    ? `<span class="${ativo ? 'tag-ativo' : 'tag-pausado'}">${ativo ? 'Ativo' : 'Pausado'}</span>`
+    : `<span class="tag-desconhecido" title="Status real indisponível — os dados ainda não trazem o status do Google. Rode o workflow 'ETL rapido'.">—</span>`;
+  const statusWarn = statusReal ? '' : `<div class="status-warn">⚠️ Status real das campanhas indisponível neste dado — exibindo "—" em vez de adivinhar. Rode o workflow <strong>"ETL rapido"</strong> pra mostrar Ativo/Pausado de verdade.</div>`;
+
+  // Campanhas ativas Google = STATUS REAL da API (campaign.status ENABLED).
+  // Fallback (sem o status no summary): heurística de gasto nos últimos 2 meses.
+  const activeCamps = getActiveGoogleCampaigns();
+
+  // ── KPIs (CPL via CRM — regra de ouro) ──
+  let tGasto = 0, tImpr = 0, tCliques = 0;
+  (G.daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
+    tGasto += r.gasto || 0; tImpr += r.impressoes || 0; tCliques += r.cliques || 0;
+  });
+  const tLeadsCRM = (DATA.utm.sources_daily || [])
+    .filter(r => r.source === 'googlecpc' && (!datePred || datePred(r.data)))
+    .reduce((s, r) => s + r.total, 0);
+  const kCpl = tLeadsCRM > 0 ? tGasto / tLeadsCRM : 0;
+  const kCtr = tImpr > 0 ? tCliques / tImpr * 100 : 0;
+  document.getElementById('kpi-google').innerHTML = [
+    { label: 'Gasto Total', value: fmt.currency(tGasto), sub: 'período', cls: '' },
+    { label: 'Leads CRM', value: fmt.num(tLeadsCRM), sub: 'entraram no CRM', cls: 'blue' },
+    { label: 'CPL (CRM)', value: fmt.currency(kCpl), sub: 'meta R$ ' + T, cls: 'orange' },
+    { label: 'Impressões', value: fmt.k(tImpr), sub: 'período', cls: '' },
+    { label: 'Cliques', value: fmt.k(tCliques), sub: 'período', cls: '' },
+    { label: 'CTR', value: fmt.pct(kCtr), sub: 'cliques/impressões', cls: 'green' },
+  ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
+
+  // ── 1. CAMPANHAS ATIVAS ──
+  // Derivado de campaign_daily (DIÁRIO, atribuição correta POR CAMPANHA) → respeita o
+  // filtro de DIA. Antes usava campaign_monthly (filtro de mês), então filtrar por dia
+  // mostrava o gasto do mês inteiro ("gasto fantasma", mesmo bug corrigido no Meta).
+  // Fallback p/ campaign_monthly enquanto o ETL novo (com campaign_daily) ainda não
+  // rodou — evita tabela vazia em dados antigos cacheados no Supabase.
+  const campMap = {};
+  const gDaily = G.campaign_daily || [];
+  if (gDaily.length) {
+    gDaily.filter(r => !datePred || datePred(r.data)).forEach(r => {
+      const c = campMap[r.campanha] || (campMap[r.campanha] = { gasto: 0, impressoes: 0, cliques: 0, conv: 0 });
+      c.gasto += r.gasto || 0; c.impressoes += r.impressoes || 0; c.cliques += r.cliques || 0; c.conv += r.conversoes || 0;
+    });
+  } else {
+    (G.campaign_monthly || []).filter(r => !pred || pred(r.mes)).forEach(r => {
+      const c = campMap[r.campanha] || (campMap[r.campanha] = { gasto: 0, impressoes: 0, cliques: 0, conv: 0 });
+      c.gasto += r.gasto || 0; c.impressoes += r.impressoes || 0; c.cliques += r.cliques || 0; c.conv += r.conversoes || 0;
+    });
+  }
+  // Leads CRM por campanha = soma dos leads CRM por anúncio (google_ads_creatives.daily,
+  // MESMA fonte das tabelas de grupos/anúncios) agrupada por campanha. Garante consistência.
+  const crmByCamp = {};
+  (GC.daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
+    const cp = r.campanha;
+    if (cp) crmByCamp[cp] = (crmByCamp[cp] || 0) + (r.leads || 0);
+  });
+  const camps = Object.entries(campMap).filter(([, d]) => d.gasto > 0).sort((a, b) => b[1].gasto - a[1].gasto);
+  document.getElementById('table-google-campaigns').innerHTML = camps.map(([name, d]) => {
+    const lc = crmByCamp[name] || 0, cpl = lc > 0 ? d.gasto / lc : 0;
+    const cpc = d.cliques > 0 ? d.gasto / d.cliques : 0, ctr = d.impressoes > 0 ? d.cliques / d.impressoes * 100 : 0;
+    return `<tr>
+      <td>${stt(activeCamps.has(name))}</td>
+      <td>${ell(name, 220)}</td>
+      <td>${fmt.num(d.conv)}</td>
+      <td><strong>${fmt.num(lc)}</strong></td>
+      <td>${lc > 0 ? fmt.currency(cpl) : '—'}</td>
+      <td>${fmt.k(d.impressoes)}</td>
+      <td>${fmt.k(d.cliques)}</td>
+      <td>${cpc > 0 ? fmt.currency(cpc) : '—'}</td>
+      <td>${fmt.pct(ctr)}</td>
+      <td>${fmt.currency(d.gasto)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="10" class="empty">Sem dados no período selecionado.</td></tr>';
+  document.getElementById('google-status-warn').innerHTML = statusWarn;
+
+  // ── 2. INVESTIMENTO × LEADS CRM (mensal, mesmo gráfico) ──
+  const meses = [...new Set([
+    ...(G.monthly || []).map(r => r.mes),
+    ...(DATA.utm.sources_monthly || []).filter(r => r.source === 'googlecpc').map(r => r.mes),
+  ])].sort().slice(-12);
+  const gastoMes = {}; (G.monthly || []).forEach(r => { gastoMes[r.mes] = r.gasto; });
+  const leadsMes = {}; (DATA.utm.sources_monthly || []).filter(r => r.source === 'googlecpc').forEach(r => { leadsMes[r.mes] = (leadsMes[r.mes] || 0) + r.total; });
+  makeChart('chart-google-invest-leads', {
+    type: 'bar',
     data: {
-      labels: monthly.map(r => mesLabel(r.mes)),
-      datasets: [{ label: 'CTR (%)', data: monthly.map(r => r.ctr), borderColor: COLORS.teal, backgroundColor: COLORS.teal + '22', fill: true, tension: 0.3 }]
+      labels: meses.map(mesLabel),
+      datasets: [
+        { label: 'Investimento (R$)', data: meses.map(m => gastoMes[m] || 0), backgroundColor: COLORS.secondary + 'CC', borderRadius: 6, yAxisID: 'y' },
+        { label: 'Leads CRM', data: meses.map(m => leadsMes[m] || 0), backgroundColor: COLORS.green + 'CC', borderRadius: 6, yAxisID: 'y1' },
+      ]
     },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, position: 'top' } },
+      scales: {
+        y:  { beginAtZero: true, position: 'left',  title: { display: true, text: 'Investimento (R$)' } },
+        y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { precision: 0 }, title: { display: true, text: 'Leads CRM' } },
+      }
+    }
   });
 
-  document.getElementById('table-google-campaigns').innerHTML = DATA.google_ads.campaigns.slice(0, 30).map(c =>
-    `<tr>
-      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${c.campanha}">${c.campanha}</td>
+  // Mapas por anúncio NO PERÍODO (google_ads_creatives.daily filtrado). `leads` já é CRM.
+  // (O daily do Google não traz impressões/cliques por anúncio — só gasto e leads.)
+  const byAd = {}; (GC.creatives || []).forEach(c => { byAd[c.anuncio] = c; });
+  const perAd = {};
+  (GC.daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
+    const a = perAd[r.anuncio] || (perAd[r.anuncio] = { gasto: 0, leadsCRM: 0, campanha: r.campanha || '' });
+    a.gasto += r.gasto || 0; a.leadsCRM += r.leads || 0;
+    if (!a.campanha && r.campanha) a.campanha = r.campanha;
+  });
+  const activeAds = Object.entries(perAd).filter(([, d]) => d.gasto > 0);
+
+  // Gasto 7D — últimos 7 dias com dados (independe do filtro de período)
+  const cdaily = GC.daily || [];
+  const maxData = cdaily.reduce((mx, r) => r.data > mx ? r.data : mx, '');
+  let cut7 = '';
+  if (maxData) { const d = new Date(maxData + 'T00:00:00'); d.setDate(d.getDate() - 6); cut7 = d.toISOString().slice(0, 10); }
+  const g7d = {}; cdaily.forEach(r => { if (cut7 && r.data >= cut7) g7d[r.anuncio] = (g7d[r.anuncio] || 0) + (r.gasto || 0); });
+
+  // ── 3. QUALIDADE DOS GRUPOS DE ANÚNCIOS (ativos no período) ──
+  const grupoMap = {};
+  activeAds.forEach(([anuncio, d]) => {
+    const meta = byAd[anuncio] || {};
+    const key = meta.grupo || '(sem grupo)';
+    const campanha = meta.campanha || d.campanha || '';
+    const a = grupoMap[key] || (grupoMap[key] = { conjunto: key, campanha, gasto: 0, leadsCRM: 0 });
+    a.gasto += d.gasto; a.leadsCRM += d.leadsCRM;
+    if (!a.campanha && campanha) a.campanha = campanha;
+  });
+  const grupos = Object.values(grupoMap).map(a => {
+    a._cpl = a.leadsCRM > 0 ? a.gasto / a.leadsCRM : 0;
+    a.q = qualidadeAds(a._cpl, a.gasto, a.leadsCRM, TQ);
+    return a;
+  }).sort((x, y) => y.gasto - x.gasto);
+  document.getElementById('table-google-grupos').innerHTML = grupos.map(a => `<tr>
+      <td>${stt(activeCamps.has(a.campanha))}</td>
+      <td>${ell(a.campanha, 180)}</td>
+      <td>${ell(a.conjunto, 240)}</td>
+      <td><strong>${fmt.num(a.leadsCRM)}</strong></td>
+      <td>${a.leadsCRM > 0 ? fmt.currency(a._cpl) : '—'}</td>
+      <td><span class="q-badge ${a.q.cls}">${a.q.nivel}</span><div class="q-acao">${a.q.acao}</div></td>
+      <td>${fmt.currency(a.gasto)}</td>
+    </tr>`).join('') || '<tr><td colspan="7" class="empty">Sem grupos ativos no período.</td></tr>';
+
+  // ── 4. QUALIDADE DOS ANÚNCIOS (criativos ativos no período) ──
+  const ads = activeAds.map(([anuncio, d]) => {
+    const meta = byAd[anuncio] || {};
+    const cpl = d.leadsCRM > 0 ? d.gasto / d.leadsCRM : 0;
+    return { anuncio, campanha: meta.campanha || d.campanha || '', conjunto: meta.grupo || '', gasto: d.gasto, gasto7d: g7d[anuncio] || 0,
+      leadsPlat: meta.conversoes_plataforma || 0, leadsCRM: d.leadsCRM, _cpl: cpl, url: meta.url_final,
+      ativo: activeCamps.has(meta.campanha || d.campanha), q: qualidadeAds(cpl, d.gasto, d.leadsCRM, TQ) };
+  }).sort((x, y) => y.gasto - x.gasto);
+  document.getElementById('table-google-ads').innerHTML = ads.map(c => {
+    const icon = `<div class="ad-thumb" style="display:flex;align-items:center;justify-content:center;">🔗</div>`;
+    const cell = c.url ? `<a href="${esc(c.url)}" target="_blank" rel="noopener" title="Abrir página do anúncio">${icon}</a>` : icon;
+    return `<tr>
+      <td>${cell}</td>
+      <td>${ell(c.anuncio, 160)}${stt(c.ativo)}</td>
+      <td>${ell(c.campanha, 150)}</td>
+      <td>${ell(c.conjunto, 150)}</td>
       <td>${fmt.currency(c.gasto)}</td>
-      <td>${fmt.num(c.conversoes)}</td>
-      <td>${fmt.currency(c.cpl)}</td>
-      <td>${fmt.k(c.impressoes)}</td>
-      <td>${fmt.k(c.cliques)}</td>
-      <td>${fmt.pct(c.ctr)}</td>
-    </tr>`
-  ).join('') || '<tr><td colspan="7" class="empty">Sem dados</td></tr>';
+      <td>${fmt.currency(c.gasto7d)}</td>
+      <td>${fmt.num(c.leadsPlat)}</td>
+      <td><strong>${fmt.num(c.leadsCRM)}</strong></td>
+      <td>${c.leadsCRM > 0 ? fmt.currency(c._cpl) : '—'}</td>
+      <td><span class="q-badge ${c.q.cls}">${c.q.acao}</span></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="10" class="empty">Sem anúncios.</td></tr>';
+
+  // ── 5. RESUMO E PRÓXIMOS PASSOS (automático) ──
+  document.getElementById('google-resumo').innerHTML = buildAdsResumo('Google Ads', { tGasto, tLeadsCRM, kCpl, kCtr, tImpr, tCliques, T, TQ, nCamps: camps.length, adsets: grupos, ads, unidade: 'Grupos', unidadeS: 'grupo' });
 }
 
 // ─── SECTION: CRIATIVOS ───────────────────────────────────────────────────────
@@ -4070,13 +4484,32 @@ function criatCampClick(e) {
   renderCreatives();
 }
 
-// Campanhas ativas: com gasto nos últimos 2 meses disponíveis nos dados
+// Campanhas ativas Meta. Preferência: STATUS REAL da API (meta_ads.campaign_status,
+// effective_status ACTIVE). Fallback (sem o status): heurística de gasto recente.
 function getActiveCampaigns() {
+  const status = (DATA.meta_ads || {}).campaign_status;
+  if (status && Object.keys(status).length) {
+    return new Set(Object.entries(status).filter(([, s]) => s === 'ACTIVE').map(([n]) => n));
+  }
   const campMonthly = DATA.meta_ads.campaign_monthly || [];
   if (!campMonthly.length) return new Set();
   const allMonths = [...new Set(campMonthly.map(r => r.mes))].sort();
   const last2 = allMonths.slice(-2);  // últimos 2 meses
   return new Set(campMonthly.filter(r => last2.includes(r.mes) && r.gasto > 0).map(r => r.campanha));
+}
+
+// Campanhas ativas Google. Preferência: STATUS REAL da API (google_ads.campaign_status,
+// campaign.status ENABLED). Fallback (sem o status): heurística de gasto recente.
+function getActiveGoogleCampaigns() {
+  const status = (DATA.google_ads || {}).campaign_status;
+  if (status && Object.keys(status).length) {
+    return new Set(Object.entries(status).filter(([, s]) => s === 'ENABLED').map(([n]) => n));
+  }
+  const gMon = (DATA.google_ads || {}).campaign_monthly || [];
+  if (!gMon.length) return new Set();
+  const allM = [...new Set(gMon.map(r => r.mes))].sort();
+  const last2 = allM.slice(-2);  // últimos 2 meses
+  return new Set(gMon.filter(r => last2.includes(r.mes) && r.gasto > 0).map(r => r.campanha));
 }
 
 // Campanhas do período selecionado (para o dropdown)
@@ -4712,30 +5145,13 @@ function renderGA4() {
 }
 
 // ─── PREVISIBILIDADE 2026 ────────────────────────────────────────────────────
-let _prevTabAtual = 'previsibilidade';
+let _prevCenario = 'base';   // conservador | base | otimista (afeta Jul–Dez)
 
-function switchPrevTab(tab) {
-  _prevTabAtual = tab;
-  document.getElementById('prev-tab-prev').classList.toggle('active', tab === 'previsibilidade');
-  document.getElementById('prev-tab-real').classList.toggle('active', tab === 'atingimento');
-  const relBtn = document.getElementById('prev-tab-relatorio');
-  if (relBtn) relBtn.classList.toggle('active', tab === 'relatorio');
-
-  const tableC  = document.getElementById('prev-table-container');
-  const reportC = document.getElementById('prev-report-container');
-  const hint    = document.getElementById('prev-hint-real');
-
-  if (tab === 'relatorio') {
-    if (tableC)  tableC.style.display  = 'none';
-    if (reportC) reportC.style.display = 'block';
-    if (hint)    hint.style.display    = 'none';
-    renderPrevReport();
-  } else {
-    if (tableC)  tableC.style.display  = 'block';
-    if (reportC) reportC.style.display = 'none';
-    if (hint)    hint.style.display    = (tab === 'atingimento') ? 'block' : 'none';
-    renderPrevisibilidade();
-  }
+function setPrevCenario(c) {
+  _prevCenario = c;
+  document.querySelectorAll('.prev-cen-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.cen === c));
+  renderPrevisibilidade();
 }
 
 // ── Parser pt-BR: "R$ 1.000.000,00" / "78,33%" / "-58,51%" → número ──────────
@@ -4857,280 +5273,281 @@ function _prevAttachTooltip(container) {
   });
 }
 
-function renderPrevisibilidade() {
-  const wrap = document.getElementById('prev-table-container');
-  const P = DATA.previsibilidade;
+const PREV_MES_ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+function _prevMi(v) {                       // R$ 4.071.819 -> "R$ 4,07 mi"
+  if (!v) return 'R$ 0';
+  if (v >= 1e6) return 'R$ ' + (v / 1e6).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' mi';
+  if (v >= 1e3) return 'R$ ' + Math.round(v / 1e3) + 'k';
+  return 'R$ ' + Math.round(v);
+}
+function _prevPct(v) { return (v * 100).toFixed(2).replace('.', ',') + '%'; }
+function _prevN1(v) { return (v == null ? '—' : (v).toLocaleString('pt-BR', {maximumFractionDigits: 1})); }
+const PREV_CEN_INFO = {
+  conservador: {nome: 'Conservador', cor: 'rgba(239,68,68,.80)', solid: '#ef4444'},
+  base:        {nome: 'Base',        cor: 'rgba(123,97,255,.80)', solid: '#7b61ff'},
+  otimista:    {nome: 'Otimista',    cor: 'rgba(34,197,94,.82)',  solid: '#22c55e'},
+};
+const PREV_AZUL = 'rgba(63,169,245,.85)';
 
-  if (!P) {
-    wrap.innerHTML = `
-      <div style="padding:24px;text-align:center;color:#999;">
-        <p style="font-size:14px;">⚠️ Dados de previsibilidade ainda não foram coletados.</p>
-        <p style="font-size:11px;">A planilha PREVISIBILIDADE IA será lida no próximo cron (07:30 / 13:30 / 16:00 BRT).</p>
-      </div>`;
-    return;
-  }
-
-  // Última atualização
-  const upd = document.getElementById('prev-ultima-atualizacao');
-  if (upd && P.ultima_atualizacao) {
-    upd.textContent = `Última atualização: ${P.ultima_atualizacao}`;
-  }
-
-  const bloco = P[_prevTabAtual];
-  if (!bloco || !bloco.rows || !bloco.rows.length) {
-    wrap.innerHTML = `<p style="padding:24px;color:#999;">Bloco "${_prevTabAtual}" não encontrado na planilha.</p>`;
-    return;
-  }
-
-  const meses = bloco.meses || [];
-
-  // Trimestres baseados na posição dos meses (Jan-Mar = Q1, Abr-Jun = Q2, etc.)
-  const trimestres = ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''];
-  meses.forEach((m, i) => {
-    const mLow = m.toLowerCase();
-    if (['janeiro', 'fevereiro', 'março'].includes(mLow) && i % 3 === 0) trimestres[i * 3] = 'Q1';
-    else if (['abril', 'maio', 'junho'].includes(mLow) && trimestres[i * 3] === '') trimestres[i * 3] = 'Q2';
-    else if (['julho', 'agosto', 'setembro'].includes(mLow) && trimestres[i * 3] === '') trimestres[i * 3] = 'Q3';
-    else if (['outubro', 'novembro', 'dezembro'].includes(mLow) && trimestres[i * 3] === '') trimestres[i * 3] = 'Q4';
-  });
-  // Detectar trimestres baseado no primeiro mês de cada
-  const quarterStart = {};
-  meses.forEach((m, i) => {
-    const ml = m.toLowerCase();
-    if (ml === 'janeiro') quarterStart[i] = 'Q1';
-    else if (ml === 'abril') quarterStart[i] = 'Q2';
-    else if (ml === 'julho') quarterStart[i] = 'Q3';
-    else if (ml === 'outubro') quarterStart[i] = 'Q4';
-  });
-
-  // ── Header trimestres ──
-  let headerQ = '<tr class="quarter-row"><th></th>';
-  meses.forEach((_, i) => {
-    if (quarterStart[i]) {
-      headerQ += `<th colspan="3">${quarterStart[i]}</th>`;
-    } else {
-      // só adiciona se nenhum colspan anterior cobre essa posição
-      headerQ += `<th colspan="3"></th>`;
-    }
-  });
-  headerQ += '</tr>';
-
-  // ── Header meses ──
-  let headerM = '<tr class="month-row"><th>Mês</th>';
-  meses.forEach(m => {
-    headerM += `<th colspan="3">${m}</th>`;
-  });
-  headerM += '</tr>';
-
-  // ── Sub-header: % CRM / Custo ──
-  let headerSub = '<tr class="subheader-row"><th></th>';
-  meses.forEach(() => {
-    headerSub += '<th>Valor</th><th>% CRM</th><th>Custo / Leads</th>';
-  });
-  headerSub += '</tr>';
-
-  // ── Coloração Real vs Meta: só na aba Atingimento ──────────────────────────
-  const isReal = _prevTabAtual === 'atingimento';
-  const metaByLabel = {};
-  ((P.previsibilidade && P.previsibilidade.rows) || []).forEach(mr => {
-    metaByLabel[_prevNorm(mr.label)] = mr;
-  });
-
-  // ── Linhas de dados ──
-  let bodyHtml = '';
-  bloco.rows.forEach(r => {
-    const rowClass = `prev-row-${r.categoria}`;
-    const cfg = isReal ? _prevKpiConfig(r) : null;
-    const metaRow = cfg ? metaByLabel[_prevNorm(r.label)] : null;
-    bodyHtml += `<tr class="${rowClass}">`;
-    bodyHtml += `<td>${r.label}</td>`;
-    r.valores.forEach((v, i) => {
-      let cls = '', ico = '', tipAttr = '';
-      if (cfg && metaRow) {
-        const metaV = (metaRow.valores[i] || {}).v || '';
-        const cmp = _prevCompare(v.v, metaV, cfg.dir);
-        if (cmp) {
-          cls = cmp.good ? 'prev-cell-good' : 'prev-cell-bad';
-          ico = cmp.good ? ' <span class="prev-ico up">▲</span>' : ' <span class="prev-ico down">▼</span>';
-          tipAttr = ` data-tip="${_prevEscAttr(_prevBuildTip(r.label, cmp, cfg))}"`;
-        }
-      }
-      bodyHtml += `<td class="${cls}"${tipAttr}>${(v.v || '')}${ico}</td>`;
-      bodyHtml += `<td class="prev-pct-col">${v.pct || ''}</td>`;
-      bodyHtml += `<td class="prev-custo-col">${v.custo || ''}</td>`;
-    });
-    bodyHtml += '</tr>';
-  });
-
-  wrap.innerHTML = `
-    <table class="prev-table">
-      <thead>
-        ${headerQ}
-        ${headerM}
-        ${headerSub}
-      </thead>
-      <tbody>${bodyHtml}</tbody>
-    </table>
-  `;
-
-  _prevAttachTooltip(wrap);
+function _prevChart(key, ctxId, cfg) {
+  const ctx = document.getElementById(ctxId);
+  if (!ctx) return;
+  if (CHARTS[key]) CHARTS[key].destroy();
+  cfg.options = Object.assign({responsive: true, maintainAspectRatio: false, animation: false}, cfg.options || {});
+  CHARTS[key] = new Chart(ctx, cfg);
 }
 
-// ── Análise Real vs Meta do último mês fechado (compartilhada tela + PDF) ─────
-function _prevAnalyze() {
-  const P = DATA.previsibilidade;
-  if (!P || !P.atingimento || !P.previsibilidade) return null;
+function renderPrevisibilidade() {
+  const P = DATA.previsibilidade_nativa;
+  const $ = id => document.getElementById(id);
+  const conteinerIds = ['prev-banner','prev-tab-consolidada','prev-tab-projecao','prev-tab-funil','prev-tab-meta','prev-funil-real','prev-resumo'];
+  const chartKeys = ['invest','leadsM','sessoes','cpl','cps','convlp','negocios','receita','funil'];
 
-  const meses    = P.atingimento.meses || [];
-  const realRows = P.atingimento.rows || [];
-  const metaByLabel = {};
-  (P.previsibilidade.rows || []).forEach(mr => { metaByLabel[_prevNorm(mr.label)] = mr; });
-  const realByLabel = {};
-  realRows.forEach(rr => { realByLabel[_prevNorm(rr.label)] = rr; });
-
-  // Detecta o último mês com dado real "substancial" (Vendas/Receita/Leads/CPL ≠ placeholder)
-  const coreLabels = ['vendas', 'receita faturada', 'leads', 'cpl'];
-  let mesIdx = -1;
-  for (let i = meses.length - 1; i >= 0; i--) {
-    const temReal = coreLabels.some(l => {
-      const rr = realByLabel[l]; if (!rr) return false;
-      const n = _prevParseBR((rr.valores[i] || {}).v);
-      return n !== null && n !== 0;
-    });
-    if (temReal) { mesIdx = i; break; }
+  if (!P || P.modelo !== 'nativo-v2' || !P.mensal) {
+    if ($('prev-cards')) $('prev-cards').innerHTML =
+      `<div style="padding:24px;color:#999;grid-column:1/-1;">⚠️ Previsibilidade ainda não coletada nesta versão (rode o ETL / próximo cron).</div>`;
+    conteinerIds.forEach(id => { if ($(id)) $(id).innerHTML = ''; });
+    chartKeys.forEach(k => { if (CHARTS[k]) { CHARTS[k].destroy(); delete CHARTS[k]; } });
+    return;
   }
-  if (mesIdx < 0) return { mesNome: null, bons: [], ruins: [], passos: [], mesIdx: -1 };
 
-  const bons = [], ruins = [], passos = [];
-  const passosSet = new Set();
-  realRows.forEach(rr => {
-    const cfg = _prevKpiConfig(rr);
-    if (!cfg) return;
-    const metaRow = metaByLabel[_prevNorm(rr.label)];
-    if (!metaRow) return;
-    const cmp = _prevCompare((rr.valores[mesIdx] || {}).v, (metaRow.valores[mesIdx] || {}).v, cfg.dir);
+  const upd = $('prev-ultima-atualizacao');
+  if (upd && P.ultima_atualizacao) upd.textContent = `Atualizado: ${P.ultima_atualizacao}`;
+
+  const cen  = P.cenarios[_prevCenario] || P.cenarios.base;
+  const info = PREV_CEN_INFO[_prevCenario] || PREV_CEN_INFO.base;
+  const M = P.mensal, T = P.realizado_totais, R = P.funil_resumo;
+
+  // séries mensais (jan-jun real; jul-dez do cenário)
+  const investMensal = M.map(m => m.investimento);
+  const leadsMensal  = M.map(m => m.status === 'real' ? m.leads : (cen.leads_mes[m.mes] ?? null));
+  const cplReal      = M.map(m => m.status === 'real' ? m.cpl : null);
+  const cplProj      = M.map(m => m.status === 'proj' ? cen.cpl : null);
+  const sessoesMensal = M.map(m => m.status === 'real' ? m.sessoes : null);
+  const cpsMensal    = M.map(m => m.status === 'real' ? m.cps : null);
+  const convMensal   = M.map(m => m.status === 'real' ? +(m.conv_lp * 100).toFixed(2) : null);
+  const corPorStatus = M.map(m => m.status === 'real' ? PREV_AZUL : info.cor);
+
+  // ── Banner: projeção teórica ───────────────────────────────────────────────
+  if ($('prev-banner')) $('prev-banner').innerHTML =
+    `⚠️ <strong>Projeção teórica.</strong> A receita projetada (${_prevMi(cen.receita)} no cenário ${info.nome}) vem do funil-meta —
+     há <strong>0 negócios fechados reais</strong> em Jan–Jun (ninguém passou de Visita/Jamil no CRM).
+     Use para planejamento; <strong>orce pelo Conservador</strong>, não como receita comprometida.`;
+
+  // ── Cards do ano (no cenário) ──────────────────────────────────────────────
+  const investAno = investMensal.reduce((a, b) => a + b, 0);
+  const leadsAno = T.leads + cen.total_leads;
+  $('prev-cards').innerHTML = [
+    {lbl: 'Investimento total 2026', val: _prevMi(investAno), sub: `Real ${_prevMi(T.investimento)} + projeção ${_prevMi(investAno - T.investimento)}`, cls: 'azul'},
+    {lbl: 'Leads 2026', val: Math.round(leadsAno).toLocaleString('pt-BR'), sub: `${T.leads} reais + ${_prevN1(cen.total_leads)} projetados`, cls: 'roxo'},
+    {lbl: 'Negócios fechados (H2)', val: _prevN1(cen.negocios_fechados), sub: `teórico · 1 venda a cada ${R.leads_por_venda} leads`, cls: 'amarelo'},
+    {lbl: 'Receita potencial (H2)', val: _prevMi(cen.receita), sub: `cenário ${info.nome} · ticket R$ 1 mi`, cls: 'verde'},
+  ].map(c => `<div class="prev-card ${c.cls}"><div class="prev-card-lbl">${c.lbl}</div><div class="prev-card-val">${c.val}</div><div class="prev-card-sub">${c.sub}</div></div>`).join('');
+
+  // ── Gráficos: investimento e leads ─────────────────────────────────────────
+  _prevChart('invest', 'chartInvest', {
+    type: 'bar',
+    data: {labels: PREV_MES_ABREV, datasets: [{label: 'Investimento', data: investMensal, backgroundColor: corPorStatus, borderRadius: 4}]},
+    options: {plugins: {legend: {display: false}, tooltip: {callbacks: {label: c => fmt.currency(c.parsed.y)}}}, scales: {y: {ticks: {callback: v => _prevMi(v)}}}},
+  });
+  _prevChart('leadsM', 'chartLeads', {
+    type: 'bar',
+    data: {labels: PREV_MES_ABREV, datasets: [{label: 'Leads', data: leadsMensal, backgroundColor: corPorStatus, borderRadius: 4}]},
+    options: {plugins: {legend: {display: false}, tooltip: {callbacks: {label: c => _prevN1(c.parsed.y) + ' leads'}}}, scales: {y: {beginAtZero: true}}},
+  });
+  _prevChart('sessoes', 'chartSessoes', {
+    type: 'bar',
+    data: {labels: PREV_MES_ABREV, datasets: [{label: 'Sessões', data: sessoesMensal, backgroundColor: '#3fa9f5', borderRadius: 4}]},
+    options: {plugins: {legend: {display: false}, tooltip: {callbacks: {label: c => c.parsed.y == null ? 'n/d' : fmt.num(c.parsed.y) + ' sessões'}}}, scales: {y: {beginAtZero: true}}},
+  });
+  // CPL: real (azul) + projeção do cenário (tracejado)
+  _prevChart('cpl', 'chartCPL', {
+    type: 'line',
+    data: {labels: PREV_MES_ABREV, datasets: [
+      {label: 'CPL real', data: cplReal, borderColor: PREV_AZUL, backgroundColor: PREV_AZUL, tension: .25, spanGaps: false, pointRadius: 3},
+      {label: `CPL proj. (${info.nome})`, data: cplProj, borderColor: info.solid, borderDash: [6, 4], backgroundColor: 'transparent', tension: 0, pointRadius: 2},
+    ]},
+    options: {plugins: {legend: {labels: {boxWidth: 10, font: {size: 10}}}, tooltip: {callbacks: {label: c => c.parsed.y == null ? '' : c.dataset.label + ': ' + fmt.currency(c.parsed.y)}}}, scales: {y: {ticks: {callback: v => 'R$ ' + v}}}},
+  });
+  _prevChart('cps', 'chartCPS', {
+    type: 'line',
+    data: {labels: PREV_MES_ABREV, datasets: [{label: 'CPS', data: cpsMensal, borderColor: '#14b8a6', backgroundColor: '#14b8a6', tension: .25, pointRadius: 3}]},
+    options: {plugins: {legend: {display: false}, tooltip: {callbacks: {label: c => c.parsed.y == null ? 'n/d' : fmt.currency(c.parsed.y)}}}, scales: {y: {ticks: {callback: v => 'R$ ' + v}}}},
+  });
+  _prevChart('convlp', 'chartConvLP', {
+    type: 'line',
+    data: {labels: PREV_MES_ABREV, datasets: [{label: 'Conversão LP', data: convMensal, borderColor: '#f59e0b', backgroundColor: '#f59e0b', tension: .25, pointRadius: 3}]},
+    options: {plugins: {legend: {display: false}, tooltip: {callbacks: {label: c => c.parsed.y == null ? 'n/d' : c.parsed.y.toString().replace('.', ',') + '%'}}}, scales: {y: {ticks: {callback: v => v + '%'}}}},
+  });
+
+  // ── Gráficos comerciais: negócios e receita por cenário ────────────────────
+  const cenOrdem = ['conservador', 'base', 'otimista'];
+  const corCen = cenOrdem.map(c => c === _prevCenario ? PREV_CEN_INFO[c].solid : PREV_CEN_INFO[c].cor);
+  _prevChart('negocios', 'chartNegocios', {
+    type: 'bar',
+    data: {labels: cenOrdem.map(c => PREV_CEN_INFO[c].nome), datasets: [{label: 'Negócios', data: cenOrdem.map(c => P.cenarios[c].negocios_fechados), backgroundColor: corCen, borderRadius: 5}]},
+    options: {plugins: {legend: {display: false}, tooltip: {callbacks: {label: c => _prevN1(c.parsed.y) + ' negócios'}}}, scales: {y: {beginAtZero: true}}},
+  });
+  _prevChart('receita', 'chartReceita', {
+    type: 'bar',
+    data: {labels: cenOrdem.map(c => PREV_CEN_INFO[c].nome), datasets: [{label: 'Receita', data: cenOrdem.map(c => P.cenarios[c].receita), backgroundColor: corCen, borderRadius: 5}]},
+    options: {plugins: {legend: {display: false}, tooltip: {callbacks: {label: c => fmt.currency(c.parsed.y)}}}, scales: {y: {ticks: {callback: v => _prevMi(v)}}}},
+  });
+
+  // ── Gráfico do funil (volume por 1.000 leads) ──────────────────────────────
+  _prevChart('funil', 'chartFunil', {
+    type: 'bar',
+    data: {labels: P.funil.map(e => e.etapa), datasets: [{label: 'Volume por 1.000 leads', data: P.funil.map(e => e.volume_por_1000),
+      backgroundColor: P.funil.map(e => e.etapa === R.gargalo_menor_taxa ? '#ef4444' : e.etapa === R.maior_perda_absoluta ? '#f59e0b' : 'rgba(63,169,245,.80)'), borderRadius: 3}]},
+    options: {indexAxis: 'y', plugins: {legend: {display: false}, tooltip: {callbacks: {label: c => _prevN1(c.parsed.x) + ' de 1.000 (' + _prevPct(P.funil[c.dataIndex].acumulada_pct / 100) + ' acum.)'}}}, scales: {x: {beginAtZero: true}, y: {ticks: {font: {size: 10}}}}},
+  });
+
+  // ── Tabela 1: consolidada mensal ───────────────────────────────────────────
+  const badge = s => s === 'real' ? '<span class="prev-badge real">Realizado</span>' : '<span class="prev-badge proj">Projeção</span>';
+  let rc = '';
+  M.forEach(m => {
+    const isR = m.status === 'real';
+    const leads = isR ? m.leads : cen.leads_mes[m.mes];
+    const cplv = isR ? m.cpl : cen.cpl;
+    rc += `<tr class="${isR ? 'prev-tr-real' : ''}">
+      <td><strong>${m.nome}</strong></td><td>${badge(m.status)}</td>
+      <td>${fmt.currency(m.investimento)}</td>
+      <td>${_prevN1(leads)}</td>
+      <td>${fmt.currency(cplv)}</td>
+      <td>${isR ? fmt.num(m.sessoes) : '<span class="prev-nd">n/d</span>'}</td>
+      <td>${isR ? fmt.currency(m.cps) : '<span class="prev-nd">n/d</span>'}</td>
+      <td>${isR ? _prevPct(m.conv_lp) : '<span class="prev-nd">n/d</span>'}</td>
+    </tr>`;
+  });
+  $('prev-tab-consolidada').innerHTML = `
+    <div class="card-title" style="margin-bottom:8px;">📋 Tabela consolidada mensal <span style="font-weight:400;color:#888;font-size:11px;">(Jul–Dez no cenário ${info.nome})</span></div>
+    <table class="prev-table2">
+      <thead><tr><th>Mês</th><th>Status</th><th>Investim.</th><th>Leads</th><th>CPL</th><th>Sessões</th><th>CPS</th><th>Conv. LP</th></tr></thead>
+      <tbody>${rc}</tbody>
+      <tfoot><tr class="prev-foot"><td><strong>Real Jan–Jun</strong></td><td></td><td><strong>${fmt.currency(T.investimento)}</strong></td><td><strong>${T.leads}</strong></td><td><strong>${fmt.currency(T.cpl_ponderado)}</strong></td><td><strong>${fmt.num(T.sessoes)}</strong></td><td></td><td><strong>${_prevPct(T.conv_lp_ponderada)}</strong></td></tr></tfoot>
+    </table>
+    <p class="prev-nd-leg">n/d = sessões/CPS/conversão LP de Jul–Dez não projetados (dado não localizado).</p>`;
+
+  // ── Tabela 2: projeção 3 cenários ──────────────────────────────────────────
+  let rp = '';
+  P.meses.slice(6).forEach(mes => {
+    const inv = M.find(x => x.mes === mes).investimento;
+    rp += `<tr><td><strong>${mes}</strong></td><td>${fmt.currency(inv)}</td>` +
+      cenOrdem.map(c => `<td>${fmt.currency(P.cenarios[c].cpl)}</td><td>${_prevN1(P.cenarios[c].leads_mes[mes])}</td>`).join('') + `</tr>`;
+  });
+  $('prev-tab-projecao').innerHTML = `
+    <div class="card-title" style="margin-bottom:8px;">🔮 Projeção de leads — 3 cenários (Jul–Dez)</div>
+    <table class="prev-table2">
+      <thead>
+        <tr><th rowspan="2">Mês</th><th rowspan="2">Investim.</th><th colspan="2" style="text-align:center;">🔴 Conservador</th><th colspan="2" style="text-align:center;">⚪ Base</th><th colspan="2" style="text-align:center;">🟢 Otimista</th></tr>
+        <tr><th>CPL</th><th>Leads</th><th>CPL</th><th>Leads</th><th>CPL</th><th>Leads</th></tr>
+      </thead>
+      <tbody>${rp}</tbody>
+      <tfoot><tr class="prev-foot"><td><strong>Total H2</strong></td><td></td>` +
+        cenOrdem.map(c => `<td>${fmt.currency(P.cenarios[c].cpl)}</td><td><strong>${_prevN1(P.cenarios[c].total_leads)}</strong></td>`).join('') + `</tr></tfoot>
+    </table>
+    <p class="prev-nd-leg">Leads = Investimento projetado ÷ CPL do cenário. Conservador = CPL de junho · Base = CPL ponderado Jan–Jun · Otimista = 3 melhores meses.</p>`;
+
+  // ── Tabela 3: funil (taxa de passagem) ─────────────────────────────────────
+  let rf = '';
+  P.funil.forEach((e, i) => {
+    const obs = e.etapa === R.gargalo_menor_taxa ? '🔴 menor taxa (gargalo)' : e.etapa === R.maior_perda_absoluta ? '🟠 maior perda de volume' : '';
+    rf += `<tr class="${obs ? 'prev-tr-alerta' : ''}">
+      <td class="prev-fun-et">${i === 0 ? '' : (i) + '. '}${e.etapa}</td>
+      <td style="text-align:right;">${i === 0 ? '—' : _prevPct(e.passagem)}</td>
+      <td style="text-align:right;font-weight:600;">${_prevN1(e.volume_por_1000)}</td>
+      <td style="text-align:right;">${_prevPct(e.acumulada_pct / 100)}</td>
+      <td style="text-align:right;color:#ef4444;">${i === 0 ? '—' : _prevN1(e.perda_abs_por_1000)}</td>
+      <td style="text-align:right;color:#888;">${i === 0 ? '—' : _prevPct(e.perda_pct)}</td>
+      <td style="font-size:11px;">${obs}</td>
+    </tr>`;
+  });
+  $('prev-tab-funil').innerHTML = `
+    <div class="card-title" style="margin-bottom:6px;">🔻 Funil — taxa de passagem, acumulada e perdas <span style="font-weight:400;color:#888;font-size:11px;">(base 1.000 leads de entrada)</span></div>
+    <table class="prev-table2 prev-table-funil">
+      <thead><tr><th>Etapa</th><th>Passagem</th><th>Volume</th><th>Acumulada</th><th>Perda abs.</th><th>Perda %</th><th>Observação</th></tr></thead>
+      <tbody>${rf}</tbody>
+    </table>
+    <p class="prev-nd-leg">Aproveitamento Entrada→1ª Reunião Agendada = <strong>${_prevPct(R.aprov_ate_1a_reuniao)}</strong> · Entrada→Negócio Fechado = <strong>${_prevPct(R.entrada_ate_negocio_fechado)}</strong> (1 venda a cada ${R.leads_por_venda} leads).</p>`;
+
+  // ── Tabela 4: meta comercial (volume por etapa no cenário) ─────────────────
+  let rm = '';
+  P.funil.forEach(e => {
+    const vol = cen.total_leads * e.acumulada;
+    rm += `<tr><td class="prev-fun-et">${e.etapa}</td><td style="text-align:right;font-weight:600;">${_prevN1(vol)}</td><td style="text-align:right;color:#888;">${_prevPct(e.acumulada_pct / 100)}</td></tr>`;
+  });
+  $('prev-tab-meta').innerHTML = `
+    <div class="card-title" style="margin-bottom:6px;">🎯 Meta comercial — volume por etapa (H2, cenário ${info.nome})</div>
+    <table class="prev-table2">
+      <thead><tr><th>Etapa</th><th style="text-align:right;">Volume esperado</th><th style="text-align:right;">% acum.</th></tr></thead>
+      <tbody>${rm}</tbody>
+      <tfoot><tr class="prev-foot"><td><strong>Receita potencial</strong></td><td colspan="2" style="text-align:right;"><strong>${_prevMi(cen.receita)}</strong> = ${_prevN1(cen.negocios_fechados)} × R$ 1 mi</td></tr></tfoot>
+    </table>
+    <p class="prev-nd-leg">${_prevN1(cen.total_leads)} leads projetados no semestre × a taxa acumulada de cada etapa.</p>`;
+
+  // ── Funil real do CRM (atingimento) ────────────────────────────────────────
+  const FR = P.funil_real_crm || {};
+  if ($('prev-funil-real')) {
+    if (FR.erro || (!FR.Mai && !FR.Jun)) {
+      $('prev-funil-real').innerHTML = `<div class="card"><div class="card-title">📭 Atingimento real (CRM)</div><p style="color:#888;font-size:12px;">Dado não localizado / CRM indisponível.</p></div>`;
+    } else {
+      const linhaR = (lbl, d) => d ? `<tr><td><strong>${lbl}${d.parcial ? ' <span class="prev-nd">(parcial)</span>' : ''}</strong></td><td style="text-align:right;">${d.entrada}</td><td style="text-align:right;">${d.reuniao_agendada}</td><td style="text-align:right;font-weight:600;">${_prevPct(d.aproveitamento)}</td></tr>` : '';
+      $('prev-funil-real').innerHTML = `
+        <div class="card">
+          <div class="card-title">✅ Atingimento real do funil (CRM) — até 1ª Reunião Agendada</div>
+          <p style="font-size:11px;color:#888;margin:2px 0 8px;">Camada de realidade (deals do CRM, sem importações). Difere dos leads de mídia da tabela acima — bases distintas. Meta de aproveitamento = <strong>${_prevPct(R.aprov_ate_1a_reuniao)}</strong>.</p>
+          <table class="prev-table2" style="max-width:520px;">
+            <thead><tr><th>Mês</th><th style="text-align:right;">Entrada</th><th style="text-align:right;">1ª Reun. Agend.</th><th style="text-align:right;">Aproveitamento</th></tr></thead>
+            <tbody>${linhaR('Maio', FR.Mai)}${linhaR('Junho', FR.Jun)}</tbody>
+          </table>
+        </div>`;
+    }
+  }
+
+  // ── Resumo / alertas ───────────────────────────────────────────────────────
+  if ($('prev-resumo')) $('prev-resumo').innerHTML = `
+    <div class="card">
+      <div class="card-title">🧭 Resumo & alertas de confiabilidade</div>
+      <ul class="prev-resumo-list">
+        ${(P.alertas || []).map(a => `<li>${a}</li>`).join('')}
+      </ul>
+    </div>`;
+}
+
+// ── Análise do último mês real vs a média ponderada do semestre (Visão Executiva) ─────
+function _prevAnalyze() {
+  const P = DATA.previsibilidade_nativa;
+  if (!P || P.modelo !== 'nativo-v2' || !P.mensal) return null;
+
+  const reais = P.mensal.filter(m => m.status === 'real');
+  if (!reais.length) return { mesNome: null, bons: [], ruins: [], passos: [], mesIdx: -1 };
+  const l = reais[reais.length - 1];                  // último mês real (Junho)
+  const T = P.realizado_totais;
+  const cpsPond = T.investimento / T.sessoes;          // CPS ponderado do semestre
+
+  // compara o mês contra a média ponderada Jan–Jun (referência)
+  const metricas = [
+    { label: 'CPL',          dir: 'down', real: fmt.currency(l.cpl),               ref: fmt.currency(T.cpl_ponderado),  key: 'cpl' },
+    { label: 'CPS',          dir: 'down', real: fmt.currency(l.cps),               ref: fmt.currency(cpsPond),          key: 'cps (geral)' },
+    { label: 'Conversão LP', dir: 'up',   real: (l.conv_lp * 100).toFixed(2) + '%', ref: (T.conv_lp_ponderada * 100).toFixed(2) + '%', key: 'taxa de conversao lp' },
+  ];
+
+  const bons = [], ruins = [], passos = [], passosSet = new Set();
+  metricas.forEach(m => {
+    const cmp = _prevCompare(m.real, m.ref, m.dir);
     if (!cmp) return;
-    const item = { label: rr.label, cmp, cfg };
+    const cfg = PREV_KPI[m.key] || { bom: '', ruim: '' };
+    const item = { label: m.label, cmp, cfg };
     if (cmp.good) bons.push(item);
     else {
       ruins.push(item);
-      if (!passosSet.has(cfg.ruim)) { passosSet.add(cfg.ruim); passos.push(cfg.ruim); }
+      if (cfg.ruim && !passosSet.has(cfg.ruim)) { passosSet.add(cfg.ruim); passos.push(cfg.ruim); }
     }
   });
-  return { mesNome: meses[mesIdx] || '', bons, ruins, passos, mesIdx };
+  return { mesNome: l.nome + ' (vs média do semestre)', bons, ruins, passos, mesIdx: 0 };
 }
 
-// ── Relatório / Próximos Passos (tela) ───────────────────────────────────────
-function renderPrevReport() {
-  const cont = document.getElementById('prev-report-container');
-  if (!cont) return;
-  const A = _prevAnalyze();
-  if (!A) {
-    cont.innerHTML = '<p class="rep-empty" style="padding:20px;">Dados de previsibilidade ainda não coletados.</p>';
-    return;
-  }
-  if (!A.mesNome) {
-    cont.innerHTML = '<div class="prev-report"><p class="rep-empty">Ainda não há mês com resultado real preenchido para analisar.</p></div>';
-    return;
-  }
-
-  const liGood = it => `<li><span class="rep-metric">${it.label}</span> — Real ${it.cmp.realStr} vs Meta ${it.cmp.metaStr} <span class="rep-sub">(${it.cmp.gapTxt})</span></li>`;
-
-  cont.innerHTML = `
-    <div class="prev-report">
-      <div class="rep-topbar">
-        <p class="rep-head">Análise referente a <strong>${A.mesNome}</strong> (Real × Meta) — último mês com resultado preenchido.</p>
-        <button class="rep-pdf-btn" onclick="downloadPrevReportPDF()">⬇️ Baixar PDF</button>
-      </div>
-
-      <div class="rep-card good">
-        <h4>✅ O que melhoramos / batemos a meta (${A.bons.length})</h4>
-        ${A.bons.length ? `<ul>${A.bons.map(liGood).join('')}</ul>` : '<p class="rep-empty">Nenhum KPI superou a meta neste mês.</p>'}
-      </div>
-
-      <div class="rep-card bad">
-        <h4>⚠️ O que ficou abaixo da meta (${A.ruins.length})</h4>
-        ${A.ruins.length ? `<ul>${A.ruins.map(liGood).join('')}</ul>` : '<p class="rep-empty">Nenhum KPI ficou abaixo da meta — excelente mês! 🎉</p>'}
-      </div>
-
-      <div class="rep-card next">
-        <h4>🎯 Próximos passos</h4>
-        ${A.passos.length ? `<ul>${A.passos.map(s => `<li>${s}</li>`).join('')}</ul>` : '<p class="rep-empty">Sem pontos críticos. Manter a estratégia atual e monitorar.</p>'}
-      </div>
-    </div>
-  `;
-}
-
-// ── Gera e baixa o relatório em PDF (jsPDF, texto nativo) ─────────────────────
-function downloadPrevReportPDF() {
-  const A = _prevAnalyze();
-  if (!A || !A.mesNome) { alert('Não há mês com resultado real preenchido para gerar o relatório.'); return; }
-  const jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
-  if (!jsPDFCtor) { alert('Biblioteca de PDF ainda não carregou. Recarregue a página e tente novamente.'); return; }
-
-  const doc = new jsPDFCtor({ unit: 'mm', format: 'a4' });
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  const mL = 15, mR = 15, contentW = pageW - mL - mR;
-  let y = 0;
-
-  const NAVY = [13, 59, 102], BLUE = [63, 169, 245], GREEN = [34, 197, 94],
-        RED = [239, 68, 68], GRAY = [107, 114, 128], DARK = [31, 41, 55];
-
-  const ensureSpace = h => { if (y + h > pageH - 15) { doc.addPage(); y = 18; } };
-
-  // Cabeçalho
-  doc.setFillColor(NAVY[0], NAVY[1], NAVY[2]); doc.rect(0, 0, pageW, 26, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
-  doc.text('Clínica da Cidade — Expansão CDC', mL, 11);
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-  doc.text('Relatório de Previsibilidade 2026 · Próximos Passos', mL, 18);
-  y = 36;
-
-  // Subtítulo
-  doc.setTextColor(DARK[0], DARK[1], DARK[2]); doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
-  doc.text(`Análise referente a ${A.mesNome} (Real x Meta)`, mL, y); y += 6;
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
-  doc.text(`Gerado em ${new Date().toLocaleDateString('pt-BR')} · último mês com resultado preenchido`, mL, y);
-  y += 10;
-
-  function section(title, color, items, isText) {
-    ensureSpace(12);
-    doc.setFillColor(color[0], color[1], color[2]); doc.rect(mL, y - 4.5, 2.5, 7, 'F');
-    doc.setTextColor(DARK[0], DARK[1], DARK[2]); doc.setFont('helvetica', 'bold'); doc.setFontSize(11.5);
-    doc.text(title, mL + 5, y); y += 8;
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
-    if (!items.length) {
-      ensureSpace(6); doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
-      doc.text('—', mL + 5, y); y += 8; return;
-    }
-    doc.setTextColor(DARK[0], DARK[1], DARK[2]);
-    items.forEach(it => {
-      const line = isText
-        ? `•  ${it}`
-        : `•  ${it.label}: Real ${it.cmp.realStr} vs Meta ${it.cmp.metaStr}  (${it.cmp.gapTxt})`;
-      const wrapped = doc.splitTextToSize(line, contentW - 4);
-      ensureSpace(wrapped.length * 5 + 2);
-      doc.text(wrapped, mL + 5, y); y += wrapped.length * 5 + 2;
-    });
-    y += 5;
-  }
-
-  section(`O que melhoramos / batemos a meta (${A.bons.length})`, GREEN, A.bons, false);
-  section(`O que ficou abaixo da meta (${A.ruins.length})`, RED, A.ruins, false);
-  section('Próximos passos', BLUE, A.passos, true);
-
-  // Rodapé em todas as páginas
-  const pages = doc.internal.getNumberOfPages();
-  for (let p = 1; p <= pages; p++) {
-    doc.setPage(p); doc.setFontSize(8); doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
-    doc.text('Dashboard Marketing — Clínica da Cidade Franchising', mL, pageH - 8);
-    doc.text(`Página ${p}/${pages}`, pageW - mR, pageH - 8, { align: 'right' });
-  }
-
-  doc.save(`Relatorio_Previsibilidade_${A.mesNome}_2026.pdf`);
-}
+// (Relatório/PDF da previsibilidade removidos — o Plano de Ação Real×Meta vive na Visão Executiva via _prevAnalyze.)
 
 // ─── SUPABASE: configuração ───────────────────────────────────────────────────
 // PREENCHA com os valores do seu projeto em: supabase.com → Project Settings → API
@@ -5183,6 +5600,19 @@ async function downloadAndRender() {
 }
 
 async function loadData() {
+  // DEV: rodando em localhost, carrega o summary.json local (sem login) — facilita
+  // revisar o preview antes de o ETL publicar no Supabase. Só vale em localhost.
+  const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
+  if (isLocal) {
+    try {
+      const r = await fetch('../data/summary.json', { cache: 'no-store' });
+      if (r.ok) {
+        DATA = await r.json();
+        await startDashboard();
+        return;
+      }
+    } catch (_) { /* cai pro fluxo normal abaixo */ }
+  }
   try {
     // Se já existe sessão ativa (localStorage), pula o login
     const { data: { session } } = await sb.auth.getSession();
@@ -5282,6 +5712,14 @@ loadData();
 </div>
 
 <script>
+// ── Recolher/expandir a sidebar (desktop/tablet) ─────────────────────────────
+function toggleSidebar() {
+  const collapsed = document.documentElement.classList.toggle('sb-collapsed');
+  try { localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0'); } catch (e) {}
+  // Após a transição da largura do #main, força os gráficos Chart.js a redimensionar
+  setTimeout(() => window.dispatchEvent(new Event('resize')), 300);
+}
+
 // ── Mobile Drawer ────────────────────────────────────────────────────────────
 function openMobDrawer() {
   document.getElementById('mob-drawer').classList.add('open');
