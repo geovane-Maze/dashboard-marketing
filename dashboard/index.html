@@ -4208,15 +4208,18 @@ function renderMeta() {
   const g7d = {}; cdaily.forEach(r => { if (cut7 && r.data >= cut7) g7d[r.anuncio] = (g7d[r.anuncio] || 0) + (r.gasto || 0); });
 
   // ── 3. QUALIDADE DOS PÚBLICOS (conjuntos ativos no período) ──
+  // Fonte: adset_daily (dimensão REAL de conjunto por linha, atribuição correta) — NÃO
+  // byAd[nome].conjunto, que inflava: despejava TODO o gasto de um anúncio multi-conjunto
+  // num único conjunto (FEIRA aparecia R$3.461 sendo que a campanha-mãe gastou R$477).
+  // Agrupa por (campanha, conjunto) — um conjunto nunca aparece maior que sua campanha.
   const adsetMap = {};
-  activeAds.forEach(([anuncio, d]) => {
-    const meta = byAd[anuncio] || {};
-    const key = meta.conjunto || '(sem conjunto)';
-    const a = adsetMap[key] || (adsetMap[key] = { conjunto: key, campanha: meta.campanha || '', gasto: 0, leadsCRM: 0, impressoes: 0, cliques: 0 });
-    a.gasto += d.gasto; a.leadsCRM += d.leadsCRM; a.impressoes += d.impressoes; a.cliques += d.cliques;
-    if (!a.campanha && meta.campanha) a.campanha = meta.campanha;
+  (M.adset_daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
+    const conj = r.conjunto || '(sem conjunto)';
+    const key = (r.campanha || '') + '|||' + conj;
+    const a = adsetMap[key] || (adsetMap[key] = { conjunto: conj, campanha: r.campanha || '', gasto: 0, leadsCRM: 0, impressoes: 0, cliques: 0 });
+    a.gasto += r.gasto || 0; a.leadsCRM += r.leads || 0; a.impressoes += r.impressoes || 0; a.cliques += r.cliques || 0;
   });
-  const adsets = Object.values(adsetMap).map(a => {
+  const adsets = Object.values(adsetMap).filter(a => a.gasto > 0).map(a => {
     a._cpl = a.leadsCRM > 0 ? a.gasto / a.leadsCRM : 0;
     a.q = qualidadeAds(a._cpl, a.gasto, a.leadsCRM, TQ);
     return a;
@@ -4227,7 +4230,7 @@ function renderMeta() {
       <td>${stt(activeCamps.has(a.campanha))}</td>
       <td>${ell(a.campanha, 160)}</td>
       <td>${ell(a.conjunto, 190)}</td>
-      <td><strong>${fmt.num(a.leadsCRM)}</strong></td>
+      <td><strong>${fmt.num(Math.round(a.leadsCRM))}</strong></td>
       <td>${a.leadsCRM > 0 ? fmt.currency(a._cpl) : '—'}</td>
       <td>${cpm > 0 ? fmt.currency(cpm) : '—'}</td>
       <td>${a.cliques > 0 ? fmt.k(a.cliques) : '—'}</td>
@@ -4335,6 +4338,15 @@ function renderGoogle() {
     const cp = r.campanha;
     if (cp) crmByCamp[cp] = (crmByCamp[cp] || 0) + (r.leads || 0);
   });
+  // Os dados de criativos do Google (planilha Adveronix → GC.daily) podem estar DEFASADOS
+  // em relação ao gasto da API (campaign_daily). Quando defasados, Leads/CPL por campanha/
+  // grupo/anúncio ficam PARCIAIS (gasto do mês inteiro ÷ leads truncados = CPL falso, ex.:
+  // R$2.855). Detecta e suprime os números enganosos, mantendo o gasto/KPIs (que vêm da API).
+  const gcMax = (GC.daily || []).reduce((mx, r) => r.data > mx ? r.data : mx, '');
+  const gMax  = (G.campaign_daily || []).reduce((mx, r) => r.data > mx ? r.data : mx, '');
+  const gcStale = !!(gcMax && gMax && gcMax < gMax);
+  const gcMaxBR = gcMax ? gcMax.slice(8, 10) + '/' + gcMax.slice(5, 7) : '';
+  const gcWarn = gcStale ? `<div class="status-warn">⚠️ Os dados de criativos do Google só atualizaram até <strong>${gcMaxBR}</strong> (a planilha de criativos travou). Por isso o <strong>Leads/CPL por campanha está oculto</strong> e as tabelas de <strong>Grupos e Anúncios refletem só até ${gcMaxBR}</strong> (parcial). O Gasto total, os KPIs e o gasto/cliques/impressões por campanha estão <strong>completos e corretos</strong> (via API).</div>` : '';
   const camps = Object.entries(campMap).filter(([, d]) => d.gasto > 0).sort((a, b) => b[1].gasto - a[1].gasto);
   document.getElementById('table-google-campaigns').innerHTML = camps.map(([name, d]) => {
     const lc = crmByCamp[name] || 0, cpl = lc > 0 ? d.gasto / lc : 0;
@@ -4343,8 +4355,8 @@ function renderGoogle() {
       <td>${stt(activeCamps.has(name))}</td>
       <td>${ell(name, 220)}</td>
       <td>${fmt.num(d.conv)}</td>
-      <td><strong>${fmt.num(lc)}</strong></td>
-      <td>${lc > 0 ? fmt.currency(cpl) : '—'}</td>
+      <td><strong>${gcStale ? '—' : fmt.num(lc)}</strong></td>
+      <td>${gcStale ? '—' : (lc > 0 ? fmt.currency(cpl) : '—')}</td>
       <td>${fmt.k(d.impressoes)}</td>
       <td>${fmt.k(d.cliques)}</td>
       <td>${cpc > 0 ? fmt.currency(cpc) : '—'}</td>
@@ -4352,7 +4364,7 @@ function renderGoogle() {
       <td>${fmt.currency(d.gasto)}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="10" class="empty">Sem dados no período selecionado.</td></tr>';
-  document.getElementById('google-status-warn').innerHTML = statusWarn;
+  document.getElementById('google-status-warn').innerHTML = statusWarn + gcWarn;
 
   // ── 2. INVESTIMENTO × LEADS CRM (mensal, mesmo gráfico) ──
   const meses = [...new Set([
