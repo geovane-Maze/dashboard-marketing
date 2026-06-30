@@ -1111,7 +1111,8 @@ def aggregate_meta_ads(rows, leads_daily_map=None):
                 "data":    dia,
                 "anuncio": nome,
                 "gasto":   round(v["gasto"], 2),
-                "leads":   leads_crm,   # <-- CRM, não plataforma!
+                "leads":   leads_crm,           # <-- CRM (matching utm), não plataforma!
+                "leads_plat": int(round(v["leads"])),  # leads reportados pela plataforma Meta
                 "impressoes": int(v["impressoes"]),
                 "cliques":    int(v["cliques"]),
             })
@@ -2294,6 +2295,20 @@ def main():
     )
 
     meta_aggregated = aggregate_meta_ads(meta_ads, leads_daily_map=meta_leads_daily)
+
+    # Status REAL das campanhas Meta (effective_status via API) — a planilha do
+    # Adveronix não traz status, então o dashboard antes "adivinhava" pelo gasto
+    # recente, marcando campanhas pausadas como Ativas. Vai em meta_ads.campaign_status.
+    try:
+        from collectors import meta_ads_api
+        meta_status = meta_ads_api.get_campaign_status()
+        if meta_status:
+            meta_aggregated["campaign_status"] = meta_status
+            n_act = sum(1 for v in meta_status.values() if v == "ACTIVE")
+            print(f"    Status Meta (API): {len(meta_status)} campanhas · {n_act} ativas")
+    except Exception as e:
+        print(f"    AVISO: status Meta (API) indisponível: {e}")
+
     # Mantém agregação total no creatives (já existente — para legacy compatibility)
     attach_rd_leads_to_creatives(meta_aggregated["creatives"], meta_ads, leads)
 

@@ -4168,24 +4168,22 @@ function renderMeta() {
   ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
 
   // ── 1. CAMPANHAS ATIVAS ──
-  const campMap = {};
-  (M.campaign_monthly || []).filter(r => !pred || pred(r.mes)).forEach(r => {
-    const c = campMap[r.campanha] || (campMap[r.campanha] = { gasto: 0, impressoes: 0, cliques: 0, leadsPlat: 0 });
-    c.gasto += r.gasto || 0; c.impressoes += r.impressoes || 0; c.cliques += r.cliques || 0; c.leadsPlat += r.leads || 0;
-  });
-  // Leads CRM por campanha = soma dos leads CRM por anúncio (creatives_daily,
-  // MESMA fonte das tabelas de públicos/anúncios) agrupada por campanha. Garante
-  // consistência: o total da campanha = soma dos seus conjuntos/anúncios. (O match
-  // por utm_campaign era pior — perdia a maioria dos leads das campanhas grandes.)
+  // TUDO derivado de creatives_daily (DIÁRIO) agrupado por campanha, respeitando o
+  // filtro de DIA. Antes o gasto/impressões/leads-plataforma vinham de campaign_monthly
+  // (MENSAL), o que fazia uma campanha aparecer com gasto em dias em que nem existia
+  // (bug "FEIRA ABF": criada 23/06 mas mostrava gasto 01–22/06). leads = CRM (matching);
+  // leads_plat = leads reportados pela plataforma. Ambos por dia.
   const adCampMap = {}; (M.creatives || []).forEach(c => { adCampMap[c.anuncio] = c.campanha || ''; });
-  const crmByCamp = {};
+  const campMap = {};
   (M.creatives_daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
-    const cp = adCampMap[r.anuncio];
-    if (cp) crmByCamp[cp] = (crmByCamp[cp] || 0) + (r.leads || 0);
+    const cp = adCampMap[r.anuncio]; if (!cp) return;
+    const c = campMap[cp] || (campMap[cp] = { gasto: 0, impressoes: 0, cliques: 0, leadsPlat: 0, leadsCRM: 0 });
+    c.gasto += r.gasto || 0; c.impressoes += r.impressoes || 0; c.cliques += r.cliques || 0;
+    c.leadsPlat += r.leads_plat || 0; c.leadsCRM += r.leads || 0;
   });
-  const camps = Object.entries(campMap).filter(([, d]) => d.gasto > 0).sort((a, b) => b[1].gasto - a[1].gasto);
+  const camps = Object.entries(campMap).filter(([, d]) => d.gasto > 0 || d.leadsCRM > 0).sort((a, b) => b[1].gasto - a[1].gasto);
   document.getElementById('table-meta-campaigns').innerHTML = camps.map(([name, d]) => {
-    const lc = crmByCamp[name] || 0, cpl = lc > 0 ? d.gasto / lc : 0;
+    const lc = d.leadsCRM, cpl = lc > 0 ? d.gasto / lc : 0;
     const cpc = d.cliques > 0 ? d.gasto / d.cliques : 0, ctr = d.impressoes > 0 ? d.cliques / d.impressoes * 100 : 0;
     return `<tr>
       <td>${stt(activeCamps.has(name))}</td>
@@ -4503,8 +4501,13 @@ function criatCampClick(e) {
   renderCreatives();
 }
 
-// Campanhas ativas: com gasto nos últimos 2 meses disponíveis nos dados
+// Campanhas ativas Meta. Preferência: STATUS REAL da API (meta_ads.campaign_status,
+// effective_status ACTIVE). Fallback (sem o status): heurística de gasto recente.
 function getActiveCampaigns() {
+  const status = (DATA.meta_ads || {}).campaign_status;
+  if (status && Object.keys(status).length) {
+    return new Set(Object.entries(status).filter(([, s]) => s === 'ACTIVE').map(([n]) => n));
+  }
   const campMonthly = DATA.meta_ads.campaign_monthly || [];
   if (!campMonthly.length) return new Set();
   const allMonths = [...new Set(campMonthly.map(r => r.mes))].sort();
