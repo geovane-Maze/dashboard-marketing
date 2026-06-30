@@ -4340,11 +4340,21 @@ function renderGoogle() {
   // Derivado de campaign_daily (DIÁRIO, atribuição correta POR CAMPANHA) → respeita o
   // filtro de DIA. Antes usava campaign_monthly (filtro de mês), então filtrar por dia
   // mostrava o gasto do mês inteiro ("gasto fantasma", mesmo bug corrigido no Meta).
+  // Fallback p/ campaign_monthly enquanto o ETL novo (com campaign_daily) ainda não
+  // rodou — evita tabela vazia em dados antigos cacheados no Supabase.
   const campMap = {};
-  (G.campaign_daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
-    const c = campMap[r.campanha] || (campMap[r.campanha] = { gasto: 0, impressoes: 0, cliques: 0, conv: 0 });
-    c.gasto += r.gasto || 0; c.impressoes += r.impressoes || 0; c.cliques += r.cliques || 0; c.conv += r.conversoes || 0;
-  });
+  const gDaily = G.campaign_daily || [];
+  if (gDaily.length) {
+    gDaily.filter(r => !datePred || datePred(r.data)).forEach(r => {
+      const c = campMap[r.campanha] || (campMap[r.campanha] = { gasto: 0, impressoes: 0, cliques: 0, conv: 0 });
+      c.gasto += r.gasto || 0; c.impressoes += r.impressoes || 0; c.cliques += r.cliques || 0; c.conv += r.conversoes || 0;
+    });
+  } else {
+    (G.campaign_monthly || []).filter(r => !pred || pred(r.mes)).forEach(r => {
+      const c = campMap[r.campanha] || (campMap[r.campanha] = { gasto: 0, impressoes: 0, cliques: 0, conv: 0 });
+      c.gasto += r.gasto || 0; c.impressoes += r.impressoes || 0; c.cliques += r.cliques || 0; c.conv += r.conversoes || 0;
+    });
+  }
   // Leads CRM por campanha = soma dos leads CRM por anúncio (google_ads_creatives.daily,
   // MESMA fonte das tabelas de grupos/anúncios) agrupada por campanha. Garante consistência.
   const crmByCamp = {};
