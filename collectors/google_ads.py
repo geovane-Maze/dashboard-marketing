@@ -105,6 +105,64 @@ def get_campaign_status():
     return out
 
 
+def get_ad_daily(days_back=120):
+    """
+    Por ANÚNCIO por DIA (via API): campanha, grupo, anúncio, gasto, cliques, impressões,
+    conversões, url final. Substitui a planilha Adveronix (que travou em 08/06) como fonte
+    das tabelas de Grupos e Anúncios do Google — dados COMPLETOS e com a dimensão REAL de
+    grupo (o mesmo que get_ad_insights_daily faz no Meta).
+
+    NÃO cobre Performance Max (PMax não tem ad_group_ad) — mas o gasto total e a tabela de
+    Campanhas vêm de get_campaign_data (FROM campaign, que inclui PMax), então o total fecha.
+    """
+    date_end = datetime.today().strftime("%Y-%m-%d")
+    date_start = (datetime.today() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+    query = f"""
+        SELECT
+            campaign.name,
+            ad_group.name,
+            ad_group_ad.ad.name,
+            ad_group_ad.ad.final_urls,
+            metrics.cost_micros,
+            metrics.clicks,
+            metrics.impressions,
+            metrics.conversions,
+            segments.date
+        FROM ad_group_ad
+        WHERE segments.date BETWEEN '{date_start}' AND '{date_end}'
+          AND metrics.cost_micros > 0
+          AND ad_group_ad.status != 'REMOVED'
+        ORDER BY segments.date DESC
+    """
+    print("Coletando anúncios/grupos do Google Ads por dia (API)...")
+    rows = []
+    try:
+        client = get_client()
+        service = client.get_service("GoogleAdsService")
+        customer_id = config.GOOGLE_ADS_CUSTOMER_ID.replace("-", "")
+        for row in service.search(customer_id=customer_id, query=query):
+            urls = list(row.ad_group_ad.ad.final_urls)
+            rows.append({
+                "data": row.segments.date,
+                "campanha": row.campaign.name,
+                "grupo": row.ad_group.name,
+                "anuncio": row.ad_group_ad.ad.name or "",
+                "custo": round(row.metrics.cost_micros / 1_000_000, 2),
+                "cliques": row.metrics.clicks,
+                "impressoes": row.metrics.impressions,
+                "conversoes": row.metrics.conversions,
+                "url_final": urls[0] if urls else "",
+            })
+    except GoogleAdsException as ex:
+        print(f"  AVISO get_ad_daily Google: {ex.error.code().name}")
+        for error in ex.failure.errors:
+            print(f"    {error.message}")
+    except Exception as e:
+        print(f"  AVISO get_ad_daily Google: {e}")
+    print(f"  Google ad_daily: {len(rows)} linhas (anúncio/dia).")
+    return rows
+
+
 def get_creative_thumbnails():
     """
     Mapa {nome_do_anuncio: thumbnail_url} via API Google Ads.

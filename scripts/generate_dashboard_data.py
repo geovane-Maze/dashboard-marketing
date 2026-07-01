@@ -1704,7 +1704,7 @@ def aggregate_google_ads_creatives(rows, leads_daily_map=None):
     `leads_crm` é a fonte de verdade (vem do RD Station via Jaccard match).
     """
     if not rows:
-        return {"daily": [], "creatives": []}
+        return {"daily": [], "creatives": [], "group_daily": [], "creative_group_daily": []}
 
     daily_list = []
     by_ad = defaultdict(lambda: {
@@ -1714,18 +1714,38 @@ def aggregate_google_ads_creatives(rows, leads_daily_map=None):
         "headlines": "", "descriptions": "", "thumbnail": "",
         "primeira_data": "", "ultima_data": "",
     })
+    # Diário por GRUPO e por ANÚNCIO×grupo (dimensão REAL, via API). Resolve a inflação por
+    # nome (o grupo antes recebia todo o gasto de um anúncio reusado, via byAd[nome].grupo) e
+    # o truncamento da planilha Adveronix. group_daily soma TUDO (inclui anúncios sem nome —
+    # Search RSA); creative_group_daily só os com nome.
+    group_daily = defaultdict(lambda: defaultdict(lambda: {"gasto": 0.0, "conv": 0.0, "leads_crm": 0.0}))
+    creative_group_daily = defaultdict(lambda: defaultdict(lambda: {"gasto": 0.0, "leads_crm": 0.0}))
+    ad_grp_spend = defaultdict(lambda: defaultdict(float))  # (anuncio,dia) -> {(camp,grupo): gasto}
 
     leads_daily_map = leads_daily_map or {}
 
     for r in rows:
         data = (r.get("data") or "").strip()
-        nome = (r.get("anuncio") or "").strip()
-        if not data or not nome:
+        if not data:
             continue
+        nome = (r.get("anuncio") or "").strip()
+        campanha_r = (r.get("campanha") or "").strip()
+        grupo_r = (r.get("grupo") or "").strip()
         gasto = parse_num(r.get("custo"))
         conv  = parse_num(r.get("conversoes"))
+
+        # GRUPO daily — inclui anúncios SEM nome (o grupo soma tudo que gastou nele)
+        if grupo_r:
+            gd = group_daily[(campanha_r, grupo_r)][data]
+            gd["gasto"] += gasto; gd["conv"] += conv
+
+        if not nome:
+            continue   # resto (nível anúncio/creative) só p/ anúncios com nome
         # Leads do CRM neste dia para este anúncio (matching prévio)
         leads_crm = leads_daily_map.get(nome, {}).get(data, 0)
+        if grupo_r:
+            creative_group_daily[(nome, campanha_r, grupo_r)][data]["gasto"] += gasto
+            ad_grp_spend[(nome, data)][(campanha_r, grupo_r)] += gasto
 
         # Linha flat (data, anuncio) — para Top 5 com filtro de data
         if gasto > 0 or leads_crm > 0:
@@ -1778,9 +1798,46 @@ def aggregate_google_ads_creatives(rows, leads_daily_map=None):
             "ultima_data":   d["ultima_data"],
         })
 
+    # Distribui os leads CRM (por nome de anúncio) ao(s) grupo(s) reais onde o anúncio rodou,
+    # PROPORCIONAL ao gasto — mesma lógica do Meta (adset_daily). Gasto já é exato por grupo.
+    for nome, dias in leads_daily_map.items():
+        for dia, n in dias.items():
+            spends = ad_grp_spend.get((nome, dia))
+            if not spends:
+                continue
+            tot = sum(spends.values())
+            if tot <= 0:
+                continue
+            for (camp, grupo), sp in spends.items():
+                frac = n * (sp / tot)
+                group_daily[(camp, grupo)][dia]["leads_crm"] += frac
+                creative_group_daily[(nome, camp, grupo)][dia]["leads_crm"] += frac
+
+    group_daily_list = []
+    for (campanha, grupo), dias in group_daily.items():
+        for dia, v in sorted(dias.items()):
+            if v["gasto"] == 0 and v["leads_crm"] == 0:
+                continue
+            group_daily_list.append({
+                "data": dia, "campanha": campanha, "grupo": grupo,
+                "gasto": round(v["gasto"], 2), "conversoes": round(v["conv"], 2),
+                "leads": round(v["leads_crm"], 2),
+            })
+    creative_group_daily_list = []
+    for (anuncio, campanha, grupo), dias in creative_group_daily.items():
+        for dia, v in sorted(dias.items()):
+            if v["gasto"] == 0 and v["leads_crm"] == 0:
+                continue
+            creative_group_daily_list.append({
+                "data": dia, "anuncio": anuncio, "campanha": campanha, "grupo": grupo,
+                "gasto": round(v["gasto"], 2), "leads": round(v["leads_crm"], 2),
+            })
+
     return {
         "daily":     daily_list,
         "creatives": creatives_list,
+        "group_daily": group_daily_list,
+        "creative_group_daily": creative_group_daily_list,
     }
 
 
@@ -2431,12 +2488,22 @@ def main():
     # Previsibilidade NATIVA (modelo novo) é montada mais abaixo — precisa do
     # investimento mensal já agregado (meta_agg/google_agg).
 
-    print("  Lendo Google Ads Criativos...")
+    print("  Lendo Google Ads Criativos (API — substitui a planilha Adveronix travada)...")
     google_ads_creatives_rows = []
     try:
-        google_ads_creatives_rows = read_sheet(gc, "google_ads_creatives")
-    except Exception:
-        print(f"    (sem aba google_ads_creatives ainda — primeira coleta vai criar)")
+        from collectors import google_ads as google_ads_collector
+        google_ads_creatives_rows = google_ads_collector.get_ad_daily(days_back=120)
+        if google_ads_creatives_rows:
+            print(f"    Google criativos via API: {len(google_ads_creatives_rows)} linhas (anúncio/dia)")
+    except Exception as e:
+        print(f"    AVISO get_ad_daily falhou ({e}) — caindo na planilha Adveronix.")
+        google_ads_creatives_rows = []
+    if not google_ads_creatives_rows:
+        try:
+            google_ads_creatives_rows = read_sheet(gc, "google_ads_creatives")
+            print(f"    (fallback planilha Adveronix: {len(google_ads_creatives_rows)} linhas)")
+        except Exception:
+            print(f"    (sem aba google_ads_creatives ainda)")
 
     print("  Agregando dados...")
 

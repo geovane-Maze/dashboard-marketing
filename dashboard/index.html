@@ -4409,35 +4409,21 @@ function renderGoogle() {
     }
   });
 
-  // Mapas por anúncio NO PERÍODO (google_ads_creatives.daily filtrado). `leads` já é CRM.
-  // (O daily do Google não traz impressões/cliques por anúncio — só gasto e leads.)
+  // byAd: metadados por anúncio (url_final, conversões plataforma) da agregação de criativos.
   const byAd = {}; (GC.creatives || []).forEach(c => { byAd[c.anuncio] = c; });
-  const perAd = {};
-  (GC.daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
-    const a = perAd[r.anuncio] || (perAd[r.anuncio] = { gasto: 0, leadsCRM: 0, campanha: r.campanha || '' });
-    a.gasto += r.gasto || 0; a.leadsCRM += r.leads || 0;
-    if (!a.campanha && r.campanha) a.campanha = r.campanha;
-  });
-  const activeAds = Object.entries(perAd).filter(([, d]) => d.gasto > 0);
 
-  // Gasto 7D — últimos 7 dias com dados (independe do filtro de período)
-  const cdaily = GC.daily || [];
-  const maxData = cdaily.reduce((mx, r) => r.data > mx ? r.data : mx, '');
-  let cut7 = '';
-  if (maxData) { const d = new Date(maxData + 'T00:00:00'); d.setDate(d.getDate() - 6); cut7 = d.toISOString().slice(0, 10); }
-  const g7d = {}; cdaily.forEach(r => { if (cut7 && r.data >= cut7) g7d[r.anuncio] = (g7d[r.anuncio] || 0) + (r.gasto || 0); });
-
-  // ── 3. QUALIDADE DOS GRUPOS DE ANÚNCIOS (ativos no período) ──
+  // ── 3. QUALIDADE DOS GRUPOS DE ANÚNCIOS ──
+  // Fonte: GC.group_daily (dimensão REAL de grupo por linha, via API Google — FROM ad_group_ad,
+  // dados completos). NÃO byAd[nome].grupo, que despejava todo o gasto de um anúncio reusado
+  // num só grupo, nem a planilha Adveronix truncada. Agrupa por (campanha, grupo).
   const grupoMap = {};
-  activeAds.forEach(([anuncio, d]) => {
-    const meta = byAd[anuncio] || {};
-    const key = meta.grupo || '(sem grupo)';
-    const campanha = meta.campanha || d.campanha || '';
-    const a = grupoMap[key] || (grupoMap[key] = { conjunto: key, campanha, gasto: 0, leadsCRM: 0 });
-    a.gasto += d.gasto; a.leadsCRM += d.leadsCRM;
-    if (!a.campanha && campanha) a.campanha = campanha;
+  (GC.group_daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
+    const grp = r.grupo || '(sem grupo)';
+    const key = (r.campanha || '') + '|||' + grp;
+    const a = grupoMap[key] || (grupoMap[key] = { conjunto: grp, campanha: r.campanha || '', gasto: 0, leadsCRM: 0 });
+    a.gasto += r.gasto || 0; a.leadsCRM += r.leads || 0;
   });
-  const grupos = Object.values(grupoMap).map(a => {
+  const grupos = Object.values(grupoMap).filter(a => a.gasto > 0).map(a => {
     a._cpl = a.leadsCRM > 0 ? a.gasto / a.leadsCRM : 0;
     a.q = qualidadeAds(a._cpl, a.gasto, a.leadsCRM, TQ);
     return a;
@@ -4446,19 +4432,34 @@ function renderGoogle() {
       <td>${stt(activeCamps.has(a.campanha))}</td>
       <td>${ell(a.campanha, 180)}</td>
       <td>${ell(a.conjunto, 240)}</td>
-      <td><strong>${fmt.num(a.leadsCRM)}</strong></td>
+      <td><strong>${fmt.num(Math.round(a.leadsCRM))}</strong></td>
       <td>${a.leadsCRM > 0 ? fmt.currency(a._cpl) : '—'}</td>
       <td><span class="q-badge ${a.q.cls}">${a.q.nivel}</span><div class="q-acao">${a.q.acao}</div></td>
       <td>${fmt.currency(a.gasto)}</td>
     </tr>`).join('') || '<tr><td colspan="7" class="empty">Sem grupos ativos no período.</td></tr>';
 
-  // ── 4. QUALIDADE DOS ANÚNCIOS (criativos ativos no período) ──
-  const ads = activeAds.map(([anuncio, d]) => {
-    const meta = byAd[anuncio] || {};
-    const cpl = d.leadsCRM > 0 ? d.gasto / d.leadsCRM : 0;
-    return { anuncio, campanha: meta.campanha || d.campanha || '', conjunto: meta.grupo || '', gasto: d.gasto, gasto7d: g7d[anuncio] || 0,
-      leadsPlat: meta.conversoes_plataforma || 0, leadsCRM: d.leadsCRM, _cpl: cpl, url: meta.url_final,
-      ativo: activeCamps.has(meta.campanha || d.campanha), q: qualidadeAds(cpl, d.gasto, d.leadsCRM, TQ) };
+  // ── 4. QUALIDADE DOS ANÚNCIOS ──
+  // Fonte: GC.creative_group_daily (gasto por ANÚNCIO×grupo reais, via API). Um criativo que
+  // roda em N grupos vira N linhas com o gasto certo de cada. gasto7d também por (anúncio,grupo).
+  const cgAll = GC.creative_group_daily || [];
+  const cgMax = cgAll.reduce((mx, r) => r.data > mx ? r.data : mx, '');
+  let cgCut7 = '';
+  if (cgMax) { const dd = new Date(cgMax + 'T00:00:00'); dd.setDate(dd.getDate() - 6); cgCut7 = dd.toISOString().slice(0, 10); }
+  const gAdMap = {}, g7dG = {};
+  cgAll.forEach(r => {
+    const key = r.anuncio + '|||' + r.campanha + '|||' + r.grupo;
+    if (cgCut7 && r.data >= cgCut7) g7dG[key] = (g7dG[key] || 0) + (r.gasto || 0);
+    if (datePred && !datePred(r.data)) return;
+    const a = gAdMap[key] || (gAdMap[key] = { anuncio: r.anuncio, campanha: r.campanha || '', grupo: r.grupo || '', gasto: 0, leadsCRM: 0 });
+    a.gasto += r.gasto || 0; a.leadsCRM += r.leads || 0;
+  });
+  const ads = Object.values(gAdMap).filter(a => a.gasto > 0).map(a => {
+    const meta = byAd[a.anuncio] || {};
+    const cpl = a.leadsCRM > 0 ? a.gasto / a.leadsCRM : 0;
+    return { anuncio: a.anuncio, campanha: a.campanha, conjunto: a.grupo, gasto: a.gasto,
+      gasto7d: g7dG[a.anuncio + '|||' + a.campanha + '|||' + a.grupo] || 0,
+      leadsPlat: meta.conversoes_plataforma || 0, leadsCRM: a.leadsCRM, _cpl: cpl, url: meta.url_final,
+      ativo: activeCamps.has(a.campanha), q: qualidadeAds(cpl, a.gasto, a.leadsCRM, TQ) };
   }).sort((x, y) => y.gasto - x.gasto);
   document.getElementById('table-google-ads').innerHTML = ads.map(c => {
     const icon = `<div class="ad-thumb" style="display:flex;align-items:center;justify-content:center;">🔗</div>`;
@@ -4471,7 +4472,7 @@ function renderGoogle() {
       <td>${fmt.currency(c.gasto)}</td>
       <td>${fmt.currency(c.gasto7d)}</td>
       <td>${fmt.num(c.leadsPlat)}</td>
-      <td><strong>${fmt.num(c.leadsCRM)}</strong></td>
+      <td><strong>${fmt.num(Math.round(c.leadsCRM))}</strong></td>
       <td>${c.leadsCRM > 0 ? fmt.currency(c._cpl) : '—'}</td>
       <td><span class="q-badge ${c.q.cls}">${c.q.acao}</span></td>
     </tr>`;
