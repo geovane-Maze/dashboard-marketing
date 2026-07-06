@@ -4372,7 +4372,7 @@ function renderGoogle() {
       <td>${stt(activeCamps.has(name))}</td>
       <td>${ell(name, 220)}</td>
       <td>${fmt.num(d.conv)}</td>
-      <td><strong>${gcStale ? '—' : fmt.num(lc)}</strong></td>
+      <td><strong>${gcStale ? '—' : fmt.num(Math.round(lc))}</strong></td>
       <td>${gcStale ? '—' : (lc > 0 ? fmt.currency(cpl) : '—')}</td>
       <td>${fmt.k(d.impressoes)}</td>
       <td>${fmt.k(d.cliques)}</td>

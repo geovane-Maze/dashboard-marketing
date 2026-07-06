@@ -1721,6 +1721,9 @@ def aggregate_google_ads_creatives(rows, leads_daily_map=None):
     group_daily = defaultdict(lambda: defaultdict(lambda: {"gasto": 0.0, "conv": 0.0, "leads_crm": 0.0}))
     creative_group_daily = defaultdict(lambda: defaultdict(lambda: {"gasto": 0.0, "leads_crm": 0.0}))
     ad_grp_spend = defaultdict(lambda: defaultdict(float))  # (anuncio,dia) -> {(camp,grupo): gasto}
+    daily_raw = []                        # linhas cruas p/ o daily_list (leads rateados depois)
+    spend_ad_day = defaultdict(float)     # (anuncio,dia) -> gasto total (base do rateio)
+    rows_ad_day = defaultdict(int)        # (anuncio,dia) -> nº de linhas (rateio igual se gasto=0)
 
     leads_daily_map = leads_daily_map or {}
 
@@ -1741,22 +1744,23 @@ def aggregate_google_ads_creatives(rows, leads_daily_map=None):
 
         if not nome:
             continue   # resto (nível anúncio/creative) só p/ anúncios com nome
-        # Leads do CRM neste dia para este anúncio (matching prévio)
-        leads_crm = leads_daily_map.get(nome, {}).get(data, 0)
         if grupo_r:
             creative_group_daily[(nome, campanha_r, grupo_r)][data]["gasto"] += gasto
             ad_grp_spend[(nome, data)][(campanha_r, grupo_r)] += gasto
 
-        # Linha flat (data, anuncio) — para Top 5 com filtro de data
-        if gasto > 0 or leads_crm > 0:
-            daily_list.append({
-                "data":     data,
-                "anuncio":  nome,
-                "campanha": r.get("campanha") or "",
-                "tipo":     r.get("tipo") or "",
-                "gasto":    round(gasto, 2),
-                "leads":    leads_crm,   # <-- CRM, fonte de verdade
-            })
+        # Linha flat (data, anuncio) — leads são RATEADOS depois do loop. Com a fonte na API,
+        # o mesmo anúncio aparece em N linhas no mesmo dia (uma por campanha/grupo); atribuir
+        # o total de leads do dia a CADA linha DUPLICAVA (2 campanhas com o mesmo anúncio
+        # somavam 14 leads sendo 7 reais). O rateio é proporcional ao gasto de cada linha.
+        daily_raw.append({
+            "data":     data,
+            "anuncio":  nome,
+            "campanha": r.get("campanha") or "",
+            "tipo":     r.get("tipo") or "",
+            "gasto":    gasto,
+        })
+        spend_ad_day[(nome, data)] += gasto
+        rows_ad_day[(nome, data)] += 1
 
         # Agregado por anuncio
         d = by_ad[nome]
@@ -1771,6 +1775,28 @@ def aggregate_google_ads_creatives(rows, leads_daily_map=None):
             d["primeira_data"] = data
         if data > d["ultima_data"]:
             d["ultima_data"] = data
+
+    # Monta o daily_list com leads RATEADOS por (anuncio, dia): proporcional ao gasto de
+    # cada linha; se o gasto do dia for 0, divide igualmente entre as linhas. Garante que
+    # a soma das linhas = leads reais do dia (sem duplicar por campanha/grupo).
+    for rr in daily_raw:
+        key = (rr["anuncio"], rr["data"])
+        leads_day = leads_daily_map.get(rr["anuncio"], {}).get(rr["data"], 0)
+        if leads_day:
+            tot = spend_ad_day[key]
+            frac = leads_day * (rr["gasto"] / tot) if tot > 0 else leads_day / rows_ad_day[key]
+        else:
+            frac = 0
+        if rr["gasto"] == 0 and frac == 0:
+            continue
+        daily_list.append({
+            "data":     rr["data"],
+            "anuncio":  rr["anuncio"],
+            "campanha": rr["campanha"],
+            "tipo":     rr["tipo"],
+            "gasto":    round(rr["gasto"], 2),
+            "leads":    round(frac, 2),   # <-- CRM rateado (soma das linhas = leads do dia)
+        })
 
     # Soma de leads_crm por anúncio (todos os dias)
     leads_crm_total = {nome: sum(dias.values()) for nome, dias in leads_daily_map.items()}
