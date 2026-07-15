@@ -3199,8 +3199,20 @@ function renderExecutivo() {
         <td style="padding:8px 6px;text-align:right;color:#16a085;">${hasFonte ? fmt.num(s.org) : '—'}</td>
       </tr>`;
     }).join('');
+    // Conciliação leads (marketing) × negócios (CRM): explica na tela por que os
+    // totais diferem — negócio do período pode vir de lead de mês anterior (ex.:
+    // represa da Leadster) e lead recém-chegado pode ainda não ter negócio.
+    let conciliacao = '';
+    if (dealsPeriodo.length && dealsPeriodo.some(d => 'lead_criado' in d)) {
+      const doPeriodo = dealsPeriodo.filter(d => d.lead_criado && (!datePred || datePred(d.lead_criado))).length;
+      const antigos = dealsPeriodo.filter(d => d.lead_criado && datePred && !datePred(d.lead_criado)).length;
+      const semLead = dealsPeriodo.length - doPeriodo - antigos;
+      const leadsSemNegocio = Math.max(0, totalLeadsPeriodo - doPeriodo);
+      conciliacao = `<p style="font-size:11px;color:#475569;margin-top:8px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;">🧾 <strong>Conciliação com o KPI "Total de Leads" (${fmt.num(totalLeadsPeriodo)}):</strong> ${fmt.num(dealsPeriodo.length)} negócios = ${fmt.num(doPeriodo)} de leads do período + ${fmt.num(antigos)} de leads de meses anteriores${semLead > 0 ? ` + ${fmt.num(semLead)} sem lead de marketing identificado` : ''}. E ${fmt.num(leadsSemNegocio)} leads do período ainda não viraram negócio no CRM.</p>`;
+    }
     document.getElementById('exec-funil-conversao').innerHTML =
       `<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead>${head}</thead><tbody>${body}</tbody></table>`
+      + conciliacao
       + `<p style="font-size:10px;color:#999;margin-top:10px;font-style:italic;">Conv. = conversão da etapa anterior · <strong>Pago</strong> = utm Google/Meta · <strong>Orgânico</strong> = demais (inclui importados sem utm)${hasFonte ? '' : ' · <span style="color:#b45309;">fonte disponível após a próxima coleta</span>'}</p>`;
   })();
 

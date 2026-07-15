@@ -871,7 +871,13 @@ def aggregate_crm(deals, leads=None):
         lead = lead_by_email.get(email)
         src = (lead.get("utm_source") if lead else "") or ""
         fonte = "googlecpc" if src == "googlecpc" else ("metaads" if src == "metaads" else "organico")
-        deals_minimal.append({"etapa": etapa, "criado_em": criado, "fonte": fonte})
+        # Data de criação do LEAD que originou o negócio (quando casou por e-mail).
+        # Permite ao front conciliar "leads do período" × "negócios do período":
+        # negócio de julho pode vir de lead de junho (ex.: represa da Leadster) e
+        # lead de julho pode ainda não ter negócio — os totais NÃO são o mesmo recorte.
+        lead_criado = parse_date_to_day(lead.get("criado_em")) if lead else None
+        deals_minimal.append({"etapa": etapa, "criado_em": criado, "fonte": fonte,
+                              "lead_criado": lead_criado})
 
     # ── Perdas: separação pago vs orgânico ───────────────────────────────────
     # Considera-se "pago" qualquer lead cuja utm_source seja googlecpc ou metaads.
