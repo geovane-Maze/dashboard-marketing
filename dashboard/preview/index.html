@@ -1536,7 +1536,7 @@
           <div id="crm-funnel-bars" style="padding: 8px 0;"></div>
         </div>
         <div class="chart-card">
-          <h3>1ª Reunião Agendada por Mês</h3>
+          <h3>1ª Reunião Agendada por Mês <span style="font-size:11px;color:#94a3b8;font-weight:400;">— negócios que chegaram à etapa (ou além), por mês de criação · mesma régua do Funil de Conversão</span></h3>
           <div class="chart-wrap"><canvas id="chart-crm-won"></canvas></div>
         </div>
       </div>
@@ -3611,13 +3611,33 @@ function renderCRM() {
     { label: 'No-Show 2ª Reunião',            value: fmt.num(r2NS),                    sub: 'campo 2ª Reunião = Não',          cls: 'red'    },
   ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
 
-  // Funnel bars — usa active_funnel, reordenado pela ordem oficial do funil
-  const crmFunnel  = (crm.active_funnel || []).slice()
-    .sort((a, b) => funnelSortIndex(a.etapa) - funnelSortIndex(b.etapa));
+  // Funnel bars — etapa ATUAL dos negócios ABERTOS, RESPEITANDO o filtro de período
+  // (deals_minimal com `st`). Antes usava o active_funnel GLOBAL, que ignorava o filtro
+  // — com jul selecionado mostrava 16 na 1ª Reunião Agendada (todos os abertos da
+  // história) enquanto os outros gráficos mostravam só o período. Fallback: dado
+  // antigo sem `st` mantém o comportamento global.
+  const nbPred = getDateFilter();
+  const dmNB = crm.deals_minimal || [];
+  const nbTemSt = dmNB.some(d => 'st' in d);
+  let crmFunnel, nbSub;
+  if (nbTemSt) {
+    const nbCnt = {};
+    dmNB.filter(d => d.st === 'aberto' && (!nbPred || nbPred(d.criado_em)))
+        .forEach(d => { nbCnt[d.etapa] = (nbCnt[d.etapa] || 0) + 1; });
+    crmFunnel = Object.entries(nbCnt).map(([etapa, total]) => ({ etapa, total }))
+      .sort((a, b) => funnelSortIndex(a.etapa) - funnelSortIndex(b.etapa));
+    nbSub = nbPred
+      ? 'Etapa ATUAL dos negócios abertos criados no período — quem avançou conta na etapa onde está hoje; ganhos/perdidos ficam de fora (por isso difere do funil "chegaram à etapa").'
+      : 'Etapa ATUAL de todos os negócios abertos.';
+  } else {
+    crmFunnel = (crm.active_funnel || []).slice()
+      .sort((a, b) => funnelSortIndex(a.etapa) - funnelSortIndex(b.etapa));
+    nbSub = 'Etapa ATUAL de todos os negócios abertos (histórico — dado sem filtro de período; atualize o ETL).';
+  }
   const crmMax     = Math.max(...crmFunnel.map(s => s.total), 1);
-  const crmTotal   = crm.total_active || crmFunnel.reduce((a, s) => a + s.total, 0) || 1;
+  const crmTotal   = crmFunnel.reduce((a, s) => a + s.total, 0) || 1;
 
-  document.getElementById('crm-funnel-bars').innerHTML = crmFunnel.length
+  document.getElementById('crm-funnel-bars').innerHTML = `<p style="font-size:10.5px;color:#94a3b8;margin:0 0 8px;font-style:italic;">${nbSub}</p>` + (crmFunnel.length
     ? crmFunnel.map(s => {
         const pctBar   = (s.total / crmMax * 100).toFixed(1);   // largura da barra
         const pctLabel = (s.total / crmMax * 100).toFixed(1);   // % exibida (maior etapa = 100%)
@@ -3632,7 +3652,7 @@ function renderCRM() {
       </div>
     </div>`;
       }).join('')
-    : '<p style="color:#999;padding:1rem">Sem negócios ativos</p>';
+    : '<p style="color:#999;padding:1rem">Sem negócios ativos no período</p>');
 
   // ── Mega-funil de conversão do CRM ─────────────────────────────────────────
   (function renderCrmMegaFunnel() {
@@ -3705,13 +3725,43 @@ function renderCRM() {
     if (lbl) lbl.textContent = (sv || ev) ? `${fmtBR(sv) || 'início'} → ${fmtBR(ev) || 'hoje'}` : 'todo o histórico';
   })();
 
-  // Won by month
-  const reuniaoMensal = filterMonthly(DATA.crm.monthly_stages || [], pred);
+  // 1ª Reunião Agendada por Mês — negócios que CHEGARAM à etapa (ou além), por mês
+  // de criação. MESMA régua do "Funil de Conversão" (etapa atual >= 1ª R. Agendada),
+  // pra os números baterem entre os gráficos. Antes contava só quem ESTÁ na etapa
+  // (quem avançava sumia da barra: jul mostrava 11 enquanto o funil mostrava 14).
+  // Fallback: monthly_stages (régua antiga) se o dado ainda não tiver deals_minimal.
+  const RA_STAGES = ['entrada de lead', 'tentativa de contato', 'qualificação', 'qualificado não agendada', '1ª reunião agendada', '1ª reunião realizada', 'reunião de bp agendada', 'reunião de bp realizada', 'envio de cof', 'visita / reunião com jamil', 'análise financeira/jurídica', 'comitê final'];
+  const raIdx = (e) => {
+    const el = (e || '').toLowerCase().trim();
+    for (let i = 0; i < RA_STAGES.length; i++) {
+      const s = RA_STAGES[i];
+      if (el === s || el.includes(s) || s.includes(el)) return i;
+    }
+    return -1;
+  };
+  let raLabels, raData;
+  const dmRA = crm.deals_minimal || [];
+  if (dmRA.length) {
+    const raByM = {};
+    dmRA.forEach(d => {
+      if (raIdx(d.etapa) >= 4) {
+        const m = (d.criado_em || '').slice(0, 7);
+        if (m) raByM[m] = (raByM[m] || 0) + 1;
+      }
+    });
+    const raMeses = Object.keys(raByM).sort().filter(m => !pred || pred(m));
+    raLabels = raMeses.map(mesLabel);
+    raData = raMeses.map(m => raByM[m]);
+  } else {
+    const reuniaoMensal = filterMonthly(DATA.crm.monthly_stages || [], pred);
+    raLabels = reuniaoMensal.map(r => mesLabel(r.mes));
+    raData = reuniaoMensal.map(r => r.reuniao_agendada || r.reuniao_pdf || 0);
+  }
   makeChart('chart-crm-won', {
     type: 'bar',
     data: {
-      labels: reuniaoMensal.map(r => mesLabel(r.mes)),
-      datasets: [{ label: '1ª Reunião Agendada', data: reuniaoMensal.map(r => r.reuniao_agendada || r.reuniao_pdf || 0), backgroundColor: COLORS.orange + 'CC', borderRadius: 4 }]
+      labels: raLabels,
+      datasets: [{ label: '1ª Reunião Agendada (chegaram à etapa)', data: raData, backgroundColor: COLORS.orange + 'CC', borderRadius: 4 }]
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
   });

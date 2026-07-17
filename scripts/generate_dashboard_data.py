@@ -876,8 +876,18 @@ def aggregate_crm(deals, leads=None):
         # negócio de julho pode vir de lead de junho (ex.: represa da Leadster) e
         # lead de julho pode ainda não ter negócio — os totais NÃO são o mesmo recorte.
         lead_criado = parse_date_to_day(lead.get("criado_em")) if lead else None
+        # Status do negócio (mesma regra do C3: win=false conta como perda mesmo sem
+        # motivo). Permite ao front montar "Negócios por Etapa" (abertos) RESPEITANDO
+        # o filtro de período — antes usava o active_funnel global, que ignorava o filtro.
+        g = str(deal.get("ganho") or "").lower()
+        if g in ("true", "1", "sim", "yes"):
+            st = "ganho"
+        elif bool(deal.get("motivo_perda")) or g in ("false", "0", "nao", "não", "no"):
+            st = "perdido"
+        else:
+            st = "aberto"
         deals_minimal.append({"etapa": etapa, "criado_em": criado, "fonte": fonte,
-                              "lead_criado": lead_criado})
+                              "lead_criado": lead_criado, "st": st})
 
     # ── Perdas: separação pago vs orgânico ───────────────────────────────────
     # Considera-se "pago" qualquer lead cuja utm_source seja googlecpc ou metaads.
