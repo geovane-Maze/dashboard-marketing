@@ -9,7 +9,7 @@ import os
 import re
 import sys
 import unicodedata
-from collections import defaultdict
+from collections import defaultdict, Counter
 from datetime import datetime
 
 import gspread
@@ -121,6 +121,69 @@ def _jaccard(a, b):
     if not a or not b:
         return 0.0
     return len(a & b) / len(a | b)
+
+def infer_utm_source_quebrada(leads, meta_rows, google_rows):
+    """
+    Recupera a utm_source de leads cujo LINK da campanha veio QUEBRADO:
+    '?%20utm_source=googlecpc&utm_medium=...' — o '%20' (espaço) corrompe o NOME do
+    1º parâmetro, então o RD grava utm_source VAZIA mas utm_medium/campaign/term/
+    content chegam preenchidos (descoberto pelo Geovane em 17/07/2026; ex.: campanha
+    DG.Grupo.Por.Cidade, 16 leads, todos Google/gclid). Sem isso, lead PAGO cai
+    como "orgânico" e some da atribuição por campanha.
+
+    Preenche a fonte SÓ com evidência inequívoca, nesta ordem:
+      1) votos: outros leads da MESMA utm_campaign com fonte paga conhecida (unânime);
+      2) fallback: containment de tokens da utm_campaign nos NOMES de campanha das
+         plataformas (google_ads/meta_ads) — ex.: 'DG.Grupo.Por.Cidade' cobre 100%
+         dos tokens de '[DG] - [GRUPO POR CIDADE] - [SP]...' (Google).
+    Links já foram corrigidos na origem; isto conserta o HISTÓRICO e cobre recaídas.
+    """
+    votos = defaultdict(Counter)
+    for l in leads:
+        s = (l.get("utm_source") or "").strip()
+        c = (l.get("utm_campaign") or "").strip()
+        if c and s in ("googlecpc", "metaads"):
+            votos[c][s] += 1
+
+    g_pool = [_tokens(r.get("campanha") or "") for r in (google_rows or [])]
+    m_pool = [_tokens(r.get("campanha") or "") for r in (meta_rows or [])]
+
+    def cobertura(tc, pool):
+        best = 0.0
+        for ts in pool:
+            if ts:
+                best = max(best, len(tc & ts) / len(tc))
+        return best
+
+    n, por_fonte, cache = 0, Counter(), {}
+    for l in leads:
+        if (l.get("utm_source") or "").strip():
+            continue
+        c = (l.get("utm_campaign") or "").strip()
+        if not c:
+            continue   # sem campanha não há evidência — fica como está (orgânico)
+        if c not in cache:
+            fonte = None
+            v = votos.get(c)
+            if v and len(v) == 1:
+                fonte = next(iter(v))
+            else:
+                tc = _tokens(c)
+                if tc:
+                    gs, ms = cobertura(tc, g_pool), cobertura(tc, m_pool)
+                    if gs >= 0.6 and gs > ms:
+                        fonte = "googlecpc"
+                    elif ms >= 0.6 and ms > gs:
+                        fonte = "metaads"
+            cache[c] = fonte
+        if cache[c]:
+            l["utm_source"] = cache[c]
+            n += 1
+            por_fonte[cache[c]] += 1
+    if n:
+        print(f"  UTM quebrada recuperada pela campanha: {n} leads -> {dict(por_fonte)}")
+    return leads
+
 
 def match_rd_leads_daily(meta_rows, google_creatives_rows, leads, threshold=0.4):
     """
@@ -2507,6 +2570,12 @@ def main():
 
     print("  Lendo Google Ads...")
     google_ads = read_sheet(gc, "google_ads")
+
+    # Recupera utm_source de leads com link quebrado ('%20utm_source') — ver docstring.
+    # Roda APÓS o backfill (que só preenche quem não tem fonte) e ANTES de todas as
+    # agregações/matching, então o lead recuperado conta como pago E entra na
+    # atribuição por campanha/anúncio (tem utm_campaign/content).
+    leads = infer_utm_source_quebrada(leads, meta_ads, google_ads)
 
     print("  Lendo GA4...")
     ga4 = read_sheet(gc, "ga4_sessions")
