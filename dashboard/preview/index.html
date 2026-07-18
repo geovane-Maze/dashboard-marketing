@@ -1695,9 +1695,13 @@
     <!-- META ADS -->
     <div id="sec-meta" class="section">
       <div class="section-title" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">Meta Ads
-        <select id="meta-camp-filter" onchange="metaCampSel=this.value;renderMeta()"
-          style="font-size:13px;font-weight:400;padding:6px 10px;border:1px solid var(--border);border-radius:8px;max-width:420px;color:var(--text);background:var(--bg-card,#fff);"
-          title="Só campanhas com gasto no período selecionado no topo"></select>
+        <div class="criat-camp-wrap" style="font-size:13px;font-weight:400;" title="Só campanhas com gasto no período selecionado no topo">
+          <div class="criat-camp-trigger" onclick="toggleCampFilter(event,'meta')">
+            <span class="criat-camp-label" id="meta-camp-label">Todas as campanhas do período</span>
+            <span style="opacity:0.45;font-size:11px;">▾</span>
+          </div>
+          <div class="criat-camp-list" id="meta-camp-list" style="min-width:430px;" onclick="campFilterClick(event,'meta')"></div>
+        </div>
       </div>
       <div class="kpi-grid" id="kpi-meta"></div>
 
@@ -1755,9 +1759,13 @@
     <!-- GOOGLE ADS -->
     <div id="sec-google" class="section">
       <div class="section-title" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">Google Ads
-        <select id="google-camp-filter" onchange="googleCampSel=this.value;renderGoogle()"
-          style="font-size:13px;font-weight:400;padding:6px 10px;border:1px solid var(--border);border-radius:8px;max-width:420px;color:var(--text);background:var(--bg-card,#fff);"
-          title="Só campanhas com gasto no período selecionado no topo"></select>
+        <div class="criat-camp-wrap" style="font-size:13px;font-weight:400;" title="Só campanhas com gasto no período selecionado no topo">
+          <div class="criat-camp-trigger" onclick="toggleCampFilter(event,'google')">
+            <span class="criat-camp-label" id="google-camp-label">Todas as campanhas do período</span>
+            <span style="opacity:0.45;font-size:11px;">▾</span>
+          </div>
+          <div class="criat-camp-list" id="google-camp-list" style="min-width:430px;" onclick="campFilterClick(event,'google')"></div>
+        </div>
       </div>
       <div class="kpi-grid" id="kpi-google"></div>
 
@@ -1997,9 +2005,34 @@ let CHARTS = {};
 let activeCampTab = 'meta';
 let selectedMeta = new Set();
 let selectedGoogle = new Set();
-// Filtro local de campanha das páginas Meta Ads / Google Ads (dropdown no título)
+// Filtro local de campanha das páginas Meta Ads / Google Ads (dropdown no título,
+// com badge de STATUS real por campanha). Opções reconstruídas a cada render.
 let metaCampSel = 'all';
 let googleCampSel = 'all';
+const _campFilterOpts = { meta: [], google: [] };
+
+function toggleCampFilter(e, which) {
+  e.stopPropagation();
+  document.querySelectorAll('.criat-camp-list.open').forEach(l => { if (l.id !== which + '-camp-list') l.classList.remove('open'); });
+  const el = document.getElementById(which + '-camp-list');
+  if (el) el.classList.toggle('open');
+}
+function campFilterClick(e, which) {
+  e.stopPropagation();
+  const item = e.target.closest('.criat-camp-item');
+  if (!item) return;
+  const idx = parseInt(item.dataset.idx);
+  const name = _campFilterOpts[which][idx];
+  const val = (!name || name === '__all__') ? 'all' : name;
+  const list = document.getElementById(which + '-camp-list');
+  if (list) list.classList.remove('open');
+  if (which === 'meta') { metaCampSel = val; renderMeta(); }
+  else { googleCampSel = val; renderGoogle(); }
+}
+// Fecha os dropdowns ao clicar fora
+document.addEventListener('click', () => {
+  document.querySelectorAll('.criat-camp-list.open').forEach(l => l.classList.remove('open'));
+});
 const COLORS = {
   primary: '#0D3B66', secondary: '#3FA9F5',
   green: '#22C55E', red: '#EF4444', orange: '#F59E0B',
@@ -4188,12 +4221,19 @@ function renderMeta() {
     c.leadsPlat += r.leads_plat || 0; c.leadsCRM += r.leads || 0;
   });
   const camps = Object.entries(campMap).filter(([, d]) => d.gasto > 0 || d.leadsCRM > 0).sort((a, b) => b[1].gasto - a[1].gasto);
-  const mcSelEl = document.getElementById('meta-camp-filter');
-  if (mcSelEl) {
+  const mcListEl = document.getElementById('meta-camp-list');
+  if (mcListEl) {
     if (metaCampSel !== 'all' && !camps.some(([n]) => n === metaCampSel)) metaCampSel = 'all';
-    mcSelEl.innerHTML = `<option value="all">Todas as campanhas do período (${camps.length})</option>`
-      + camps.map(([n]) => `<option value="${esc(n)}"${n === metaCampSel ? ' selected' : ''}>${esc(n.length > 58 ? n.slice(0, 58) + '…' : n)}</option>`).join('');
-    mcSelEl.value = metaCampSel;
+    _campFilterOpts.meta = ['__all__', ...camps.map(([n]) => n)];
+    const tagOf = (n) => statusReal
+      ? (activeCamps.has(n) ? '<span class="tag-ativo">Ativo</span>' : '<span class="tag-pausado">Pausado</span>')
+      : '<span class="tag-desconhecido">—</span>';
+    mcListEl.innerHTML = _campFilterOpts.meta.map((n, i) => n === '__all__'
+      ? `<div class="criat-camp-item${metaCampSel === 'all' ? ' selected' : ''}" data-idx="0"><span class="camp-name-text" style="font-weight:700;">Todas as campanhas do período (${camps.length})</span></div>`
+      : `<div class="criat-camp-item${metaCampSel === n ? ' selected' : ''}" data-idx="${i}">${tagOf(n)}<span class="camp-name-text" title="${esc(n)}">${esc(n.length > 52 ? n.slice(0, 52) + '…' : n)}</span></div>`).join('');
+    document.getElementById('meta-camp-label').textContent = metaCampSel === 'all'
+      ? `Todas as campanhas do período (${camps.length})`
+      : (metaCampSel.length > 40 ? metaCampSel.slice(0, 40) + '…' : metaCampSel);
   }
   const campSel = metaCampSel === 'all' ? null : metaCampSel;
 
@@ -4421,12 +4461,19 @@ function renderGoogle() {
     });
   }
   const campsAll = Object.entries(campMap).filter(([, d]) => d.gasto > 0).sort((a, b) => b[1].gasto - a[1].gasto);
-  const gSelEl = document.getElementById('google-camp-filter');
-  if (gSelEl) {
+  const gListEl = document.getElementById('google-camp-list');
+  if (gListEl) {
     if (googleCampSel !== 'all' && !campsAll.some(([n]) => n === googleCampSel)) googleCampSel = 'all';
-    gSelEl.innerHTML = `<option value="all">Todas as campanhas do período (${campsAll.length})</option>`
-      + campsAll.map(([n]) => `<option value="${esc(n)}"${n === googleCampSel ? ' selected' : ''}>${esc(n.length > 58 ? n.slice(0, 58) + '…' : n)}</option>`).join('');
-    gSelEl.value = googleCampSel;
+    _campFilterOpts.google = ['__all__', ...campsAll.map(([n]) => n)];
+    const tagOf = (n) => statusReal
+      ? (activeCamps.has(n) ? '<span class="tag-ativo">Ativo</span>' : '<span class="tag-pausado">Pausado</span>')
+      : '<span class="tag-desconhecido">—</span>';
+    gListEl.innerHTML = _campFilterOpts.google.map((n, i) => n === '__all__'
+      ? `<div class="criat-camp-item${googleCampSel === 'all' ? ' selected' : ''}" data-idx="0"><span class="camp-name-text" style="font-weight:700;">Todas as campanhas do período (${campsAll.length})</span></div>`
+      : `<div class="criat-camp-item${googleCampSel === n ? ' selected' : ''}" data-idx="${i}">${tagOf(n)}<span class="camp-name-text" title="${esc(n)}">${esc(n.length > 52 ? n.slice(0, 52) + '…' : n)}</span></div>`).join('');
+    document.getElementById('google-camp-label').textContent = googleCampSel === 'all'
+      ? `Todas as campanhas do período (${campsAll.length})`
+      : (googleCampSel.length > 40 ? googleCampSel.slice(0, 40) + '…' : googleCampSel);
   }
   const campSel = googleCampSel === 'all' ? null : googleCampSel;
 
