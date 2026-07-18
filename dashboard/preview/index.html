@@ -1745,6 +1745,61 @@
         <h3>Resumo e Próximos Passos</h3>
         <div id="meta-resumo" style="font-size:13px;line-height:1.6;color:var(--text);padding:4px 2px;"></div>
       </div>
+
+      <!-- 6. Galeria de Criativos (movida da página Criativos) -->
+      <div class="section-title" style="font-size:18px;margin-top:24px;">🎨 Galeria de Criativos</div>
+      <div class="filter-group" style="margin-bottom:20px;flex-wrap:wrap;gap:10px;align-items:center;">
+        <label>Período</label>
+        <input type="date" id="criat-from"
+          style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
+        <span style="font-size:13px;color:var(--text-secondary)">até</span>
+        <input type="date" id="criat-to"
+          style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
+
+        <label style="margin-left:8px;">Campanha</label>
+        <div class="criat-camp-wrap" id="criat-camp-wrap">
+          <div class="criat-camp-trigger" id="criat-camp-trigger" onclick="toggleCriatCamp(event)">
+            <span class="criat-camp-label" id="criat-camp-label">Todas as campanhas</span>
+            <span style="opacity:0.45;font-size:11px;">▾</span>
+          </div>
+          <div class="criat-camp-list" id="criat-camp-list" onclick="criatCampClick(event)"></div>
+        </div>
+
+        <label style="margin-left:8px;">Status</label>
+        <select id="criat-status">
+          <option value="all" selected>Todos</option>
+          <option value="ativo">Ativo</option>
+          <option value="pausado">Pausado</option>
+        </select>
+
+        <label style="margin-left:8px;">Ordenar por</label>
+        <select id="creative-sort">
+          <option value="gasto">Maior Gasto</option>
+          <option value="leads">Mais Leads</option>
+          <option value="cpl_asc">Menor CPL</option>
+          <option value="ctr">Maior CTR</option>
+        </select>
+
+        <button onclick="renderMetaGallery()" style="
+          margin-left:8px; padding:7px 20px; background:var(--primary); color:#fff;
+          border:none; border-radius:6px; font-size:13px; font-weight:600;
+          cursor:pointer; white-space:nowrap;">
+          Aplicar
+        </button>
+      </div>
+      <div class="table-card">
+        <h3>Top Criativos Meta por Performance</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Criativo</th><th>Campanha</th><th>Ad Set Name</th><th>Ad Name</th>
+              <th>Status</th><th>Gasto</th>
+              <th>Leads</th><th>CPL</th><th>Impressões</th><th>CTR</th>
+            </tr>
+          </thead>
+          <tbody id="table-creatives"></tbody>
+        </table>
+      </div>
     </div>
 
     <!-- GOOGLE ADS -->
@@ -1800,6 +1855,19 @@
         <h3>Resumo e Próximos Passos</h3>
         <div id="google-resumo" style="font-size:13px;line-height:1.6;color:var(--text);padding:4px 2px;"></div>
       </div>
+
+      <!-- 6. Galeria de Anúncios (movida da página Criativos) -->
+      <div class="section-title" style="font-size:18px;margin-top:24px;">🎨 Galeria de Anúncios</div>
+      <div class="filter-group" style="margin-bottom:12px;flex-wrap:wrap;gap:10px;align-items:center;">
+        <span style="font-size:12px;color:var(--text-secondary);">Período: usa o filtro do topo da página.</span>
+        <label style="margin-left:8px;">Ordenar por</label>
+        <select id="gc-sort" onchange="renderGoogleGallery()">
+          <option value="gasto">Maior Gasto</option>
+          <option value="leads">Mais Leads</option>
+          <option value="cpl_asc">Menor CPL</option>
+        </select>
+      </div>
+      <div id="google-creatives-content"></div>
     </div>
 
     <!-- CRIATIVOS -->
@@ -1812,7 +1880,7 @@
         <p style="font-size:11px;color:#92400E;margin:0 0 12px;">
           Mistura criativos de Meta Ads + Google Ads, ranqueado por <strong>volume de leads do CRM</strong>
           (RD Station, via matching utm_content ↔ anúncio). <strong>Não</strong> usa números das plataformas.
-          Filtra pelo período selecionado abaixo.
+          Filtra pelo período selecionado no topo da página.
         </p>
         <div id="top5-criativos-grid" class="criativos-mes-grid"></div>
       </div>
@@ -1850,68 +1918,10 @@
         </p>
       </div>
 
-      <!-- 🟦 META ADS — filtros + tabela existente -->
-      <div class="section-title" style="font-size:18px;margin-top:24px;">🟦 Meta Ads</div>
-      <div class="filter-group" style="margin-bottom:20px;flex-wrap:wrap;gap:10px;align-items:center;">
-        <label>Período</label>
-        <input type="date" id="criat-from"
-          style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
-        <span style="font-size:13px;color:var(--text-secondary)">até</span>
-        <input type="date" id="criat-to"
-          style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;">
-
-        <label style="margin-left:8px;">Campanha</label>
-        <div class="criat-camp-wrap" id="criat-camp-wrap">
-          <div class="criat-camp-trigger" id="criat-camp-trigger" onclick="toggleCriatCamp(event)">
-            <span class="criat-camp-label" id="criat-camp-label">Todas as campanhas</span>
-            <span style="opacity:0.45;font-size:11px;">▾</span>
-          </div>
-          <div class="criat-camp-list" id="criat-camp-list" onclick="criatCampClick(event)"></div>
-        </div>
-
-        <label style="margin-left:8px;">Status</label>
-        <select id="criat-status">
-          <option value="all" selected>Todos</option>
-          <option value="ativo">Ativo</option>
-          <option value="pausado">Pausado</option>
-        </select>
-
-        <label style="margin-left:8px;">Ordenar por</label>
-        <select id="creative-sort">
-          <option value="gasto">Maior Gasto</option>
-          <option value="leads">Mais Leads</option>
-          <option value="cpl_asc">Menor CPL</option>
-          <option value="ctr">Maior CTR</option>
-        </select>
-
-        <button onclick="renderCreatives()" style="
-          margin-left:8px; padding:7px 20px; background:var(--primary); color:#fff;
-          border:none; border-radius:6px; font-size:13px; font-weight:600;
-          cursor:pointer; white-space:nowrap;">
-          Aplicar
-        </button>
-      </div>
-      <div class="table-card">
-        <h3>Top Criativos Meta por Performance</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>Criativo</th><th>Campanha</th><th>Ad Set Name</th><th>Ad Name</th>
-              <th>Status</th><th>Gasto</th>
-              <th>Leads</th><th>CPL</th><th>Impressões</th><th>CTR</th>
-            </tr>
-          </thead>
-          <tbody id="table-creatives"></tbody>
-        </table>
-      </div>
-
-      <!-- 🟧 GOOGLE ADS — Criativos textuais (sem thumbnail por limitação da planilha) -->
-      <div class="section-title" style="font-size:18px;margin-top:32px;">🟧 Google Ads</div>
-      <p style="font-size:11px;color:#666;margin:0 0 16px;">
-        Anúncios do Google Ads (sem preview visual — a planilha exportada não traz URLs de imagem/vídeo).
-        Quando a integração via API for aprovada pelo Google, esta seção ganhará thumbnails.
+      <p style="font-size:11px;color:#94a3b8;margin:8px 0 0;font-style:italic;">
+        As galerias completas de criativos agora vivem nas páginas de cada plataforma:
+        <strong>Meta Ads → 🎨 Galeria de Criativos</strong> e <strong>Google Ads → 🎨 Galeria de Anúncios</strong>.
       </p>
-      <div id="google-creatives-content"></div>
     </div>
 
     <!-- UTM / ATRIBUIÇÃO -->
@@ -4393,6 +4403,9 @@ function renderMeta() {
 
   // ── 5. RESUMO E PRÓXIMOS PASSOS (automático) ──
   document.getElementById('meta-resumo').innerHTML = buildAdsResumo('Meta Ads', { tGasto, tLeadsCRM, kCpl, kCtr, tImpr, tCliques, T, TQ, nCamps: camps.length, adsets, ads });
+
+  // 6. Galeria de Criativos (movida da página Criativos)
+  renderMetaGallery();
 }
 
 // ─── SECTION: GOOGLE ADS ──────────────────────────────────────────────────────
@@ -4587,6 +4600,9 @@ function renderGoogle() {
 
   // ── 5. RESUMO E PRÓXIMOS PASSOS (automático) ──
   document.getElementById('google-resumo').innerHTML = buildAdsResumo('Google Ads', { tGasto, tLeadsCRM, kCpl, kCtr, tImpr, tCliques, T, TQ, nCamps: camps.length, adsets: grupos, ads, unidade: 'Grupos', unidadeS: 'grupo' });
+
+  // 6. Galeria de Anúncios (movida da página Criativos)
+  renderGoogleGallery();
 }
 
 // ─── SECTION: CRIATIVOS ───────────────────────────────────────────────────────
@@ -4618,7 +4634,7 @@ function criatCampClick(e) {
     : (selectedCreativeCamp.length > 38 ? selectedCreativeCamp.slice(0, 38) + '…' : selectedCreativeCamp);
   document.getElementById('criat-camp-label').textContent = label;
   document.getElementById('criat-camp-list').classList.remove('open');
-  renderCreatives();
+  renderMetaGallery();
 }
 
 // Campanhas ativas Meta. Preferência: STATUS REAL da API (meta_ads.campaign_status,
@@ -4691,34 +4707,21 @@ function populateCriatCampDropdown(activeCamps, periodCamps) {
 }
 
 function renderCreatives() {
-  const sort       = document.getElementById('creative-sort').value;
-  const statusFilt = document.getElementById('criat-status').value;
-  const fromVal    = document.getElementById('criat-from').value;
-  const toVal      = document.getElementById('criat-to').value;
+  // Página Criativos: só Top 5 (período GLOBAL do topo) + Qualidade de Lead.
+  // As galerias por plataforma moveram p/ as páginas Meta Ads (renderMetaGallery)
+  // e Google Ads (renderGoogleGallery).
+  const datePred = getDateFilter();
+  const dateInRange = (data) => !datePred || datePred(data);
 
-  const fromMonth = fromVal ? fromVal.slice(0, 7) : null;
-  const toMonth   = toVal   ? toVal.slice(0, 7)   : null;
-
-  // Predicate de data baseado nos filtros da seção (criat-from / criat-to)
-  const dateInRange = (data) => {
-    if (!data) return false;
-    if (fromVal && data < fromVal) return false;
-    if (toVal && data > toVal) return false;
-    return true;
-  };
-
-  // Label do período pro Top 5
+  // Label do período pro Top 5 (mesmo padrão das outras seções: filtro do topo)
   const fmtDt = (s) => s ? s.split('-').reverse().join('/') : '';
-  const periodLabel = (fromVal || toVal)
-    ? `${fmtDt(fromVal) || 'início'} → ${fmtDt(toVal) || 'hoje'}`
+  const sv = document.getElementById('filter-date-start').value;
+  const ev = document.getElementById('filter-date-end').value;
+  const periodLabel = (sv || ev)
+    ? `${fmtDt(sv) || 'início'} → ${fmtDt(ev) || 'hoje'}`
     : 'todo o histórico';
   const top5Label = document.getElementById('top5-period-label');
   if (top5Label) top5Label.textContent = periodLabel;
-
-  // Campanhas ativas (últimos 2 meses) para tags no dropdown e coluna Status
-  const activeCamps = getActiveCampaigns();
-  const periodCamps = getPeriodCampaigns(fromMonth, toMonth);
-  populateCriatCampDropdown(activeCamps, periodCamps);
 
   // ════════════════════════════════════════════════════════════════════
   // 1) TOP 5 CRIATIVOS DO PERÍODO (Meta + Google mixed)
@@ -4728,7 +4731,7 @@ function renderCreatives() {
   // plataforma Meta nem "conversões" do Google — fonte de verdade.
   const metaByAd = {};
   (DATA.meta_ads.creatives_daily || [])
-    .filter(r => !fromVal && !toVal ? true : dateInRange(r.data))
+    .filter(r => dateInRange(r.data))
     .forEach(r => {
       const k = r.anuncio;
       if (!metaByAd[k]) metaByAd[k] = { volume: 0, gasto: 0 };
@@ -4738,7 +4741,7 @@ function renderCreatives() {
 
   const googleByAd = {};
   (DATA.google_ads_creatives?.daily || [])
-    .filter(r => !fromVal && !toVal ? true : dateInRange(r.data))
+    .filter(r => dateInRange(r.data))
     .forEach(r => {
       const k = r.anuncio;
       if (!googleByAd[k]) googleByAd[k] = { volume: 0, gasto: 0, campanha: r.campanha || '', tipo: r.tipo || '' };
@@ -4807,9 +4810,22 @@ function renderCreatives() {
       }).join('')
     : '<p style="color:#92400E;font-size:12px;padding:8px;">Sem criativos com volume no período selecionado.</p>';
 
-  // ════════════════════════════════════════════════════════════════════
-  // 2) META ADS — Tabela existente (com filtros próprios)
-  // ════════════════════════════════════════════════════════════════════
+  _renderCreativeQuality();
+}
+
+// ── Galeria de Criativos Meta (página Meta Ads) — filtros próprios da galeria ──
+function renderMetaGallery() {
+  if (!document.getElementById('table-creatives')) return;
+  const sort       = document.getElementById('creative-sort').value;
+  const statusFilt = document.getElementById('criat-status').value;
+  const fromVal    = document.getElementById('criat-from').value;
+  const toVal      = document.getElementById('criat-to').value;
+  const fromMonth  = fromVal ? fromVal.slice(0, 7) : null;
+  const toMonth    = toVal   ? toVal.slice(0, 7)   : null;
+  const activeCamps = getActiveCampaigns();
+  const periodCamps = getPeriodCampaigns(fromMonth, toMonth);
+  populateCriatCampDropdown(activeCamps, periodCamps);
+
   let creatives = [...DATA.meta_ads.creatives];
 
   if (selectedCreativeCamp !== 'all') {
@@ -4853,14 +4869,19 @@ function renderCreatives() {
       <td>${fmt.pct(c.ctr)}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="10" class="empty">Sem criativos no período</td></tr>';
+}
 
-  // ════════════════════════════════════════════════════════════════════
-  // 3) GOOGLE ADS — Cards textuais (sem thumbnail)
-  // ════════════════════════════════════════════════════════════════════
-  // Aggrega criativos Google filtrados por data — `leads` é do CRM (RD Station)
+// ── Galeria de Anúncios Google (página Google Ads) ──
+// Período = filtro GLOBAL do topo; ordenação própria (select gc-sort).
+// `leads` é do CRM (matching utm_content ↔ anúncio), não conversões da plataforma.
+function renderGoogleGallery() {
+  if (!document.getElementById('google-creatives-content')) return;
+  const datePred = getDateFilter();
+  const sortSel = document.getElementById('gc-sort');
+  const sort = sortSel ? sortSel.value : 'gasto';
   const googleCardsByAd = {};
   (DATA.google_ads_creatives?.daily || [])
-    .filter(r => !fromVal && !toVal ? true : dateInRange(r.data))
+    .filter(r => !datePred || datePred(r.data))
     .forEach(r => {
       const k = r.anuncio;
       if (!googleCardsByAd[k]) googleCardsByAd[k] = { gasto: 0, leads: 0 };
@@ -4933,10 +4954,10 @@ function renderCreatives() {
           </div>
         </div>`).join('')}</div>`
     : '<p style="color:#999;font-size:13px;padding:16px;">Sem criativos Google no período selecionado.</p>';
+}
 
-  // ════════════════════════════════════════════════════════════════════
-  // 4) CRIATIVOS POR QUALIDADE DE LEAD (atinge etapas qualificadas no CRM)
-  // ════════════════════════════════════════════════════════════════════
+// ── Tabela "Top Criativos por QUALIDADE de Lead" (página Criativos, todo o histórico) ──
+function _renderCreativeQuality() {
   const qualityList = DATA.creative_quality || [];
   const qualBody = document.getElementById('creative-quality-body');
   if (qualBody) {
