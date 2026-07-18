@@ -1694,7 +1694,11 @@
 
     <!-- META ADS -->
     <div id="sec-meta" class="section">
-      <div class="section-title">Meta Ads</div>
+      <div class="section-title" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">Meta Ads
+        <select id="meta-camp-filter" onchange="metaCampSel=this.value;renderMeta()"
+          style="font-size:13px;font-weight:400;padding:6px 10px;border:1px solid var(--border);border-radius:8px;max-width:420px;color:var(--text);background:var(--bg-card,#fff);"
+          title="Só campanhas com gasto no período selecionado no topo"></select>
+      </div>
       <div class="kpi-grid" id="kpi-meta"></div>
 
       <!-- 1. Campanhas ativas -->
@@ -1750,7 +1754,11 @@
 
     <!-- GOOGLE ADS -->
     <div id="sec-google" class="section">
-      <div class="section-title">Google Ads</div>
+      <div class="section-title" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">Google Ads
+        <select id="google-camp-filter" onchange="googleCampSel=this.value;renderGoogle()"
+          style="font-size:13px;font-weight:400;padding:6px 10px;border:1px solid var(--border);border-radius:8px;max-width:420px;color:var(--text);background:var(--bg-card,#fff);"
+          title="Só campanhas com gasto no período selecionado no topo"></select>
+      </div>
       <div class="kpi-grid" id="kpi-google"></div>
 
       <!-- 1. Campanhas ativas -->
@@ -1989,6 +1997,9 @@ let CHARTS = {};
 let activeCampTab = 'meta';
 let selectedMeta = new Set();
 let selectedGoogle = new Set();
+// Filtro local de campanha das páginas Meta Ads / Google Ads (dropdown no título)
+let metaCampSel = 'all';
+let googleCampSel = 'all';
 const COLORS = {
   primary: '#0D3B66', secondary: '#3FA9F5',
   green: '#22C55E', red: '#EF4444', orange: '#F59E0B',
@@ -4165,39 +4176,60 @@ function renderMeta() {
     : `<span class="tag-desconhecido" title="Status real indisponível — os dados ainda não trazem o status da Meta. Rode o workflow 'ETL rapido' com o token configurado.">—</span>`;
   const statusWarn = statusReal ? '' : `<div class="status-warn">⚠️ Status real das campanhas indisponível neste dado — exibindo "—" em vez de adivinhar. Rode o workflow <strong>"ETL rapido"</strong> com o token da Meta configurado pra mostrar Ativo/Pausado de verdade.</div>`;
 
-  // ── KPIs (CPL via CRM — regra de ouro) ──
-  let tGasto = 0, tImpr = 0, tCliques = 0;
-  (M.daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
-    tGasto += r.gasto || 0; tImpr += r.impressoes || 0; tCliques += r.cliques || 0;
-  });
-  const tLeadsCRM = (DATA.utm.sources_daily || [])
-    .filter(r => r.source === 'metaads' && (!datePred || datePred(r.data)))
-    .reduce((s, r) => s + r.total, 0);
-  const kCpl = tLeadsCRM > 0 ? tGasto / tLeadsCRM : 0;
-  const kCtr = tImpr > 0 ? tCliques / tImpr * 100 : 0;
-  document.getElementById('kpi-meta').innerHTML = [
-    { label: 'Gasto Total', value: fmt.currency(tGasto), sub: 'período', cls: '' },
-    { label: 'Leads CRM', value: fmt.num(tLeadsCRM), sub: 'entraram no CRM', cls: 'blue' },
-    { label: 'CPL (CRM)', value: fmt.currency(kCpl), sub: 'meta R$ ' + T, cls: 'orange' },
-    { label: 'Impressões', value: fmt.k(tImpr), sub: 'período', cls: '' },
-    { label: 'Cliques', value: fmt.k(tCliques), sub: 'período', cls: '' },
-    { label: 'CTR', value: fmt.pct(kCtr), sub: 'cliques/impressões', cls: 'green' },
-  ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
-
-  // ── 1. CAMPANHAS ATIVAS ──
-  // Derivado de campaign_daily (DIÁRIO, atribuição correta POR CAMPANHA — cada linha
-  // bruta tem sua campanha). Respeita o filtro de DIA e NÃO tem o problema de atribuição
-  // do creatives_daily (que agrega por nome de anúncio reusado entre campanhas, o que
-  // inflava o gasto). Corrige o bug "FEIRA ABF" (criada 23/06 mostrava gasto 01–22/06)
-  // sem inflar (FEIRA ABF = R$ 477,77, não R$ 5.768).
+  // ── Filtro local de CAMPANHA (dropdown ao lado do título) ──
+  // Lista SÓ campanhas com gasto/leads no período selecionado (não polui com
+  // pausadas antigas). Selecionar uma filtra a página INTEIRA: KPIs, tabela,
+  // gráfico, conjuntos, anúncios e resumo.
+  const mcDaily = (M.campaign_daily || []).filter(r => !datePred || datePred(r.data));
   const campMap = {};
-  (M.campaign_daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
+  mcDaily.forEach(r => {
     const c = campMap[r.campanha] || (campMap[r.campanha] = { gasto: 0, impressoes: 0, cliques: 0, leadsPlat: 0, leadsCRM: 0 });
     c.gasto += r.gasto || 0; c.impressoes += r.impressoes || 0; c.cliques += r.cliques || 0;
     c.leadsPlat += r.leads_plat || 0; c.leadsCRM += r.leads || 0;
   });
   const camps = Object.entries(campMap).filter(([, d]) => d.gasto > 0 || d.leadsCRM > 0).sort((a, b) => b[1].gasto - a[1].gasto);
-  document.getElementById('table-meta-campaigns').innerHTML = camps.map(([name, d]) => {
+  const mcSelEl = document.getElementById('meta-camp-filter');
+  if (mcSelEl) {
+    if (metaCampSel !== 'all' && !camps.some(([n]) => n === metaCampSel)) metaCampSel = 'all';
+    mcSelEl.innerHTML = `<option value="all">Todas as campanhas do período (${camps.length})</option>`
+      + camps.map(([n]) => `<option value="${esc(n)}"${n === metaCampSel ? ' selected' : ''}>${esc(n.length > 58 ? n.slice(0, 58) + '…' : n)}</option>`).join('');
+    mcSelEl.value = metaCampSel;
+  }
+  const campSel = metaCampSel === 'all' ? null : metaCampSel;
+
+  // ── KPIs (CPL via CRM — regra de ouro) ──
+  // Sem campanha selecionada: gasto do daily + leads CRM por UTM (fonte oficial).
+  // COM campanha: tudo do campaign_daily dela (leads = matching por anúncio).
+  let tGasto = 0, tImpr = 0, tCliques = 0, tLeadsCRM = 0;
+  if (campSel) {
+    mcDaily.filter(r => r.campanha === campSel).forEach(r => {
+      tGasto += r.gasto || 0; tImpr += r.impressoes || 0; tCliques += r.cliques || 0; tLeadsCRM += r.leads || 0;
+    });
+  } else {
+    (M.daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
+      tGasto += r.gasto || 0; tImpr += r.impressoes || 0; tCliques += r.cliques || 0;
+    });
+    tLeadsCRM = (DATA.utm.sources_daily || [])
+      .filter(r => r.source === 'metaads' && (!datePred || datePred(r.data)))
+      .reduce((s, r) => s + r.total, 0);
+  }
+  const kCpl = tLeadsCRM > 0 ? tGasto / tLeadsCRM : 0;
+  const kCtr = tImpr > 0 ? tCliques / tImpr * 100 : 0;
+  const subPer = campSel ? 'campanha filtrada' : 'período';
+  document.getElementById('kpi-meta').innerHTML = [
+    { label: 'Gasto Total', value: fmt.currency(tGasto), sub: subPer, cls: '' },
+    { label: 'Leads CRM', value: fmt.num(tLeadsCRM), sub: campSel ? 'da campanha (matching)' : 'entraram no CRM', cls: 'blue' },
+    { label: 'CPL (CRM)', value: fmt.currency(kCpl), sub: 'meta R$ ' + T, cls: 'orange' },
+    { label: 'Impressões', value: fmt.k(tImpr), sub: subPer, cls: '' },
+    { label: 'Cliques', value: fmt.k(tCliques), sub: subPer, cls: '' },
+    { label: 'CTR', value: fmt.pct(kCtr), sub: 'cliques/impressões', cls: 'green' },
+  ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
+
+  // ── 1. CAMPANHAS ATIVAS ──
+  // Derivado de campaign_daily (DIÁRIO, atribuição correta POR CAMPANHA — cada linha
+  // bruta tem sua campanha). Respeita o filtro de DIA e o filtro local de campanha.
+  const campsShow = campSel ? camps.filter(([n]) => n === campSel) : camps;
+  document.getElementById('table-meta-campaigns').innerHTML = campsShow.map(([name, d]) => {
     const lc = d.leadsCRM, cpl = lc > 0 ? d.gasto / lc : 0;
     const cpc = d.cliques > 0 ? d.gasto / d.cliques : 0, ctr = d.impressoes > 0 ? d.cliques / d.impressoes * 100 : 0;
     return `<tr>
@@ -4216,12 +4248,21 @@ function renderMeta() {
   document.getElementById('meta-status-warn').innerHTML = statusWarn;
 
   // ── 2. INVESTIMENTO × LEADS CRM (mensal, mesmo gráfico) ──
-  const meses = [...new Set([
-    ...(M.monthly || []).map(r => r.mes),
-    ...(DATA.utm.sources_monthly || []).filter(r => r.source === 'metaads').map(r => r.mes),
-  ])].sort().slice(-12);
-  const gastoMes = {}; (M.monthly || []).forEach(r => { gastoMes[r.mes] = r.gasto; });
-  const leadsMes = {}; (DATA.utm.sources_monthly || []).filter(r => r.source === 'metaads').forEach(r => { leadsMes[r.mes] = (leadsMes[r.mes] || 0) + r.total; });
+  // Com campanha selecionada: série mensal SÓ dela (campaign_daily agregado por mês,
+  // leads = matching). Sem seleção: total da conta (monthly + leads por UTM).
+  const gastoMes = {}, leadsMes = {};
+  if (campSel) {
+    (M.campaign_daily || []).filter(r => r.campanha === campSel).forEach(r => {
+      const m = (r.data || '').slice(0, 7);
+      if (!m) return;
+      gastoMes[m] = (gastoMes[m] || 0) + (r.gasto || 0);
+      leadsMes[m] = (leadsMes[m] || 0) + (r.leads || 0);
+    });
+  } else {
+    (M.monthly || []).forEach(r => { gastoMes[r.mes] = r.gasto; });
+    (DATA.utm.sources_monthly || []).filter(r => r.source === 'metaads').forEach(r => { leadsMes[r.mes] = (leadsMes[r.mes] || 0) + r.total; });
+  }
+  const meses = [...new Set([...Object.keys(gastoMes), ...Object.keys(leadsMes)])].sort().slice(-12);
   makeChart('chart-meta-invest-leads', {
     type: 'bar',
     data: {
@@ -4264,7 +4305,7 @@ function renderMeta() {
   // num único conjunto (FEIRA aparecia R$3.461 sendo que a campanha-mãe gastou R$477).
   // Agrupa por (campanha, conjunto) — um conjunto nunca aparece maior que sua campanha.
   const adsetMap = {};
-  (M.adset_daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
+  (M.adset_daily || []).filter(r => (!datePred || datePred(r.data)) && (!campSel || r.campanha === campSel)).forEach(r => {
     const conj = r.conjunto || '(sem conjunto)';
     const key = (r.campanha || '') + '|||' + conj;
     const a = adsetMap[key] || (adsetMap[key] = { conjunto: conj, campanha: r.campanha || '', gasto: 0, leadsCRM: 0, impressoes: 0, cliques: 0 });
@@ -4302,6 +4343,7 @@ function renderMeta() {
   if (cadMax) { const dd = new Date(cadMax + 'T00:00:00'); dd.setDate(dd.getDate() - 6); cadCut7 = dd.toISOString().slice(0, 10); }
   const adMap = {}, g7dConj = {};
   cadAll.forEach(r => {
+    if (campSel && r.campanha !== campSel) return;
     const key = r.anuncio + '|||' + r.campanha + '|||' + r.conjunto;
     if (cadCut7 && r.data >= cadCut7) g7dConj[key] = (g7dConj[key] || 0) + (r.gasto || 0);
     if (datePred && !datePred(r.data)) return;
@@ -4336,7 +4378,7 @@ function renderMeta() {
   }).join('') || '<tr><td colspan="10" class="empty">Sem anúncios.</td></tr>';
 
   // ── 5. RESUMO E PRÓXIMOS PASSOS (automático) ──
-  document.getElementById('meta-resumo').innerHTML = buildAdsResumo('Meta Ads', { tGasto, tLeadsCRM, kCpl, kCtr, tImpr, tCliques, T, TQ, nCamps: camps.length, adsets, ads });
+  document.getElementById('meta-resumo').innerHTML = buildAdsResumo('Meta Ads', { tGasto, tLeadsCRM, kCpl, kCtr, tImpr, tCliques, T, TQ, nCamps: campsShow.length, adsets, ads });
 }
 
 // ─── SECTION: GOOGLE ADS ──────────────────────────────────────────────────────
@@ -4361,35 +4403,14 @@ function renderGoogle() {
   // Fallback (sem o status no summary): heurística de gasto nos últimos 2 meses.
   const activeCamps = getActiveGoogleCampaigns();
 
-  // ── KPIs (CPL via CRM — regra de ouro) ──
-  let tGasto = 0, tImpr = 0, tCliques = 0;
-  (G.daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
-    tGasto += r.gasto || 0; tImpr += r.impressoes || 0; tCliques += r.cliques || 0;
-  });
-  const tLeadsCRM = (DATA.utm.sources_daily || [])
-    .filter(r => r.source === 'googlecpc' && (!datePred || datePred(r.data)))
-    .reduce((s, r) => s + r.total, 0);
-  const kCpl = tLeadsCRM > 0 ? tGasto / tLeadsCRM : 0;
-  const kCtr = tImpr > 0 ? tCliques / tImpr * 100 : 0;
-  document.getElementById('kpi-google').innerHTML = [
-    { label: 'Gasto Total', value: fmt.currency(tGasto), sub: 'período', cls: '' },
-    { label: 'Leads CRM', value: fmt.num(tLeadsCRM), sub: 'entraram no CRM', cls: 'blue' },
-    { label: 'CPL (CRM)', value: fmt.currency(kCpl), sub: 'meta R$ ' + T, cls: 'orange' },
-    { label: 'Impressões', value: fmt.k(tImpr), sub: 'período', cls: '' },
-    { label: 'Cliques', value: fmt.k(tCliques), sub: 'período', cls: '' },
-    { label: 'CTR', value: fmt.pct(kCtr), sub: 'cliques/impressões', cls: 'green' },
-  ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
-
-  // ── 1. CAMPANHAS ATIVAS ──
-  // Derivado de campaign_daily (DIÁRIO, atribuição correta POR CAMPANHA) → respeita o
-  // filtro de DIA. Antes usava campaign_monthly (filtro de mês), então filtrar por dia
-  // mostrava o gasto do mês inteiro ("gasto fantasma", mesmo bug corrigido no Meta).
-  // Fallback p/ campaign_monthly enquanto o ETL novo (com campaign_daily) ainda não
-  // rodou — evita tabela vazia em dados antigos cacheados no Supabase.
+  // ── Filtro local de CAMPANHA (dropdown ao lado do título) ──
+  // Lista SÓ campanhas com gasto no período (não polui com pausadas antigas).
+  // Selecionar uma filtra a página INTEIRA: KPIs, tabela, gráfico, grupos, anúncios, resumo.
   const campMap = {};
   const gDaily = G.campaign_daily || [];
+  const gcDailyPer = gDaily.filter(r => !datePred || datePred(r.data));
   if (gDaily.length) {
-    gDaily.filter(r => !datePred || datePred(r.data)).forEach(r => {
+    gcDailyPer.forEach(r => {
       const c = campMap[r.campanha] || (campMap[r.campanha] = { gasto: 0, impressoes: 0, cliques: 0, conv: 0 });
       c.gasto += r.gasto || 0; c.impressoes += r.impressoes || 0; c.cliques += r.cliques || 0; c.conv += r.conversoes || 0;
     });
@@ -4399,6 +4420,16 @@ function renderGoogle() {
       c.gasto += r.gasto || 0; c.impressoes += r.impressoes || 0; c.cliques += r.cliques || 0; c.conv += r.conversoes || 0;
     });
   }
+  const campsAll = Object.entries(campMap).filter(([, d]) => d.gasto > 0).sort((a, b) => b[1].gasto - a[1].gasto);
+  const gSelEl = document.getElementById('google-camp-filter');
+  if (gSelEl) {
+    if (googleCampSel !== 'all' && !campsAll.some(([n]) => n === googleCampSel)) googleCampSel = 'all';
+    gSelEl.innerHTML = `<option value="all">Todas as campanhas do período (${campsAll.length})</option>`
+      + campsAll.map(([n]) => `<option value="${esc(n)}"${n === googleCampSel ? ' selected' : ''}>${esc(n.length > 58 ? n.slice(0, 58) + '…' : n)}</option>`).join('');
+    gSelEl.value = googleCampSel;
+  }
+  const campSel = googleCampSel === 'all' ? null : googleCampSel;
+
   // Leads CRM por campanha = soma dos leads CRM por anúncio (google_ads_creatives.daily,
   // MESMA fonte das tabelas de grupos/anúncios) agrupada por campanha. Garante consistência.
   const crmByCamp = {};
@@ -4406,6 +4437,37 @@ function renderGoogle() {
     const cp = r.campanha;
     if (cp) crmByCamp[cp] = (crmByCamp[cp] || 0) + (r.leads || 0);
   });
+
+  // ── KPIs (CPL via CRM — regra de ouro) ──
+  // Sem campanha selecionada: gasto do daily + leads CRM por UTM (fonte oficial).
+  // COM campanha: gasto/impr/cliques do campaign_daily dela; leads = matching (GC.daily).
+  let tGasto = 0, tImpr = 0, tCliques = 0, tLeadsCRM = 0;
+  if (campSel) {
+    gcDailyPer.filter(r => r.campanha === campSel).forEach(r => {
+      tGasto += r.gasto || 0; tImpr += r.impressoes || 0; tCliques += r.cliques || 0;
+    });
+    tLeadsCRM = Math.round(crmByCamp[campSel] || 0);
+  } else {
+    (G.daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
+      tGasto += r.gasto || 0; tImpr += r.impressoes || 0; tCliques += r.cliques || 0;
+    });
+    tLeadsCRM = (DATA.utm.sources_daily || [])
+      .filter(r => r.source === 'googlecpc' && (!datePred || datePred(r.data)))
+      .reduce((s, r) => s + r.total, 0);
+  }
+  const kCpl = tLeadsCRM > 0 ? tGasto / tLeadsCRM : 0;
+  const kCtr = tImpr > 0 ? tCliques / tImpr * 100 : 0;
+  const subPer = campSel ? 'campanha filtrada' : 'período';
+  document.getElementById('kpi-google').innerHTML = [
+    { label: 'Gasto Total', value: fmt.currency(tGasto), sub: subPer, cls: '' },
+    { label: 'Leads CRM', value: fmt.num(tLeadsCRM), sub: campSel ? 'da campanha (matching)' : 'entraram no CRM', cls: 'blue' },
+    { label: 'CPL (CRM)', value: fmt.currency(kCpl), sub: 'meta R$ ' + T, cls: 'orange' },
+    { label: 'Impressões', value: fmt.k(tImpr), sub: subPer, cls: '' },
+    { label: 'Cliques', value: fmt.k(tCliques), sub: subPer, cls: '' },
+    { label: 'CTR', value: fmt.pct(kCtr), sub: 'cliques/impressões', cls: 'green' },
+  ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
+
+  // ── 1. CAMPANHAS ATIVAS ── (campaign_daily diário; respeita filtro de dia e de campanha)
   // Os dados de criativos do Google (planilha Adveronix → GC.daily) podem estar DEFASADOS
   // em relação ao gasto da API (campaign_daily). Quando defasados, Leads/CPL por campanha/
   // grupo/anúncio ficam PARCIAIS (gasto do mês inteiro ÷ leads truncados = CPL falso, ex.:
@@ -4415,7 +4477,7 @@ function renderGoogle() {
   const gcStale = !!(gcMax && gMax && gcMax < gMax);
   const gcMaxBR = gcMax ? gcMax.slice(8, 10) + '/' + gcMax.slice(5, 7) : '';
   const gcWarn = gcStale ? `<div class="status-warn">⚠️ Os dados de criativos do Google só atualizaram até <strong>${gcMaxBR}</strong> (a planilha de criativos travou). Por isso o <strong>Leads/CPL por campanha está oculto</strong> e as tabelas de <strong>Grupos e Anúncios refletem só até ${gcMaxBR}</strong> (parcial). O Gasto total, os KPIs e o gasto/cliques/impressões por campanha estão <strong>completos e corretos</strong> (via API).</div>` : '';
-  const camps = Object.entries(campMap).filter(([, d]) => d.gasto > 0).sort((a, b) => b[1].gasto - a[1].gasto);
+  const camps = campSel ? campsAll.filter(([n]) => n === campSel) : campsAll;
   document.getElementById('table-google-campaigns').innerHTML = camps.map(([name, d]) => {
     const lc = crmByCamp[name] || 0, cpl = lc > 0 ? d.gasto / lc : 0;
     const cpc = d.cliques > 0 ? d.gasto / d.cliques : 0, ctr = d.impressoes > 0 ? d.cliques / d.impressoes * 100 : 0;
@@ -4435,12 +4497,24 @@ function renderGoogle() {
   document.getElementById('google-status-warn').innerHTML = statusWarn + gcWarn;
 
   // ── 2. INVESTIMENTO × LEADS CRM (mensal, mesmo gráfico) ──
-  const meses = [...new Set([
-    ...(G.monthly || []).map(r => r.mes),
-    ...(DATA.utm.sources_monthly || []).filter(r => r.source === 'googlecpc').map(r => r.mes),
-  ])].sort().slice(-12);
-  const gastoMes = {}; (G.monthly || []).forEach(r => { gastoMes[r.mes] = r.gasto; });
-  const leadsMes = {}; (DATA.utm.sources_monthly || []).filter(r => r.source === 'googlecpc').forEach(r => { leadsMes[r.mes] = (leadsMes[r.mes] || 0) + r.total; });
+  // Com campanha selecionada: série mensal SÓ dela (gasto do campaign_daily;
+  // leads = matching do GC.daily). Sem seleção: total da conta (monthly + UTM).
+  const gastoMes = {}, leadsMes = {};
+  if (campSel) {
+    gDaily.filter(r => r.campanha === campSel).forEach(r => {
+      const m = (r.data || '').slice(0, 7);
+      if (m) gastoMes[m] = (gastoMes[m] || 0) + (r.gasto || 0);
+    });
+    (GC.daily || []).filter(r => r.campanha === campSel).forEach(r => {
+      const m = (r.data || '').slice(0, 7);
+      if (m) leadsMes[m] = (leadsMes[m] || 0) + (r.leads || 0);
+    });
+    Object.keys(leadsMes).forEach(m => { leadsMes[m] = Math.round(leadsMes[m]); });
+  } else {
+    (G.monthly || []).forEach(r => { gastoMes[r.mes] = r.gasto; });
+    (DATA.utm.sources_monthly || []).filter(r => r.source === 'googlecpc').forEach(r => { leadsMes[r.mes] = (leadsMes[r.mes] || 0) + r.total; });
+  }
+  const meses = [...new Set([...Object.keys(gastoMes), ...Object.keys(leadsMes)])].sort().slice(-12);
   makeChart('chart-google-invest-leads', {
     type: 'bar',
     data: {
@@ -4468,7 +4542,7 @@ function renderGoogle() {
   // dados completos). NÃO byAd[nome].grupo, que despejava todo o gasto de um anúncio reusado
   // num só grupo, nem a planilha Adveronix truncada. Agrupa por (campanha, grupo).
   const grupoMap = {};
-  (GC.group_daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
+  (GC.group_daily || []).filter(r => (!datePred || datePred(r.data)) && (!campSel || r.campanha === campSel)).forEach(r => {
     const grp = r.grupo || '(sem grupo)';
     const key = (r.campanha || '') + '|||' + grp;
     const a = grupoMap[key] || (grupoMap[key] = { conjunto: grp, campanha: r.campanha || '', gasto: 0, leadsCRM: 0 });
@@ -4498,6 +4572,7 @@ function renderGoogle() {
   if (cgMax) { const dd = new Date(cgMax + 'T00:00:00'); dd.setDate(dd.getDate() - 6); cgCut7 = dd.toISOString().slice(0, 10); }
   const gAdMap = {}, g7dG = {};
   cgAll.forEach(r => {
+    if (campSel && r.campanha !== campSel) return;
     const key = r.anuncio + '|||' + r.campanha + '|||' + r.grupo;
     if (cgCut7 && r.data >= cgCut7) g7dG[key] = (g7dG[key] || 0) + (r.gasto || 0);
     if (datePred && !datePred(r.data)) return;
