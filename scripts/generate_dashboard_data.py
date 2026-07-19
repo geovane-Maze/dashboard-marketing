@@ -973,6 +973,26 @@ def aggregate_crm(deals, leads=None):
     total_lost = 0
     total_value = 0.0
 
+    def is_deal_importado(deal):
+        # 164 deals entraram no RD em 04-05/05/2026 via importação em massa
+        # (bases dos CRMs antigos) com deal_source "Formulário de CRM" e a data
+        # de IMPORTAÇÃO no criado_em — distorciam qualquer visão por período.
+        fonte_ascii = unicodedata.normalize("NFKD", str(deal.get("fonte") or ""))
+        fonte_ascii = fonte_ascii.encode("ascii", "ignore").decode().strip().lower()
+        return fonte_ascii.startswith("formulario de crm")
+
+    def criado_efetivo_do(deal, lead):
+        # Deals importados: a data real de origem é a do LEAD que os originou
+        # (a aba leads já passa pelo imports_backfill, que devolve a data
+        # original dos CRMs antigos). Sem lead casado, mantém a data de
+        # importação — o front declara isso na conciliação.
+        criado = deal.get("criado_em")
+        if is_deal_importado(deal) and lead:
+            lead_criado = lead.get("criado_em")
+            if lead_criado and str(lead_criado)[:10] < str(criado or "9999")[:10]:
+                return lead_criado
+        return criado
+
     for deal in deals:
         etapa_raw = deal.get("etapa") or "sem etapa"
         etapa = normalize_etapa(etapa_raw)          # nome normalizado
@@ -984,6 +1004,9 @@ def aggregate_crm(deals, leads=None):
         perdeu_flag = ganho_raw in ("false", "0", "nao", "não", "no")
         perdido = bool(deal.get("motivo_perda")) or perdeu_flag
         valor = parse_num(deal.get("valor_total"))
+        deal_email = (deal.get("contato_email") or "").strip().lower()
+        deal_lead = lead_by_email.get(deal_email)
+        criado_efetivo = criado_efetivo_do(deal, deal_lead)
 
         by_stage[etapa]["total"] += 1
         by_stage[etapa]["valor"] += valor
@@ -1013,8 +1036,7 @@ def aggregate_crm(deals, leads=None):
             total_lost += 1
 
             # Cruzar UTMs via e-mail do contato
-            email = (deal.get("contato_email") or "").strip().lower()
-            lead = lead_by_email.get(email)
+            lead = deal_lead
             if lead:
                 src  = lead.get("utm_source")   or "não identificado"
                 camp = lead.get("utm_campaign") or "não identificado"
@@ -1027,13 +1049,14 @@ def aggregate_crm(deals, leads=None):
 
             # Aggregação DIÁRIA para filtro por período no front-end.
             # "data"   = data de fechamento (quando a perda foi marcada).
-            # "criado" = data de criação do lead — usada para filtrar as perdas
+            # "criado" = data de criação do negócio — usada para filtrar as perdas
             #            no MESMO eixo dos leads (perda = subconjunto dos leads
             #            que entraram no período, evitando perdas > leads).
+            #            Deals importados usam a data ORIGINAL do lead (backfill).
             dia_perda = parse_date_to_day(deal.get("data_fechamento") or deal.get("criado_em"))
-            dia_criado = parse_date_to_day(deal.get("criado_em"))
+            dia_criado = parse_date_to_day(criado_efetivo)
             if dia_perda:
-                losses_daily.append({
+                loss_row = {
                     "data": dia_perda,
                     "criado": dia_criado,
                     "motivo": motivo_lbl,
@@ -1041,9 +1064,12 @@ def aggregate_crm(deals, leads=None):
                     "utm_source": src,
                     "utm_campaign": camp,
                     "utm_content": cont,
-                })
+                }
+                if is_deal_importado(deal):
+                    loss_row["imp"] = 1
+                losses_daily.append(loss_row)
 
-        mes_criado = parse_date_to_month(deal.get("criado_em"))
+        mes_criado = parse_date_to_month(criado_efetivo)
         if mes_criado:
             etapa_lower = etapa.lower()
             # reuniao_pdf = renomeada para "1ª Reunião Agendada" (mantém legado)
@@ -1100,12 +1126,16 @@ def aggregate_crm(deals, leads=None):
     deals_minimal = []
     for deal in deals:
         etapa = normalize_etapa(deal.get("etapa") or "sem etapa")
-        criado = parse_date_to_day(deal.get("criado_em"))
-        if not criado:
-            continue
         # Fonte do lead (cruza por e-mail). Pago = googlecpc/metaads; resto = orgânico.
         email = (deal.get("contato_email") or "").strip().lower()
         lead = lead_by_email.get(email)
+        # Deals IMPORTADOS (04-05/05/2026, fonte "Formulário de CRM") entram com a
+        # data ORIGINAL do lead — sem isso, 174 negócios de jan-abr empilhavam em
+        # maio e distorciam qualquer funil por período. Flag "imp" permite ao front
+        # declarar a régua na tela.
+        criado = parse_date_to_day(criado_efetivo_do(deal, lead))
+        if not criado:
+            continue
         src = (lead.get("utm_source") if lead else "") or ""
         fonte = "googlecpc" if src == "googlecpc" else ("metaads" if src == "metaads" else "organico")
         # Data de criação do LEAD que originou o negócio (quando casou por e-mail).
@@ -1123,8 +1153,11 @@ def aggregate_crm(deals, leads=None):
             st = "perdido"
         else:
             st = "aberto"
-        deals_minimal.append({"etapa": etapa, "criado_em": criado, "fonte": fonte,
-                              "lead_criado": lead_criado, "st": st})
+        row = {"etapa": etapa, "criado_em": criado, "fonte": fonte,
+               "lead_criado": lead_criado, "st": st}
+        if is_deal_importado(deal):
+            row["imp"] = 1
+        deals_minimal.append(row)
 
     # ── Perdas: separação pago vs orgânico ───────────────────────────────────
     # Considera-se "pago" qualquer lead cuja utm_source seja googlecpc ou metaads.
@@ -1330,7 +1363,9 @@ def aggregate_meta_ads(rows, leads_daily_map=None):
 
     monthly_list = []
     for mes, d in sorted(monthly.items()):
-        cpl = round(d["gasto"] / d["leads"], 2) if d["leads"] > 0 else 0
+        # CPL sem leads = null (não 0): meses históricos com gasto e 0 leads
+        # coletados desenhavam CPL R$0 no gráfico — parecia ótimo, era buraco.
+        cpl = round(d["gasto"] / d["leads"], 2) if d["leads"] > 0 else None
         ctr = round(d["cliques"] / d["impressoes"] * 100, 2) if d["impressoes"] > 0 else 0
         monthly_list.append({
             "mes": mes,
@@ -1548,7 +1583,9 @@ def aggregate_google_ads(rows):
 
     monthly_list = []
     for mes, d in sorted(monthly.items()):
-        cpl = round(d["gasto"] / d["conversoes"], 2) if d["conversoes"] > 0 else 0
+        # CPL sem conversões = null (não 0) — mesmo racional do Meta: gasto sem
+        # lead coletado não é CPL zero, é ausência de dado.
+        cpl = round(d["gasto"] / d["conversoes"], 2) if d["conversoes"] > 0 else None
         ctr = round(d["cliques"] / d["impressoes"] * 100, 2) if d["impressoes"] > 0 else 0
         monthly_list.append({
             "mes": mes,

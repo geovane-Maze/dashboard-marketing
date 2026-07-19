@@ -1434,10 +1434,12 @@
       <div class="charts-row">
         <div class="chart-card">
           <h3>CPL Mensal — Meta Ads</h3>
+          <p style="font-size:10.5px;color:#94a3b8;margin:2px 0 6px;font-style:italic;">Meses com gasto e nenhum lead coletado ficam sem ponto — ausência de dado não é CPL R$ 0.</p>
           <div class="chart-wrap"><canvas id="chart-meta-cpl"></canvas></div>
         </div>
         <div class="chart-card">
           <h3>CPL Mensal — Google Ads</h3>
+          <p style="font-size:10.5px;color:#94a3b8;margin:2px 0 6px;font-style:italic;">Meses com gasto e nenhuma conversão coletada ficam sem ponto — ausência de dado não é CPL R$ 0.</p>
           <div class="chart-wrap"><canvas id="chart-google-cpl"></canvas></div>
         </div>
       </div>
@@ -1601,6 +1603,7 @@
     <!-- GARGALOS & PERDAS -->
     <div id="sec-perdas" class="section">
       <div class="section-title">Gargalos & Perdas</div>
+      <p style="font-size:11px;color:#64748b;margin:-8px 0 14px;">📐 <strong>Régua:</strong> perdas de negócios <strong>criados no período selecionado</strong> — o mesmo eixo dos leads e do Funil de Conversão, pra os números baterem entre as páginas (não é a data em que a perda foi registrada no CRM).</p>
 
       <!-- Linha 1: Motivos de Perda + Perdas por Etapa -->
       <div class="charts-row">
@@ -1671,6 +1674,7 @@
           </tr></thead>
           <tbody id="table-meta-campaigns"></tbody>
         </table>
+        <div id="meta-leads-concil"></div>
       </div>
 
       <!-- 2. Investimento x Leads CRM -->
@@ -1735,6 +1739,7 @@
           </tr></thead>
           <tbody id="table-google-campaigns"></tbody>
         </table>
+        <div id="google-leads-concil"></div>
       </div>
 
       <!-- 2. Investimento x Leads CRM -->
@@ -3064,8 +3069,12 @@ function renderExecutivo() {
     return -1;
   };
   const dealsPeriodo = (crm.deals_minimal || []).filter(d => !datePred || datePred(d.criado_em));
+  // "Qualificado Não agendada" (índice 3) é RAMO PARALELO da Qualificação — quem
+  // agenda direto nunca passa por ela. A linha do ramo mostra quem ESTÁ na etapa;
+  // as demais seguem cumulativas (chegou à etapa ou além).
+  const FUNIL_BRANCH_I = 3;
   const passedCounts = FUNIL_STAGES.map((stage, i) => {
-    const sel = dealsPeriodo.filter(d => i === 0 ? true : stageIdxOf(d.etapa) >= i);
+    const sel = dealsPeriodo.filter(d => i === 0 ? true : (i === FUNIL_BRANCH_I ? stageIdxOf(d.etapa) === i : stageIdxOf(d.etapa) >= i));
     return {
       etapa: stage, total: sel.length,
       google: sel.filter(d => d.fonte === 'googlecpc').length,
@@ -3122,9 +3131,12 @@ function renderExecutivo() {
       <th style="padding:7px 6px;text-align:right;color:#16a085;">🌱 Orgânico</th>
     </tr>`;
     const body = passedCounts.map((s, i) => {
-      const prev = i > 0 ? passedCounts[i - 1].total : s.total;
+      const isBranch = i === FUNIL_BRANCH_I;
+      const prevI = (i - 1 === FUNIL_BRANCH_I) ? i - 2 : i - 1;   // pula o ramo na cadeia de conversão
+      const prev = i > 0 ? passedCounts[prevI].total : s.total;
       let convPct = '—', convColor = '#666';
-      if (prev > 0) {
+      if (isBranch) { convPct = '⑂'; convColor = '#94a3b8'; }
+      else if (prev > 0) {
         const p = s.total / prev * 100;
         convPct = i === 0 ? '100%' : p.toFixed(1) + '%';
         if (i > 0) convColor = p < 30 ? '#dc2626' : (p < 60 ? '#ea580c' : '#16a34a');
@@ -3132,7 +3144,7 @@ function renderExecutivo() {
       const bw = (s.total / maxFunil * 100).toFixed(1);
       return `<tr style="border-bottom:1px solid #f1f5f9;">
         <td style="padding:8px 6px;">
-          <div style="font-weight:600;font-size:13px;">${s.etapa}</div>
+          <div style="font-weight:600;font-size:13px;">${s.etapa}${isBranch ? ' <span style="color:#94a3b8;font-size:10px;font-weight:400;">(ramo paralelo — está na etapa)</span>' : ''}</div>
           <div style="background:#F1F5F9;border-radius:3px;height:7px;overflow:hidden;margin-top:4px;max-width:240px;"><div style="width:${bw}%;background:linear-gradient(to right,var(--primary),var(--secondary));height:100%;"></div></div>
         </td>
         <td style="padding:8px 6px;text-align:center;color:${convColor};font-weight:700;font-size:12px;">${convPct}</td>
@@ -3151,12 +3163,13 @@ function renderExecutivo() {
       const antigos = dealsPeriodo.filter(d => d.lead_criado && datePred && !datePred(d.lead_criado)).length;
       const semLead = dealsPeriodo.length - doPeriodo - antigos;
       const leadsSemNegocio = Math.max(0, totalLeadsPeriodo - doPeriodo);
-      conciliacao = `<p style="font-size:11px;color:#475569;margin-top:8px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;">🧾 <strong>Conciliação com o KPI "Total de Leads" (${fmt.num(totalLeadsPeriodo)}):</strong> ${fmt.num(dealsPeriodo.length)} negócios = ${fmt.num(doPeriodo)} de leads do período + ${fmt.num(antigos)} de leads de meses anteriores${semLead > 0 ? ` + ${fmt.num(semLead)} sem lead de marketing identificado` : ''}. E ${fmt.num(leadsSemNegocio)} leads do período ainda não viraram negócio no CRM.</p>`;
+      const importadosN = dealsPeriodo.filter(d => d.imp).length;
+      conciliacao = `<p style="font-size:11px;color:#475569;margin-top:8px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;">🧾 <strong>Conciliação com o KPI "Total de Leads" (${fmt.num(totalLeadsPeriodo)}):</strong> ${fmt.num(dealsPeriodo.length)} negócios = ${fmt.num(doPeriodo)} de leads do período + ${fmt.num(antigos)} de leads de meses anteriores${semLead > 0 ? ` + ${fmt.num(semLead)} sem lead de marketing identificado` : ''}. E ${fmt.num(leadsSemNegocio)} leads do período ainda não viraram negócio no CRM.${importadosN > 0 ? ` Inclui ${fmt.num(importadosN)} negócios importados dos CRMs antigos, re-datados pela data original do lead.` : ''}</p>`;
     }
     document.getElementById('exec-funil-conversao').innerHTML =
       `<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead>${head}</thead><tbody>${body}</tbody></table>`
       + conciliacao
-      + `<p style="font-size:10px;color:#999;margin-top:10px;font-style:italic;">Conv. = conversão da etapa anterior · <strong>Pago</strong> = utm Google/Meta · <strong>Orgânico</strong> = demais (inclui importados sem utm)${hasFonte ? '' : ' · <span style="color:#b45309;">fonte disponível após a próxima coleta</span>'}</p>`;
+      + `<p style="font-size:10px;color:#999;margin-top:10px;font-style:italic;">Conv. = conversão da etapa anterior · ⑂ "Qualificado Não agendada" é ramo paralelo (mostra quem está na etapa; a conversão da 1ª Reunião compara com a Qualificação) · <strong>Pago</strong> = utm Google/Meta · <strong>Orgânico</strong> = demais (inclui importados sem utm)${hasFonte ? '' : ' · <span style="color:#b45309;">fonte disponível após a próxima coleta</span>'}</p>`;
   })();
 
   // ── Bloco 4: Detalhe das Reuniões no Período ──
@@ -3418,11 +3431,13 @@ function renderEvolucao() {
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
   });
 
+  // CPL sem denominador = null → gap na linha (não R$0). Guarda também contra dado
+  // antigo do Supabase, que ainda traz cpl:0 nos meses com gasto e 0 leads (C7).
   makeChart('chart-meta-cpl', {
     type: 'line',
     data: {
       labels: metaData.map(r => mesLabel(r.mes)),
-      datasets: [{ label: 'CPL (R$)', data: metaData.map(r => r.cpl), borderColor: COLORS.orange, backgroundColor: COLORS.orange + '22', fill: true, tension: 0.3 }]
+      datasets: [{ label: 'CPL (R$)', data: metaData.map(r => (r.cpl > 0 ? r.cpl : null)), borderColor: COLORS.orange, backgroundColor: COLORS.orange + '22', fill: true, tension: 0.3, spanGaps: false }]
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
   });
@@ -3431,7 +3446,7 @@ function renderEvolucao() {
     type: 'line',
     data: {
       labels: googleData.map(r => mesLabel(r.mes)),
-      datasets: [{ label: 'CPL (R$)', data: googleData.map(r => r.cpl), borderColor: COLORS.purple, backgroundColor: COLORS.purple + '22', fill: true, tension: 0.3 }]
+      datasets: [{ label: 'CPL (R$)', data: googleData.map(r => (r.cpl > 0 ? r.cpl : null)), borderColor: COLORS.purple, backgroundColor: COLORS.purple + '22', fill: true, tension: 0.3, spanGaps: false }]
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
   });
@@ -3530,8 +3545,27 @@ function renderCRM() {
   const totAgendadas = r1Agendadas + r2Agendadas;
   const totNoShow = r1NS + r2NS;
 
-  // Custo por Reunião Agendada = investimento total ÷ reuniões agendadas (1ª + 2ª)
-  const custoReuniaoAgendada = totAgendadas > 0 ? totalInvest / totAgendadas : 0;
+  // ── Custo por Reunião Agendada ─────────────────────────────────────────────
+  // Denominador = negócios que CHEGARAM à etapa "1ª Reunião Agendada" (ou além)
+  // no período — a MESMA régua do funil de conversão e do gráfico mensal. O campo
+  // manual "1ª/2ª Reunião" do RD é raramente preenchido e dava denominador
+  // minúsculo (custo estourado). Fallback pra régua antiga se o dado ainda não
+  // tiver deals_minimal.
+  const RA_STAGES = ['entrada de lead', 'tentativa de contato', 'qualificação', 'qualificado não agendada', '1ª reunião agendada', '1ª reunião realizada', 'reunião de bp agendada', 'reunião de bp realizada', 'envio de cof', 'visita / reunião com jamil', 'análise financeira/jurídica', 'comitê final'];
+  const raIdx = (e) => {
+    const el = (e || '').toLowerCase().trim();
+    for (let i = 0; i < RA_STAGES.length; i++) {
+      const s = RA_STAGES[i];
+      if (el === s || el.includes(s) || s.includes(el)) return i;
+    }
+    return -1;
+  };
+  const dmCusto = crm.deals_minimal || [];
+  const chegouRA = dmCusto.filter(d => (!datePredCRM || datePredCRM(d.criado_em)) && raIdx(d.etapa) >= 4).length;
+  const custoReuniaoAgendada = dmCusto.length
+    ? (chegouRA > 0 ? totalInvest / chegouRA : 0)
+    : (totAgendadas > 0 ? totalInvest / totAgendadas : 0);
+  const custoReuniaoSub = dmCusto.length ? 'invest. ÷ chegaram à 1ª R. Agendada' : 'invest. ÷ reun. agendadas';
 
   // Taxa de No-Show = no-show total ÷ total de reuniões agendadas
   const taxaNoShow = totAgendadas > 0 ? (totNoShow / totAgendadas * 100) : 0;
@@ -3544,7 +3578,7 @@ function renderCRM() {
     { label: 'Reunião de BP Agendada',        value: fmt.num(apresentacaoBP),          sub: 'leads nesta etapa',               cls: 'teal'   },
     // ── Linha 2: Eficiência e perdas ──────────────────────────────────────────
     { label: 'Visita / Reunião com Jamil',        value: fmt.num(visitaJamilCount),    sub: 'leads nesta etapa',               cls: 'purple' },
-    { label: 'Custo por Lead — Reun. Agendada',   value: fmt.currency(custoReuniaoAgendada), sub: 'invest. ÷ reun. agendadas',  cls: 'orange' },
+    { label: 'Custo por Lead — Reun. Agendada',   value: fmt.currency(custoReuniaoAgendada), sub: custoReuniaoSub,              cls: 'orange' },
     { label: 'Taxa de No-Show',                   value: fmt.pct(taxaNoShow),          sub: 'no-show ÷ reun. agendadas',       cls: 'orange' },
     { label: 'Negócios Perdidos',                 value: fmt.num(crm.total_lost),      sub: 'com motivo registrado',           cls: 'red'    },
     // ── Linha 3: Reuniões (detalhamento 1ª e 2ª) ──────────────────────────────
@@ -3614,7 +3648,7 @@ function renderCRM() {
     const topOf = (o) => { const e = Object.entries(o || {}).sort((a, b) => b[1] - a[1])[0]; return e ? e[0] : '—'; };
 
     // Cores coesas teal → azul, afunilando
-    const COL = ['#0E7C86', '#127f93', '#1a7fa8', '#2378bd', '#2f6fce', '#3f6ee0', '#4c6ef5', '#5c7cfa', '#7088fb', '#8597fc', '#99a6fd'];
+    const COL = ['#0E7C86', '#127f93', '#1a7fa8', '#2378bd', '#2f6fce', '#3f6ee0', '#4c6ef5', '#5c7cfa', '#7088fb', '#8597fc', '#99a6fd', '#adb5fe'];
     const mouthMax = Math.max(totalLeads, passed[0] || 0, 1);
     const barW = (n) => Math.max(n / mouthMax * 100, 4).toFixed(2);
 
@@ -3625,10 +3659,18 @@ function renderCRM() {
       <div class="cmf-right"></div>
     </div>`;
     const sortDesc = (o) => Object.entries(o || {}).sort((a, b) => b[1] - a[1]);
+    // "Qualificado Não agendada" é RAMO PARALELO da Qualificação (quem agenda a
+    // reunião direto nunca passa por ela). Tratá-la como etapa sequencial deixava
+    // as taxas enganosas. Régua: a barra do ramo mostra quem ESTÁ nela hoje; a %
+    // da etapa seguinte compara com a Qualificação, não com o ramo.
+    const BRANCH_I = 3;
+    const branchCnt = deals.filter(d => sIdx(d.etapa) === BRANCH_I).length;
     window._cmfStages = [];
     STAGES.forEach((st, i) => {
-      const cnt = passed[i];
-      const prev = i === 0 ? (totalLeads || cnt) : passed[i - 1];
+      const isBranch = i === BRANCH_I;
+      const cnt = isBranch ? branchCnt : passed[i];
+      const prevI = (i - 1 === BRANCH_I) ? i - 2 : i - 1;
+      const prev = i === 0 ? (totalLeads || cnt) : passed[prevI];
       const conv = Math.min(prev > 0 ? (cnt / prev * 100) : 0, 100);
       const convC = conv < 30 ? '#dc2626' : (conv < 60 ? '#ea580c' : '#16a34a');
       const L = lossAgg[i];
@@ -3640,13 +3682,18 @@ function renderCRM() {
       window._cmfStages[i] = { name: st, leads: cnt, losses: L ? L.total : 0, perdaPct,
         mot: L ? sortDesc(L.mot) : [], camp: L ? sortDesc(L.camp) : [] };
       const clickable = (L && L.total) ? `onclick="openCmfModal(${i})" style="width:${barW(cnt)}%;background:${COL[i]};cursor:pointer;" title="Ver motivos e anúncios — clique"` : `style="width:${barW(cnt)}%;background:${COL[i]};"`;
+      const convCell = isBranch
+        ? `<span title="Ramo paralelo da Qualificação — fora da cadeia de conversão">⑂</span>`
+        : `${conv.toFixed(0)}%`;
       rows += `<div class="cmf-row">
-        <div class="cmf-conv" style="color:${convC}">${conv.toFixed(0)}%</div>
-        <div class="cmf-name" title="${st}">${st}</div>
+        <div class="cmf-conv" style="color:${isBranch ? '#94a3b8' : convC}">${convCell}</div>
+        <div class="cmf-name" title="${st}${isBranch ? ' — ramo paralelo (está na etapa hoje)' : ''}">${st}${isBranch ? ' <span style="color:#94a3b8;font-size:10px;">(ramo)</span>' : ''}</div>
         <div class="cmf-center"><div class="cmf-bar" ${clickable}>${fmt.num(cnt)}</div></div>
         <div class="cmf-right">${right}</div>
       </div>`;
     });
+    const impCnt = deals.filter(d => d.imp).length;
+    rows += `<p style="font-size:10.5px;color:#94a3b8;margin:8px 0 0;font-style:italic;">⑂ "Qualificado Não agendada" é ramo paralelo da Qualificação: a barra mostra quem está na etapa hoje e a conversão da "1ª Reunião Agendada" compara com a Qualificação.${impCnt ? ` · Inclui ${fmt.num(impCnt)} negócios importados dos CRMs antigos, re-datados pela data original do lead.` : ''}</p>`;
     document.getElementById('crm-mega-funnel').innerHTML = rows;
 
     const fmtBR = (s) => s ? s.split('-').reverse().join('/') : '';
@@ -3661,15 +3708,7 @@ function renderCRM() {
   // pra os números baterem entre os gráficos. Antes contava só quem ESTÁ na etapa
   // (quem avançava sumia da barra: jul mostrava 11 enquanto o funil mostrava 14).
   // Fallback: monthly_stages (régua antiga) se o dado ainda não tiver deals_minimal.
-  const RA_STAGES = ['entrada de lead', 'tentativa de contato', 'qualificação', 'qualificado não agendada', '1ª reunião agendada', '1ª reunião realizada', 'reunião de bp agendada', 'reunião de bp realizada', 'envio de cof', 'visita / reunião com jamil', 'análise financeira/jurídica', 'comitê final'];
-  const raIdx = (e) => {
-    const el = (e || '').toLowerCase().trim();
-    for (let i = 0; i < RA_STAGES.length; i++) {
-      const s = RA_STAGES[i];
-      if (el === s || el.includes(s) || s.includes(el)) return i;
-    }
-    return -1;
-  };
+  // (RA_STAGES/raIdx definidos no topo da função — mesmos do custo por reunião.)
   let raLabels, raData;
   const dmRA = crm.deals_minimal || [];
   if (dmRA.length) {
@@ -3891,8 +3930,12 @@ function renderPerdas() {
   const datePred = getDateFilter();   // mesmo filtro usado pelas outras páginas
 
   // ── Filtra losses_daily pelo período. Cada linha = 1 deal perdido. ──────────
+  // Eixo = data de CRIAÇÃO do negócio (r.criado), o MESMO do mega-funil e dos
+  // leads — perdas do período são subconjunto dos leads do período, e os números
+  // batem entre as páginas (antes: data de fechamento → 136 aqui vs 27 no funil).
+  // Fallback r.data p/ dado antigo sem o campo criado.
   const lossesFilt = (DATA.crm.losses_daily || [])
-    .filter(r => !datePred || datePred(r.data));
+    .filter(r => !datePred || datePred(r.criado || r.data));
 
   // Se backend antigo (sem losses_daily) → fallback para agregados históricos
   const usingFallback = lossesFilt.length === 0 && !datePred;
@@ -4029,9 +4072,13 @@ function renderPerdas() {
     : '<p style="font-size:12px;color:#999;padding:8px;">Sem perdas no período selecionado.</p>';
 
   // ── 4) Perdas por UTM Source ─────────────────────────────────────────────────
+  // "não identificado" = lead sem utm_source — pela régua do dashboard, tudo que
+  // não é googlecpc/metaads conta como orgânico. Rótulo honesto no gráfico.
+  const SRC_LBL = (s) => (!s || s === 'não identificado') ? 'orgânico / não rastreado' : s;
   let lossSrc = aggBy(lossesFilt, 'utm_source').slice(0, 8)
-    .map(({ k, v }) => ({ utm: k, total: v }));
-  if (usingFallback) lossSrc = (DATA.crm.losses_by_utm_source || []).slice(0, 8);
+    .map(({ k, v }) => ({ utm: SRC_LBL(k), total: v }));
+  if (usingFallback) lossSrc = (DATA.crm.losses_by_utm_source || []).slice(0, 8)
+    .map(r => ({ utm: SRC_LBL(r.utm), total: r.total }));
   if (lossSrc.length) {
     makeChart('chart-losses-utm-source', {
       type: 'doughnut',
@@ -4229,6 +4276,19 @@ function renderMeta() {
     </tr>`;
   }).join('') || '<tr><td colspan="10" class="empty">Sem dados no período selecionado.</td></tr>';
   document.getElementById('meta-status-warn').innerHTML = statusWarn;
+
+  // Conciliação KPI × tabela: a coluna "Leads CRM" vem do matching por anúncio/
+  // campanha (cobre a maioria, não todos); o KPI é a verdade (utm_source). A
+  // decomposição por campanha nunca excede o KPI — menor é esperado; a diferença
+  // é declarada aqui em vez de deixar o leitor achar que a tabela "não fecha".
+  const concilMeta = document.getElementById('meta-leads-concil');
+  if (concilMeta) {
+    const somaTab = Math.round(campsShow.reduce((s, [, d]) => s + (d.leadsCRM || 0), 0));
+    const difLeads = Math.round(tLeadsCRM) - somaTab;
+    concilMeta.innerHTML = (!campSel && difLeads > 0)
+      ? `<p style="font-size:11px;color:#475569;margin:8px 0 0;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;">🧾 <strong>Conciliação:</strong> KPI "Leads CRM" do período = ${fmt.num(Math.round(tLeadsCRM))} (por UTM — a verdade). Soma da coluna = ${fmt.num(somaTab)}. Os ${fmt.num(difLeads)} restantes são leads do CRM sem campanha identificada (sem matching por anúncio) — não aparecem na tabela, mas contam no KPI.</p>`
+      : '';
+  }
 
   // ── 2. INVESTIMENTO × LEADS CRM (mensal, mesmo gráfico) ──
   // Com campanha selecionada: série mensal SÓ dela (campaign_daily agregado por mês,
@@ -4497,6 +4557,17 @@ function renderGoogle() {
     </tr>`;
   }).join('') || '<tr><td colspan="10" class="empty">Sem dados no período selecionado.</td></tr>';
   document.getElementById('google-status-warn').innerHTML = statusWarn + gcWarn;
+
+  // Conciliação KPI × tabela (mesma régua da página Meta): KPI = leads por UTM;
+  // coluna = atribuição por utm_campaign/matching. Diferença declarada na tela.
+  const concilGoogle = document.getElementById('google-leads-concil');
+  if (concilGoogle) {
+    const somaTabG = camps.reduce((s, [name]) => s + Math.round(crmByCamp[name] || 0), 0);
+    const difLeadsG = Math.round(tLeadsCRM) - somaTabG;
+    concilGoogle.innerHTML = (!campSel && !escondeLeadsCamp && difLeadsG > 0)
+      ? `<p style="font-size:11px;color:#475569;margin:8px 0 0;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;padding:8px 10px;">🧾 <strong>Conciliação:</strong> KPI "Leads CRM" do período = ${fmt.num(Math.round(tLeadsCRM))} (por UTM — a verdade). Soma da coluna = ${fmt.num(somaTabG)}. Os ${fmt.num(difLeadsG)} restantes são leads do CRM sem campanha identificada (utm_campaign ausente/sem matching) — não aparecem na tabela, mas contam no KPI.</p>`
+      : '';
+  }
 
   // ── 2. INVESTIMENTO × LEADS CRM (mensal, mesmo gráfico) ──
   // Com campanha selecionada: série mensal SÓ dela (gasto do campaign_daily;
