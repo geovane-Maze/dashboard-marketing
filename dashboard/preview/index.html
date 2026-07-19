@@ -1532,7 +1532,7 @@
 
       <div class="charts-row">
         <div class="chart-card">
-          <h3>Negócios por Etapa</h3>
+          <h3>Negócios por Etapa <span style="font-size:11px;color:#94a3b8;font-weight:400;">— etapa em tempo real no CRM · atualizado <span id="crm-funnel-upd"></span></span></h3>
           <div id="crm-funnel-bars" style="padding: 8px 0;"></div>
         </div>
         <div class="chart-card">
@@ -3599,29 +3599,17 @@ function renderCRM() {
     { label: 'No-Show 2ª Reunião',            value: fmt.num(r2NS),                    sub: 'campo 2ª Reunião = Não',          cls: 'red'    },
   ].map(k => `<div class="kpi-card ${k.cls}"><div class="kpi-label">${k.label}</div><div class="kpi-value">${k.value}</div><div class="kpi-sub">${k.sub}</div></div>`).join('');
 
-  // Funnel bars — etapa ATUAL dos negócios ABERTOS, RESPEITANDO o filtro de período
-  // (deals_minimal com `st`). Antes usava o active_funnel GLOBAL, que ignorava o filtro
-  // — com jul selecionado mostrava 16 na 1ª Reunião Agendada (todos os abertos da
-  // história) enquanto os outros gráficos mostravam só o período. Fallback: dado
-  // antigo sem `st` mantém o comportamento global.
-  const nbPred = getDateFilter();
-  const dmNB = crm.deals_minimal || [];
-  const nbTemSt = dmNB.some(d => 'st' in d);
-  let crmFunnel, nbSub;
-  if (nbTemSt) {
-    const nbCnt = {};
-    dmNB.filter(d => d.st === 'aberto' && (!nbPred || nbPred(d.criado_em)))
-        .forEach(d => { nbCnt[d.etapa] = (nbCnt[d.etapa] || 0) + 1; });
-    crmFunnel = Object.entries(nbCnt).map(([etapa, total]) => ({ etapa, total }))
-      .sort((a, b) => funnelSortIndex(a.etapa) - funnelSortIndex(b.etapa));
-    nbSub = nbPred
-      ? 'Etapa ATUAL dos negócios abertos criados no período — quem avançou conta na etapa onde está hoje; ganhos/perdidos ficam de fora (por isso difere do funil "chegaram à etapa").'
-      : 'Etapa ATUAL de todos os negócios abertos.';
-  } else {
-    crmFunnel = (crm.active_funnel || []).slice()
-      .sort((a, b) => funnelSortIndex(a.etapa) - funnelSortIndex(b.etapa));
-    nbSub = 'Etapa ATUAL de todos os negócios abertos (histórico — dado sem filtro de período; atualize o ETL).';
-  }
+  // Funnel bars — FOTO EM TEMPO REAL do CRM (decisão do Geovane, 19/07): etapa ATUAL
+  // de TODOS os negócios abertos, IGNORANDO o filtro de período de propósito. Este
+  // gráfico só muda quando os negócios se movem dentro do CRM (a cada coleta), nunca
+  // com o seletor de datas — é o espelho operacional da carteira. Ganhos/perdidos fora.
+  const crmFunnel = (crm.active_funnel || []).slice()
+    .sort((a, b) => funnelSortIndex(a.etapa) - funnelSortIndex(b.etapa));
+  const nbSub = 'Espelho em tempo real do CRM: etapa ATUAL de todos os negócios ABERTOS. '
+    + 'NÃO muda com o filtro de período — muda quando os negócios se movem no funil. '
+    + 'Ganhos/perdidos ficam de fora.';
+  const updEl = document.getElementById('crm-funnel-upd');
+  if (updEl) updEl.textContent = DATA.last_update || '—';
   const crmMax     = Math.max(...crmFunnel.map(s => s.total), 1);
   const crmTotal   = crmFunnel.reduce((a, s) => a + s.total, 0) || 1;
 
