@@ -122,6 +122,61 @@ def _jaccard(a, b):
         return 0.0
     return len(a & b) / len(a | b)
 
+def attach_google_campaign_leads(google_agg, leads):
+    """
+    Leads CRM por CAMPANHA Google via utm_campaign DIRETO (grava `leads` no
+    google_ads.campaign_daily). Antes a coluna "Leads CRM" da tabela de campanhas
+    vinha só do matching utm_content ↔ nome de anúncio — campanhas cujos anúncios
+    não casam por nome (ex.: DG.Grupo.Por.Cidade, utm_content genérico) mostravam
+    0 leads mesmo com leads reais no CRM. utm_campaign → nome da campanha por
+    containment de tokens (mesma régua do infer_utm_source_quebrada); sem match
+    inequívoco, não atribui (decomposição nunca excede o KPI por fonte).
+    """
+    names = google_agg.get("campaign_names") or []
+    pools = [(n, _tokens(n)) for n in names]
+    cache = {}
+
+    def resolve(c):
+        if c not in cache:
+            tc = _tokens(c)
+            best, bn = 0.0, None
+            for n, ts in pools:
+                if ts and tc:
+                    cov = len(tc & ts) / len(tc)
+                    if cov > best:
+                        best, bn = cov, n
+            cache[c] = bn if best >= 0.6 else None
+        return cache[c]
+
+    per = defaultdict(int)
+    for l in leads:
+        if (l.get("utm_source") or "").strip() != "googlecpc":
+            continue
+        c = (l.get("utm_campaign") or "").strip()
+        dia = parse_date_to_day(l.get("criado_em"))
+        if not c or not dia:
+            continue
+        camp = resolve(c)
+        if camp:
+            per[(camp, dia)] += 1
+
+    rows = google_agg.get("campaign_daily") or []
+    idx = {(r["campanha"], r["data"]): r for r in rows}
+    for (camp, dia), n in per.items():
+        r = idx.get((camp, dia))
+        if r is None:
+            r = {"campanha": camp, "data": dia, "gasto": 0, "conversoes": 0,
+                 "impressoes": 0, "cliques": 0}
+            rows.append(r)
+            idx[(camp, dia)] = r
+        r["leads"] = n
+    google_agg["campaign_daily"] = rows
+    total = sum(per.values())
+    if total:
+        print(f"    Leads CRM por campanha Google (utm_campaign direto): {total} leads atribuídos")
+    return google_agg
+
+
 def infer_utm_source_quebrada(leads, meta_rows, google_rows):
     """
     Recupera a utm_source de leads cujo LINK da campanha veio QUEBRADO:
@@ -2677,6 +2732,9 @@ def main():
                   "em vez de Ativo/Pausado.")
     except Exception as e:
         print(f"::error::Status Google (API) FALHOU: {e}")
+
+    # Leads CRM por campanha Google via utm_campaign (grava `leads` no campaign_daily)
+    attach_google_campaign_leads(google_agg, leads)
 
     utm_agg     = aggregate_utm(leads)
     leads_agg   = aggregate_leads(leads)

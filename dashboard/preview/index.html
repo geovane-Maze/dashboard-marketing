@@ -4477,13 +4477,22 @@ function renderGoogle() {
   }
   const campSel = googleCampSel === 'all' ? null : googleCampSel;
 
-  // Leads CRM por campanha = soma dos leads CRM por anúncio (google_ads_creatives.daily,
-  // MESMA fonte das tabelas de grupos/anúncios) agrupada por campanha. Garante consistência.
+  // Leads CRM por campanha. Fonte preferida: campaign_daily.leads (atribuição DIRETA
+  // por utm_campaign no ETL — cobre campanhas cujos anúncios não casam por nome, ex.
+  // DG.Grupo.Por.Cidade, que mostrava 0). Fallback (dado antigo sem o campo): soma do
+  // matching por anúncio (GC.daily).
   const crmByCamp = {};
-  (GC.daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
-    const cp = r.campanha;
-    if (cp) crmByCamp[cp] = (crmByCamp[cp] || 0) + (r.leads || 0);
-  });
+  const temLeadsCamp = gDaily.some(r => 'leads' in r);
+  if (temLeadsCamp) {
+    gcDailyPer.forEach(r => {
+      if (r.leads) crmByCamp[r.campanha] = (crmByCamp[r.campanha] || 0) + r.leads;
+    });
+  } else {
+    (GC.daily || []).filter(r => !datePred || datePred(r.data)).forEach(r => {
+      const cp = r.campanha;
+      if (cp) crmByCamp[cp] = (crmByCamp[cp] || 0) + (r.leads || 0);
+    });
+  }
 
   // ── KPIs (CPL via CRM — regra de ouro) ──
   // Sem campanha selecionada: gasto do daily + leads CRM por UTM (fonte oficial).
@@ -4523,7 +4532,10 @@ function renderGoogle() {
   const gMax  = (G.campaign_daily || []).reduce((mx, r) => r.data > mx ? r.data : mx, '');
   const gcStale = !!(gcMax && gMax && gcMax < gMax);
   const gcMaxBR = gcMax ? gcMax.slice(8, 10) + '/' + gcMax.slice(5, 7) : '';
-  const gcWarn = gcStale ? `<div class="status-warn">⚠️ Os dados de criativos do Google só atualizaram até <strong>${gcMaxBR}</strong> (a planilha de criativos travou). Por isso o <strong>Leads/CPL por campanha está oculto</strong> e as tabelas de <strong>Grupos e Anúncios refletem só até ${gcMaxBR}</strong> (parcial). O Gasto total, os KPIs e o gasto/cliques/impressões por campanha estão <strong>completos e corretos</strong> (via API).</div>` : '';
+  // Com a atribuição direta por utm_campaign (temLeadsCamp), o Leads/CPL por campanha
+  // NÃO depende mais da planilha de criativos — só grupos/anúncios ficam parciais.
+  const escondeLeadsCamp = gcStale && !temLeadsCamp;
+  const gcWarn = gcStale ? `<div class="status-warn">⚠️ Os dados de criativos do Google só atualizaram até <strong>${gcMaxBR}</strong>. ${escondeLeadsCamp ? 'Por isso o <strong>Leads/CPL por campanha está oculto</strong> e as' : 'As'} tabelas de <strong>Grupos e Anúncios refletem só até ${gcMaxBR}</strong> (parcial). O Gasto total, os KPIs${escondeLeadsCamp ? '' : ', o Leads/CPL por campanha'} e o gasto/cliques/impressões estão <strong>completos e corretos</strong> (via API).</div>` : '';
   const camps = campSel ? campsAll.filter(([n]) => n === campSel) : campsAll;
   document.getElementById('table-google-campaigns').innerHTML = camps.map(([name, d]) => {
     const lc = crmByCamp[name] || 0, cpl = lc > 0 ? d.gasto / lc : 0;
@@ -4532,8 +4544,8 @@ function renderGoogle() {
       <td>${stt(activeCamps.has(name))}</td>
       <td>${ell(name, 220)}</td>
       <td>${fmt.num(d.conv)}</td>
-      <td><strong>${gcStale ? '—' : fmt.num(Math.round(lc))}</strong></td>
-      <td>${gcStale ? '—' : (lc > 0 ? fmt.currency(cpl) : '—')}</td>
+      <td><strong>${escondeLeadsCamp ? '—' : fmt.num(Math.round(lc))}</strong></td>
+      <td>${escondeLeadsCamp ? '—' : (lc > 0 ? fmt.currency(cpl) : '—')}</td>
       <td>${fmt.k(d.impressoes)}</td>
       <td>${fmt.k(d.cliques)}</td>
       <td>${cpc > 0 ? fmt.currency(cpc) : '—'}</td>
@@ -4550,13 +4562,17 @@ function renderGoogle() {
   if (campSel) {
     gDaily.filter(r => r.campanha === campSel).forEach(r => {
       const m = (r.data || '').slice(0, 7);
-      if (m) gastoMes[m] = (gastoMes[m] || 0) + (r.gasto || 0);
+      if (!m) return;
+      gastoMes[m] = (gastoMes[m] || 0) + (r.gasto || 0);
+      if (temLeadsCamp && r.leads) leadsMes[m] = (leadsMes[m] || 0) + r.leads;
     });
-    (GC.daily || []).filter(r => r.campanha === campSel).forEach(r => {
-      const m = (r.data || '').slice(0, 7);
-      if (m) leadsMes[m] = (leadsMes[m] || 0) + (r.leads || 0);
-    });
-    Object.keys(leadsMes).forEach(m => { leadsMes[m] = Math.round(leadsMes[m]); });
+    if (!temLeadsCamp) {
+      (GC.daily || []).filter(r => r.campanha === campSel).forEach(r => {
+        const m = (r.data || '').slice(0, 7);
+        if (m) leadsMes[m] = (leadsMes[m] || 0) + (r.leads || 0);
+      });
+      Object.keys(leadsMes).forEach(m => { leadsMes[m] = Math.round(leadsMes[m]); });
+    }
   } else {
     (G.monthly || []).forEach(r => { gastoMes[r.mes] = r.gasto; });
     (DATA.utm.sources_monthly || []).filter(r => r.source === 'googlecpc').forEach(r => { leadsMes[r.mes] = (leadsMes[r.mes] || 0) + r.total; });

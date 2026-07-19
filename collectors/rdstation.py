@@ -140,7 +140,13 @@ def _decode_traffic_source(traffic_source_raw):
         value = value.lstrip("+")
 
         # Parseia query string: utm_source=x&utm_medium=y...
+        # PEGADINHA (17/07/2026): links de campanha quebrados chegam como
+        # '?%20utm_source=googlecpc&...' — o %20 vira ESPAÇO no nome do 1º
+        # parâmetro (' utm_source') e o get("utm_source") não encontrava,
+        # deixando a coluna utm_source VAZIA (lead pago caía como orgânico).
+        # Normaliza as chaves (strip de espaços e '?') pra recuperar.
         params = parse_qs(value, keep_blank_values=False)
+        params = {k.strip().lstrip("?").strip(): v for k, v in params.items()}
         result = {
             "utm_source": params.get("utm_source", [None])[0],
             "utm_medium": params.get("utm_medium", [None])[0],
