@@ -4627,16 +4627,20 @@ function renderGoogle() {
     const key = r.anuncio + '|||' + r.campanha + '|||' + r.grupo;
     if (cgCut7 && r.data >= cgCut7) g7dG[key] = (g7dG[key] || 0) + (r.gasto || 0);
     if (datePred && !datePred(r.data)) return;
-    const a = gAdMap[key] || (gAdMap[key] = { anuncio: r.anuncio, campanha: r.campanha || '', grupo: r.grupo || '', gasto: 0, leadsCRM: 0 });
-    a.gasto += r.gasto || 0; a.leadsCRM += r.leads || 0;
+    const a = gAdMap[key] || (gAdMap[key] = { anuncio: r.anuncio, campanha: r.campanha || '', grupo: r.grupo || '', gasto: 0, leadsCRM: 0, leadsEst: 0 });
+    a.gasto += r.gasto || 0; a.leadsCRM += r.leads || 0; a.leadsEst += r.leads_est || 0;
   });
   const ads = Object.values(gAdMap).filter(a => a.gasto > 0).map(a => {
     const meta = byAd[a.anuncio] || {};
-    const cpl = a.leadsCRM > 0 ? a.gasto / a.leadsCRM : 0;
+    // leadsEst = ESTIMATIVA por rateio de gasto no grupo (leads sem rastreio por
+    // anúncio, ex. DG). Soma no total (régua/CPL) e é exibida com "≈" na tabela.
+    const leadsTot = a.leadsCRM + (a.leadsEst || 0);
+    const cpl = leadsTot > 0 ? a.gasto / leadsTot : 0;
     return { anuncio: a.anuncio, campanha: a.campanha, conjunto: a.grupo, gasto: a.gasto,
       gasto7d: g7dG[a.anuncio + '|||' + a.campanha + '|||' + a.grupo] || 0,
-      leadsPlat: meta.conversoes_plataforma || 0, leadsCRM: a.leadsCRM, _cpl: cpl, url: meta.url_final,
-      ativo: activeCamps.has(a.campanha), q: qualidadeAds(cpl, a.gasto, a.leadsCRM, TQ) };
+      leadsPlat: meta.conversoes_plataforma || 0, leadsCRM: leadsTot, leadsEst: a.leadsEst || 0,
+      _cpl: cpl, url: meta.url_final,
+      ativo: activeCamps.has(a.campanha), q: qualidadeAds(cpl, a.gasto, leadsTot, TQ) };
   }).sort((x, y) => y.gasto - x.gasto);
 
   // HONESTIDADE: campanhas com leads SEM rastreio por anúncio (utm_content genérico —
@@ -4657,8 +4661,9 @@ function renderGoogle() {
     }
   });
   const totSemRastreio = Object.values(semRastreio).reduce((s, n) => s + n, 0);
-  const notaSemRastreio = totSemRastreio > 0
-    ? `<p style="font-size:11px;color:#92400E;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:8px 10px;margin-top:10px;">ℹ️ <strong>${fmt.num(totSemRastreio)} leads sem rastreio por anúncio</strong> (utm_content genérico) — contam na campanha e nos grupos (por estado/utm_term), mas não têm anúncio identificável. Por isso os anúncios dessas campanhas aparecem como "dados insuf." em vez de "Ruim".</p>`
+  const temEst = ads.some(a => (a.leadsEst || 0) > 0.4);
+  const notaSemRastreio = (temEst || totSemRastreio > 0)
+    ? `<p style="font-size:11px;color:#92400E;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:8px 10px;margin-top:10px;">ℹ️ Alguns leads não têm rastreio individual por anúncio (utm_content genérico da campanha). ${temEst ? 'Os valores marcados com <strong>≈</strong> são <strong>estimativas por rateio proporcional ao gasto</strong> dentro do grupo — o rastreio REAL vai até o nível de grupo (utm_term/estado). Para rastreio exato por anúncio, usar utm_content único por criativo no link.' : 'Esses leads contam na campanha e nos grupos, mas não têm anúncio identificável — por isso esses anúncios aparecem como "dados insuf." em vez de "Ruim".'}</p>`
     : '';
   document.getElementById('table-google-ads').innerHTML = ads.map(c => {
     const icon = `<div class="ad-thumb" style="display:flex;align-items:center;justify-content:center;">🔗</div>`;
@@ -4671,8 +4676,8 @@ function renderGoogle() {
       <td>${fmt.currency(c.gasto)}</td>
       <td>${fmt.currency(c.gasto7d)}</td>
       <td>${fmt.num(c.leadsPlat)}</td>
-      <td><strong>${fmt.num(Math.round(c.leadsCRM))}</strong></td>
-      <td>${c.leadsCRM > 0 ? fmt.currency(c._cpl) : '—'}</td>
+      <td><strong>${(c.leadsEst || 0) > 0.4 ? '≈' : ''}${fmt.num(Math.round(c.leadsCRM))}</strong></td>
+      <td>${c.leadsCRM > 0 ? ((c.leadsEst || 0) > 0.4 ? '≈' : '') + fmt.currency(c._cpl) : '—'}</td>
       <td><span class="q-badge ${c.q.cls}">${c.q.acao}</span></td>
     </tr>`;
   }).join('') || '<tr><td colspan="10" class="empty">Sem anúncios.</td></tr>';

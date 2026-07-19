@@ -268,9 +268,31 @@ def attach_google_group_leads(gc_agg, google_agg, leads, gc_rows):
             idx[(camp, grupo, dia)] = r
         r["leads"] = round((r.get("leads") or 0) + n, 2)
     gc_agg["group_daily"] = rows
+
+    # Nível ANÚNCIO: sem rastreio individual (utm_content genérico), o melhor possível
+    # é uma ESTIMATIVA por rateio proporcional ao gasto dos anúncios do grupo no dia
+    # (mesmo mecanismo do rateio Meta). Vai num campo SEPARADO `leads_est` — o front
+    # exibe com "≈" pra nunca confundir estimativa com rastreio real.
+    cad_rows = gc_agg.get("creative_group_daily") or []
+    cad_idx = defaultdict(list)
+    for r in cad_rows:
+        cad_idx[(r["campanha"], r["grupo"], r["data"])].append(r)
+    est_total = 0.0
+    for (camp, grupo, dia), n in per.items():
+        ads_dia = cad_idx.get((camp, grupo, dia)) or []
+        tot_g = sum(r.get("gasto") or 0 for r in ads_dia)
+        if tot_g <= 0:
+            continue
+        for r in ads_dia:
+            frac = n * ((r.get("gasto") or 0) / tot_g)
+            if frac:
+                r["leads_est"] = round((r.get("leads_est") or 0) + frac, 2)
+                est_total += frac
+
     tot = sum(per.values())
     if tot:
-        print(f"    Leads CRM por grupo Google (utm_term/UF): {tot} leads atribuídos")
+        print(f"    Leads CRM por grupo Google (utm_term/UF): {tot} leads atribuídos "
+              f"({est_total:.1f} rateados como estimativa p/ anúncios)")
     return gc_agg
 
 
