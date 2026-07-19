@@ -4593,6 +4593,28 @@ function renderGoogle() {
       leadsPlat: meta.conversoes_plataforma || 0, leadsCRM: a.leadsCRM, _cpl: cpl, url: meta.url_final,
       ativo: activeCamps.has(a.campanha), q: qualidadeAds(cpl, a.gasto, a.leadsCRM, TQ) };
   }).sort((x, y) => y.gasto - x.gasto);
+
+  // HONESTIDADE: campanhas com leads SEM rastreio por anúncio (utm_content genérico —
+  // ex.: DG.Grupo.Por.Cidade). Os leads existem (contam na campanha e nos grupos via
+  // utm_term), mas não dá pra saber QUAL anúncio gerou — então anúncio com 0 leads
+  // dessas campanhas NÃO pode ser julgado "Ruim/Pausar" pelo 0 falso: vira "dados
+  // insuf. / Observar", com nota explicando.
+  const adsLeadsByCamp = {};
+  ads.forEach(a => { adsLeadsByCamp[a.campanha] = (adsLeadsByCamp[a.campanha] || 0) + a.leadsCRM; });
+  const semRastreio = {};
+  Object.entries(crmByCamp).forEach(([c, n]) => {
+    const diff = Math.round(n) - Math.round(adsLeadsByCamp[c] || 0);
+    if (diff > 0 && camps.some(([nome]) => nome === c)) semRastreio[c] = diff;
+  });
+  ads.forEach(a => {
+    if (semRastreio[a.campanha] && a.leadsCRM === 0 && a.gasto > 0) {
+      a.q = { nivel: 'Dados insuf.', acao: 'Observar', cls: 'q-warn' };
+    }
+  });
+  const totSemRastreio = Object.values(semRastreio).reduce((s, n) => s + n, 0);
+  const notaSemRastreio = totSemRastreio > 0
+    ? `<p style="font-size:11px;color:#92400E;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:8px 10px;margin-top:10px;">ℹ️ <strong>${fmt.num(totSemRastreio)} leads sem rastreio por anúncio</strong> (utm_content genérico) — contam na campanha e nos grupos (por estado/utm_term), mas não têm anúncio identificável. Por isso os anúncios dessas campanhas aparecem como "dados insuf." em vez de "Ruim".</p>`
+    : '';
   document.getElementById('table-google-ads').innerHTML = ads.map(c => {
     const icon = `<div class="ad-thumb" style="display:flex;align-items:center;justify-content:center;">🔗</div>`;
     const cell = c.url ? `<a href="${esc(c.url)}" target="_blank" rel="noopener" title="Abrir página do anúncio">${icon}</a>` : icon;
@@ -4609,6 +4631,14 @@ function renderGoogle() {
       <td><span class="q-badge ${c.q.cls}">${c.q.acao}</span></td>
     </tr>`;
   }).join('') || '<tr><td colspan="10" class="empty">Sem anúncios.</td></tr>';
+  const gadsCard = document.getElementById('table-google-ads').closest('.table-card');
+  let gadsNota = gadsCard ? gadsCard.querySelector('#gads-sem-rastreio') : null;
+  if (gadsCard && !gadsNota) {
+    gadsNota = document.createElement('div');
+    gadsNota.id = 'gads-sem-rastreio';
+    gadsCard.appendChild(gadsNota);
+  }
+  if (gadsNota) gadsNota.innerHTML = notaSemRastreio;
 
   // ── 5. RESUMO E PRÓXIMOS PASSOS (automático) ──
   document.getElementById('google-resumo').innerHTML = buildAdsResumo('Google Ads', { tGasto, tLeadsCRM, kCpl, kCtr, tImpr, tCliques, T, TQ, nCamps: camps.length, adsets: grupos, ads, unidade: 'Grupos', unidadeS: 'grupo' });

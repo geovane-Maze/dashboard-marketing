@@ -177,6 +177,103 @@ def attach_google_campaign_leads(google_agg, leads):
     return google_agg
 
 
+def attach_google_group_leads(gc_agg, google_agg, leads, gc_rows):
+    """
+    Leads CRM por GRUPO Google via utm_term (estado/UF), para leads SEM rastreio
+    por anúncio. Caso DG.Grupo.Por.Cidade: o utm_content é genérico e não casa com
+    nenhum nome de anúncio — a campanha mostrava 13 leads e TODOS os grupos/anúncios
+    mostravam 0 (e a régua recomendava "Pausar" com base no 0 falso). Mas o utm_term
+    traz o estado ('Cidade.Sao.Paulo') e os grupos são '[ESTADO - SP] ...': dá pra
+    atribuir ao GRUPO com evidência real. Regras:
+      - só leads googlecpc cujo utm_content NÃO casa com anúncio (evita dupla contagem
+        com o matching por nome, mesma régua Jaccard >= 0.4);
+      - utm_campaign resolve a campanha (containment >= 0.6, como nas outras);
+      - o UF do utm_term precisa bater com EXATAMENTE um grupo da campanha.
+    O nível ANÚNCIO fica sem esses leads mesmo (não há evidência) — o front marca
+    "dados insuf." em vez de "Ruim/Pausar".
+    """
+    ad_pool = [_tokens(r.get("anuncio") or "") for r in (gc_rows or [])]
+    ad_pool = [t for t in ad_pool if t]
+
+    def casa_com_anuncio(utm_content):
+        tc = _tokens(utm_content)
+        return bool(tc) and any(_jaccard(tc, ta) >= 0.4 for ta in ad_pool)
+
+    grupos_por_camp = defaultdict(dict)   # campanha -> {grupo: set(UFs no nome)}
+    for r in (gc_rows or []):
+        c = (r.get("campanha") or "").strip()
+        g = (r.get("grupo") or "").strip()
+        if c and g and g not in grupos_por_camp[c]:
+            grupos_por_camp[c][g] = set(re.findall(r"\b[A-Z]{2}\b", g))
+
+    ESTADO_UF = {"sao paulo": "SP", "rio de janeiro": "RJ", "minas gerais": "MG",
+                 "minas": "MG", "parana": "PR", "santa catarina": "SC",
+                 "rio grande do sul": "RS", "bahia": "BA", "goias": "GO",
+                 "espirito santo": "ES", "distrito federal": "DF"}
+
+    def uf_do_term(t):
+        t = unicodedata.normalize("NFKD", str(t or "")).encode("ascii", "ignore").decode().lower()
+        t = re.sub(r"[^a-z]+", " ", t).strip()
+        for nome, uf in ESTADO_UF.items():
+            if nome in t:
+                return uf
+        m = re.search(r"\b(sp|rj|mg|pr|sc|rs|ba|go|es|df)\b", t)
+        return m.group(1).upper() if m else None
+
+    names = google_agg.get("campaign_names") or []
+    pools = [(n, _tokens(n)) for n in names]
+    cache = {}
+
+    def resolve(c):
+        if c not in cache:
+            tc = _tokens(c)
+            best, bn = 0.0, None
+            for n, ts in pools:
+                if ts and tc:
+                    cov = len(tc & ts) / len(tc)
+                    if cov > best:
+                        best, bn = cov, n
+            cache[c] = bn if best >= 0.6 else None
+        return cache[c]
+
+    per = defaultdict(int)
+    for l in leads:
+        if (l.get("utm_source") or "").strip() != "googlecpc":
+            continue
+        c = (l.get("utm_campaign") or "").strip()
+        dia = parse_date_to_day(l.get("criado_em"))
+        if not c or not dia:
+            continue
+        if casa_com_anuncio(l.get("utm_content") or ""):
+            continue   # já entra via matching por anúncio (group_daily normal)
+        camp = resolve(c)
+        if not camp:
+            continue
+        uf = uf_do_term(l.get("utm_term") or "")
+        if not uf:
+            continue
+        candidatos = [g for g, ufs in grupos_por_camp.get(camp, {}).items() if uf in ufs]
+        if len(candidatos) != 1:
+            continue
+        per[(camp, candidatos[0], dia)] += 1
+
+    rows = gc_agg.get("group_daily") or []
+    idx = {(r["campanha"], r["grupo"], r["data"]): r for r in rows}
+    for (camp, grupo, dia), n in per.items():
+        r = idx.get((camp, grupo, dia))
+        if r is None:
+            r = {"data": dia, "campanha": camp, "grupo": grupo,
+                 "gasto": 0, "conversoes": 0, "leads": 0}
+            rows.append(r)
+            idx[(camp, grupo, dia)] = r
+        r["leads"] = round((r.get("leads") or 0) + n, 2)
+    gc_agg["group_daily"] = rows
+    tot = sum(per.values())
+    if tot:
+        print(f"    Leads CRM por grupo Google (utm_term/UF): {tot} leads atribuídos")
+    return gc_agg
+
+
 def infer_utm_source_quebrada(leads, meta_rows, google_rows):
     """
     Recupera a utm_source de leads cujo LINK da campanha veio QUEBRADO:
@@ -2736,6 +2833,11 @@ def main():
     # Leads CRM por campanha Google via utm_campaign (grava `leads` no campaign_daily)
     attach_google_campaign_leads(google_agg, leads)
 
+    # Criativos Google agregados + leads por GRUPO via utm_term/UF (leads sem
+    # rastreio por anúncio — ex.: DG.Grupo.Por.Cidade)
+    gc_agg = aggregate_google_ads_creatives(google_ads_creatives_rows, leads_daily_map=google_leads_daily)
+    attach_google_group_leads(gc_agg, google_agg, leads, google_ads_creatives_rows)
+
     utm_agg     = aggregate_utm(leads)
     leads_agg   = aggregate_leads(leads)
 
@@ -2780,7 +2882,7 @@ def main():
         "ga4": aggregate_ga4(ga4),
         "ga4_lps": aggregate_ga4_lps(ga4),
         "utm": utm_agg,
-        "google_ads_creatives": aggregate_google_ads_creatives(google_ads_creatives_rows, leads_daily_map=google_leads_daily),
+        "google_ads_creatives": gc_agg,
         "creative_quality": creative_quality,
         "previsibilidade": previsibilidade_data,
         "previsibilidade_nativa": previsibilidade_nativa_data,
