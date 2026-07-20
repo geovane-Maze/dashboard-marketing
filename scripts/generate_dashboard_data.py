@@ -2800,6 +2800,25 @@ def main():
     print("  Lendo GA4...")
     ga4 = read_sheet(gc, "ga4_sessions")
 
+    # Série diária da aba "Metas e Conversão" (site de expansão via hostName +
+    # evento lead_prospecta). A aba pode não existir até o coletor novo rodar —
+    # nesse caso o front mantém os cartões em "Aguardando conexão do GA4".
+    print("  Lendo GA4 Metas (hostName + lead_prospecta)...")
+    metas_ga4_daily = []
+    try:
+        for row in read_sheet(gc, "ga4_metas_daily"):
+            dia = parse_date_to_day(row.get("date"))
+            if not dia:
+                continue
+            metas_ga4_daily.append({
+                "data": dia,
+                "sessoes": int(parse_num(row.get("sessions"))),
+                "lead_prospecta": int(parse_num(row.get("lead_prospecta"))),
+            })
+        print(f"    ga4_metas_daily: {len(metas_ga4_daily)} dias")
+    except Exception as e:
+        print(f"    ga4_metas_daily indisponível ({e}) — cartões da aba Metas ficam reservados")
+
     print("  Lendo Previsibilidade 2026 (espelho planilha — legado/produção)...")
     previsibilidade_data = None
     try:
@@ -2949,6 +2968,7 @@ def main():
         "google_ads": google_agg,
         "ga4": aggregate_ga4(ga4),
         "ga4_lps": aggregate_ga4_lps(ga4),
+        "metas": {"ga4_daily": metas_ga4_daily},   # aba Metas e Conversão
         "utm": utm_agg,
         "google_ads_creatives": gc_agg,
         "creative_quality": creative_quality,

@@ -5473,7 +5473,14 @@ function renderMetas() {
   const sum7 = (arr, f) => (arr || []).filter(r => r.data >= d7ini && r.data <= anchor).reduce((s, r) => s + (r[f] || 0), 0);
   const invest7 = sum7((DATA.meta_ads || {}).daily, 'gasto') + sum7((DATA.google_ads || {}).daily, 'gasto');
   const leads7 = sum7(DATA.leads.daily, 'total');
-  const ga4w = RESERVADO.ga4_semana || null;    // {sessoes, leads_prospecta}
+  // GA4 da aba (site de expansão via hostName + evento lead_prospecta):
+  // preferência pela série diária metas.ga4_daily (soma a MESMA janela de 7d);
+  // fallback pro agregado ga4_semana; sem nenhum → cartões reservados.
+  const g4rows = (RESERVADO.ga4_daily || []).filter(r => r.data >= d7ini && r.data <= anchor);
+  const ga4w = g4rows.length
+    ? { sessoes: g4rows.reduce((s, r) => s + (r.sessoes || 0), 0),
+        leads_prospecta: g4rows.reduce((s, r) => s + (r.lead_prospecta || 0), 0) }
+    : (RESERVADO.ga4_semana || null);
   // CPL exige gasto COLETADO na janela: com coletor de mídia atrasado e leads
   // entrando, invest7=0 daria CPL R$0 → farol verde falso. Sem gasto → neutro.
   const valsA = {

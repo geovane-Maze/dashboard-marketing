@@ -131,6 +131,63 @@ def _default_start_date():
     return (datetime.today() - timedelta(days=180)).strftime("%Y-%m-%d")
 
 
+HOSTNAME_EXPANSAO = "franquiaclinicadacidade.com.br"
+
+
+def get_metas_daily(start_date=None, end_date="today"):
+    """
+    Série diária pra aba "Metas e Conversão" (sessões + evento lead_prospecta).
+
+    OBRIGATÓRIO filtrar hostName: esta propriedade GA4 recebe dados de outros
+    sites (www.clinicadacidade, cdctatui, essencialclinica...) — sem o filtro,
+    as sessões vêm ~2x infladas (verificado: 7.597 vs ~14.000 em 30d).
+    Diferente do ga4_sessions (que filtra pagePath das LPs), aqui é o SITE
+    INTEIRO de expansão — é a régua da meta semanal do consultor.
+    """
+    if start_date is None:
+        start_date = _default_start_date()
+    print("Coletando GA4 — série da aba Metas (hostName + lead_prospecta)...")
+    client = _get_client()
+
+    host_filter = FilterExpression(filter=Filter(
+        field_name="hostName",
+        string_filter=Filter.StringFilter(
+            match_type=Filter.StringFilter.MatchType.EXACT, value=HOSTNAME_EXPANSAO),
+    ))
+
+    def _report(metrics, dim_filter):
+        request = RunReportRequest(
+            property=f"properties/{PROPERTY_ID}",
+            dimensions=[Dimension(name="date")],
+            metrics=[Metric(name=m) for m in metrics],
+            date_ranges=[DateRange(start_date=start_date, end_date=end_date)],
+            dimension_filter=dim_filter,
+            limit=250000,
+        )
+        resp = client.run_report(request)
+        return {r.dimension_values[0].value: int(float(r.metric_values[0].value)) for r in resp.rows}
+
+    sessoes = _report(["sessions"], host_filter)
+
+    from google.analytics.data_v1beta.types import FilterExpressionList
+    lead_filter = FilterExpression(and_group=FilterExpressionList(expressions=[
+        host_filter,
+        FilterExpression(filter=Filter(
+            field_name="eventName",
+            string_filter=Filter.StringFilter(
+                match_type=Filter.StringFilter.MatchType.EXACT, value="lead_prospecta"),
+        )),
+    ]))
+    leads_ev = _report(["eventCount"], lead_filter)
+
+    rows = [
+        {"date": d, "sessions": sessoes.get(d, 0), "lead_prospecta": leads_ev.get(d, 0)}
+        for d in sorted(set(sessoes) | set(leads_ev))
+    ]
+    print(f"  Metas GA4: {len(rows)} dias · sessões={sum(sessoes.values())} · lead_prospecta={sum(leads_ev.values())}")
+    return rows
+
+
 def get_ga4_data(start_date=None, end_date="today"):
     if start_date is None:
         start_date = _default_start_date()

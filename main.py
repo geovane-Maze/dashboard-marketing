@@ -38,6 +38,10 @@ def run():
     try:
         ga4_data = ga4.get_ga4_data()
         writer.write_sheet("ga4_sessions", ga4_data)
+        # Série da aba "Metas e Conversão" (site de expansão via hostName +
+        # evento lead_prospecta) — mesma credencial, mesma regra de falha.
+        metas_rows = ga4.get_metas_daily()
+        writer.write_sheet("ga4_metas_daily", metas_rows)
     except Exception as e:
         # Falha BARULHENTA: essa coleta já ficou 44 dias quebrada em silêncio
         # (secret GA4_TOKEN_JSON malformado, jun-jul/26) com o run verde. O
