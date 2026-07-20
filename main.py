@@ -34,11 +34,22 @@ def run():
 
     # Google Analytics 4
     print("\n[3/6] Google Analytics 4")
+    ga4_falhou = False
     try:
         ga4_data = ga4.get_ga4_data()
         writer.write_sheet("ga4_sessions", ga4_data)
     except Exception as e:
+        # Falha BARULHENTA: essa coleta já ficou 44 dias quebrada em silêncio
+        # (secret GA4_TOKEN_JSON malformado, jun-jul/26) com o run verde. O
+        # ::error:: vira anotação vermelha e o exit 1 no fim marca o run como
+        # FALHO na listagem — o workflow segue rodando o ETL mesmo assim (os
+        # steps seguintes têm if: steps.coleta.outcome == 'failure').
+        ga4_falhou = True
+        err_txt = str(e).replace("\r", " ").replace("\n", " ")
         print(f"  ERRO GA4: {e}")
+        print(f"::error::Coleta GA4 FALHOU — aba ga4_sessions NAO atualizada. "
+              f"Cheque o secret GA4_TOKEN_JSON (deve ser o JSON exato do arquivo "
+              f"local credentials/ga4_token.json). Erro: {err_txt}")
 
     # Google Ads API (inclui Performance Max via FROM campaign — a planilha
     # Adveronix NÃO captura PMax, então a API é a fonte completa).
@@ -111,6 +122,10 @@ def run():
         print(f"  ERRO Google Ads Criativos: {e}")
 
     print("\n" + "=" * 50)
+    if ga4_falhou:
+        print("Coleta finalizada COM FALHA no GA4 (run marcado como erro).")
+        print("=" * 50)
+        sys.exit(1)
     print("Coleta finalizada com sucesso!")
     print("=" * 50)
 

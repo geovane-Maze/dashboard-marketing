@@ -62,21 +62,30 @@ jobs:
           echo '${{ secrets.GOOGLE_CREDENTIALS_JSON }}' > credentials/google_service_account.json
           echo '${{ secrets.GA4_TOKEN_JSON }}' > credentials/ga4_token.json
 
+      # main.py sai com exit 1 se a coleta GA4 falhar (falha barulhenta — o run
+      # fica VERMELHO na listagem). Os steps seguintes rodam mesmo assim
+      # (success() || coleta falhou), pra uma falha só do GA4 não travar o ETL
+      # e o deploy dos demais dados.
       - name: Executar coleta de dados
+        id: coleta
         run: python -u main.py
         timeout-minutes: 60
 
       - name: Gerar dados do dashboard
+        id: etl
+        if: success() || steps.coleta.outcome == 'failure'
         run: |
           mkdir -p dashboard/data
           python -u scripts/generate_dashboard_data.py
         timeout-minutes: 25
 
       - name: Publicar dashboard no GitHub Pages
+        if: steps.etl.outcome == 'success'
         uses: actions/upload-pages-artifact@v3
         with:
           path: dashboard/
 
       - name: Deploy para GitHub Pages
+        if: steps.etl.outcome == 'success'
         uses: actions/deploy-pages@v4
 

@@ -1915,9 +1915,10 @@
         🗓️ <strong>O filtro de período aqui tem granularidade mensal</strong> — se você selecionar "15/05 → 20/05",
         mostra o mês de Maio inteiro.
         <span id="ga4-demo-warn" style="display:none;color:#D97706;">
-          ⚠️ Faixa etária e sexo ainda não foram coletadas — recoletar GA4 após renovar o token.
+          ⚠️ Faixa etária e sexo ainda não foram coletadas — aguardando próxima coleta do GA4.
         </span>
       </p>
+      <div id="ga4-stale-warn"></div>
 
       <!-- Cards de overview por LP (3 lado a lado) -->
       <div class="ga4-lp-overview" id="ga4-lp-overview"></div>
@@ -5081,6 +5082,24 @@ function _ga4AggregateMonths(monthlyData, monthPred) {
 }
 
 function renderGA4() {
+  // ── Aviso de defasagem da coleta ──────────────────────────────────────────
+  // A coleta GA4 já ficou 44 dias parada em SILÊNCIO (secret quebrado no
+  // Actions, jun-jul/26) e a página mostrava dado velho como se fosse atual.
+  // Regra: último dia coletado (ga4.last_date, emitido pelo ETL) a mais de
+  // 4 dias do relógio → banner. Dado antigo sem o campo → sem banner (compat).
+  const staleEl = document.getElementById('ga4-stale-warn');
+  if (staleEl) {
+    const ld = DATA.ga4 && DATA.ga4.last_date;
+    let staleHtml = '';
+    if (ld) {
+      const dias = Math.floor((Date.now() - new Date(ld + 'T12:00:00').getTime()) / 86400000);
+      if (dias > 4) {
+        staleHtml = `<div class="status-warn">⚠️ Dados do Google Analytics coletados só até <strong>${ld.split('-').reverse().join('/')}</strong> (há ${dias} dias) — a coleta parece PARADA e os números desta página estão defasados. Cheque o workflow <strong>"Coletar Dados Dashboard Marketing"</strong> e o secret <strong>GA4_TOKEN_JSON</strong> no GitHub.</div>`;
+      }
+    }
+    staleEl.innerHTML = staleHtml;
+  }
+
   const rawLPs = (DATA.ga4_lps && DATA.ga4_lps.by_lp) || {};
 
   // Se o summary.json ainda não tem ga4_lps (cache Supabase desatualizado),
@@ -5143,8 +5162,8 @@ function renderGA4() {
             <div style="font-size:24px;margin-bottom:6px;">⏳</div>
             <div style="font-size:12px;font-weight:600;color:var(--text);">Sem dados ainda</div>
             <div style="font-size:11px;color:#999;margin-top:6px;line-height:1.5;">
-              Aguardando próxima coleta GA4 (token expirado).
-              Os dados aparecem aqui automaticamente após recoletar.
+              Sem sessões registradas no período selecionado — ou a coleta do GA4
+              está atrasada (veja o aviso no topo da página, se houver).
             </div>
           </div>
         </div>`;

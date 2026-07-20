@@ -1666,7 +1666,15 @@ def aggregate_ga4(rows):
     # Detecta linhas com flag _kind (coleta nova). Ignora 'demo' pra não duplicar.
     has_kind_flag = any("_kind" in r for r in (rows or []))
 
+    # Último dia coletado — o front usa pra avisar quando a coleta GA4 estiver
+    # parada (já ficou 44 dias congelada em silêncio, jun-jul/26).
+    last_day = ""
+
     for row in rows:
+        dia_row = parse_date_to_day(row.get("date"))
+        if dia_row and dia_row > last_day:
+            last_day = dia_row
+
         if has_kind_flag and row.get("_kind") == "demo":
             continue  # demografia: já foi agregada pelo aggregate_ga4_lps
 
@@ -1720,6 +1728,7 @@ def aggregate_ga4(rows):
     return {
         "total_sessions": sum(d["sessions"] for d in monthly.values()),
         "total_users": sum(d["users"] for d in monthly.values()),
+        "last_date": last_day or None,   # último dia coletado (aviso de defasagem)
         "monthly": monthly_list,
         "channels": [
             {"channel": k, "sessions": v["sessions"], "users": v["users"], "conversions": v["conversions"]}
