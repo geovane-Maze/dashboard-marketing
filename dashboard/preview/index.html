@@ -876,6 +876,21 @@
   .q-good { background:#DCFCE7; color:#15803D; }
   .q-warn { background:#FEF9C3; color:#A16207; }
   .q-bad  { background:#FEE2E2; color:#B91C1C; }
+
+  /* ═══ METAS E CONVERSÃO — Expansão CDC ═══ */
+  .mt-farol { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; padding:3px 9px; border-radius:20px; white-space:nowrap; }
+  .mt-farol .mt-dot { width:7px; height:7px; border-radius:50%; background:currentColor; }
+  .mt-farol.g { background:#DCFCE7; color:#15803D; }
+  .mt-farol.a { background:#FEF9C3; color:#A16207; }
+  .mt-farol.v { background:#FEE2E2; color:#B91C1C; }
+  .mt-farol.n { background:#EEF1F4; color:#8695A3; }
+  tr.mt-divisor td { background:var(--primary); color:#fff; font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; padding:5px 10px; }
+  tr.mt-divisor td span { opacity:.6; font-weight:400; text-transform:none; letter-spacing:.03em; margin-left:8px; }
+  tr.mt-mudo td { background:repeating-linear-gradient(135deg,#FBFCFD,#FBFCFD 7px,#F3F6F8 7px,#F3F6F8 14px); }
+  tr.mt-mudo td, tr.mt-mudo td strong { color:#94a3b8; }
+  .mt-premissa { display:inline-block; font-size:9.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:#7c6ba0; background:#efeaf9; border-radius:3px; padding:1px 5px; margin-left:6px; vertical-align:middle; }
+  .mt-jan { font-size:11px; color:#475569; background:#EEF1F4; border-radius:4px; padding:2px 7px; white-space:nowrap; }
+  .mt-sub { display:block; font-weight:400; font-size:10.5px; color:#94a3b8; }
   .q-acao { font-size:10px; color:#94A3B8; margin-top:3px; }
   .ad-thumb { width:46px; height:46px; border-radius:6px; object-fit:cover; background:#F1F5F9; display:block; }
   #meta-resumo p, #google-resumo p { margin:0 0 10px; }
@@ -1234,8 +1249,8 @@
     <a href="#" data-section="perdas">
       <i class="icon">⚠️</i><span class="nav-label">Gargalos & Perdas</span>
     </a>
-    <a href="#" data-section="previsibilidade">
-      <i class="icon">📈</i><span class="nav-label">Previsibilidade 2026</span>
+    <a href="#" data-section="metas">
+      <i class="icon">🎯</i><span class="nav-label">Metas e Conversão</span>
     </a>
     <a href="#" data-section="criativos">
       <i class="icon">🎨</i><span class="nav-label">Criativos</span>
@@ -1939,6 +1954,78 @@
       <div id="ga4-lp-details"></div>
     </div>
 
+    <!-- METAS E CONVERSÃO — EXPANSÃO CDC (substitui a Previsibilidade 2026 na navegação) -->
+    <div id="sec-metas" class="section">
+      <div class="section-title">🎯 Metas e Conversão — Expansão CDC</div>
+      <p id="metas-periodo" style="font-size:12px;color:#888;margin:-10px 0 6px;"></p>
+      <p style="font-size:11px;color:#64748b;margin:0 0 14px;">📐 Duas réguas convivem nesta aba e <strong>nunca se misturam</strong>: <strong>evento</strong> (aconteceu na janela de 7 dias) e <strong>safra</strong> (leads criados dentro da janela própria de cada etapa). As linhas da tabela de conversão <strong>não encadeiam</strong> entre si. Variações menores que 10 p.p. entre semanas provavelmente são variação de amostra, não mudança de desempenho.</p>
+
+      <!-- Bloco A: Ritmo de mídia -->
+      <div class="chart-card" style="margin-bottom:14px;">
+        <h3>Ritmo de mídia <span style="font-weight:400;font-size:11px;color:#94a3b8;">· últimos 7 dias · por data do evento · sem maturação</span></h3>
+        <div class="kpi-grid" id="metas-bloco-a" style="margin-top:10px;"></div>
+      </div>
+
+      <!-- Bloco B: Volume comercial -->
+      <div class="chart-card" style="margin-bottom:14px;">
+        <h3>Volume comercial <span style="font-weight:400;font-size:11px;color:#94a3b8;">· últimos 7 dias · por data do evento · cobrança de follow-up, não julga taxa</span></h3>
+        <div class="kpi-grid" id="metas-bloco-b" style="margin-top:10px;"></div>
+        <p id="metas-bloco-b-warn" style="font-size:11px;color:#b45309;margin:8px 0 0;"></p>
+      </div>
+
+      <!-- Bloco C: Conversão por safra -->
+      <div class="table-card" style="margin-bottom:14px;">
+        <h3>Conversão por safra <span style="font-weight:400;font-size:11px;color:#94a3b8;">· cada linha lê a própria janela · numerador e denominador sempre da mesma janela</span></h3>
+        <table>
+          <thead><tr>
+            <th style="width:30px;">#</th><th>Etapa</th><th>Janela</th><th style="text-align:right;">Amostra</th>
+            <th style="text-align:right;">Base histórica</th><th style="text-align:right;">Meta</th>
+            <th style="text-align:right;">Realizado</th><th style="text-align:center;">Farol</th>
+          </tr></thead>
+          <tbody id="metas-safra-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Bloco D: % da meta de vendas -->
+      <div class="chart-card" style="margin-bottom:14px;">
+        <h3>% da meta de vendas — fechamento mensal <span style="font-weight:400;font-size:11px;color:#94a3b8;">· uma barra por mês fechado desde mai/26 · projeção anualizada ÷ 3,88 vendas/ano</span></h3>
+        <div id="metas-mensal-top" style="margin:10px 0 8px;"></div>
+        <div class="chart-wrap"><canvas id="chart-metas-mensal"></canvas></div>
+        <p style="font-size:10.5px;color:#94a3b8;font-style:italic;margin:8px 0 0;">Volume do mês = <strong>negócios de entrada no CRM</strong> (mesma população das taxas — leads sem negócio não convertem). A barra cinza é o mês em curso (parcial, projetado pro ritmo do mês) e não entra na série. O que importa na reunião é a <strong>inclinação da série</strong>, não o valor de um mês isolado. Etapas ainda sem amostra madura no mês usam a base histórica no cálculo.</p>
+      </div>
+
+      <!-- Painéis explicativos -->
+      <div class="charts-row" style="margin-bottom:14px;">
+        <div class="chart-card">
+          <h3>Como o farol acende</h3>
+          <ul style="margin:8px 0 0;padding:0;list-style:none;font-size:12px;color:#475569;line-height:1.9;">
+            <li><span class="mt-farol g"><span class="mt-dot"></span>Meta batida</span> — realizado igual ou acima da meta (ou abaixo, quando menor é melhor).</li>
+            <li><span class="mt-farol a"><span class="mt-dot"></span>Acima da base</span> — melhorou contra o histórico, mas ainda não chegou na meta.</li>
+            <li><span class="mt-farol v"><span class="mt-dot"></span>Abaixo da base</span> — piorou contra o histórico. É aqui que a reunião para e discute.</li>
+            <li><span class="mt-farol n"><span class="mt-dot"></span>Neutro</span> — menos de 20 negócios no denominador, ou safra ainda não maturou. Não acende cor, não vira pauta.</li>
+          </ul>
+        </div>
+        <div class="chart-card">
+          <h3>Como ler o fechamento mensal</h3>
+          <ul style="margin:8px 0 0;padding:0 0 0 16px;font-size:12px;color:#475569;line-height:1.8;">
+            <li><strong>Projeção anualizada</strong> — as taxas do mês, aplicadas sobre o volume de leads, geram vendas/ano.</li>
+            <li><strong>% da meta</strong> — a projeção dividida por 3,88 vendas/ano. Acima de 100% = mês rodou em ritmo de bater a meta.</li>
+            <li>Referências no gráfico: <strong>meta em 100%</strong> e <strong>base histórica em 51%</strong> (1,96 vendas/ano).</li>
+          </ul>
+        </div>
+        <div class="chart-card">
+          <h3>Regras que a aba respeita</h3>
+          <ul style="margin:8px 0 0;padding:0 0 0 16px;font-size:12px;color:#475569;line-height:1.8;">
+            <li>Data de criação e data de evento <strong>nunca</strong> se misturam na mesma tabela.</li>
+            <li>Comparação entre semanas usa sempre <strong>safras de mesma idade</strong>.</li>
+            <li>Linhas de cadência mensal/trimestral mostram a <strong>data da última apuração</strong> (coorte fixa na virada; sem o histórico de movimentação do RD, a etapa lida é a atual — o valor pode refinar até a próxima apuração).</li>
+            <li>Venda não entra no painel semanal: com ~0,5 negócio/mês no Comitê, semana sem venda é o comportamento normal do funil.</li>
+          </ul>
+        </div>
+      </div>
+      <p style="font-size:11px;color:#94a3b8;border-top:1px solid var(--border);padding-top:10px;">Fontes: Meta Ads API, Google Ads API, GA4 e RD Station CRM · Histórico do RD confiável a partir de mai/2026 · Meta calibrada para 1 franquia a cada 3 meses (3,88/ano) com R$ 25.000/mês de mídia · CAC de mídia alvo R$ 77.348.</p>
+    </div>
+
     <!-- PREVISIBILIDADE 2026 -->
     <div id="sec-previsibilidade" class="section">
       <div class="section-title">📈 Previsibilidade 2026</div>
@@ -2396,7 +2483,8 @@ function renderSection(sec) {
     case 'criativos': renderCreatives(); break;
     case 'utm':       renderUTM(); break;
     case 'ga4':       renderGA4(); break;
-    case 'previsibilidade': renderPrevisibilidade(); break;
+    case 'metas': renderMetas(); break;
+    case 'previsibilidade': renderPrevisibilidade(); break;   // dormante (aba substituída por Metas)
   }
 }
 
@@ -5267,6 +5355,293 @@ function renderGA4() {
   document.getElementById('ga4-lp-details').innerHTML = details;
 }
 
+// ─── METAS E CONVERSÃO — EXPANSÃO CDC ────────────────────────────────────────
+// Aba da reunião semanal (spec do documento de jul/26): base histórica × meta ×
+// realizado por etapa. Duas réguas que NUNCA se misturam:
+//  · EVENTO — conta pela data em que aconteceu (Blocos A e B, janela 7d);
+//  · SAFRA  — conta pela data de criação do lead; cada etapa tem janela própria
+//    e numerador/denominador saem SEMPRE da mesma janela. Linhas não encadeiam.
+// Nesta aba "Qualificado Não agendada" é etapa SEQUENCIAL da cadeia (definição
+// do documento — funil acumulado), diferente do mega-funil, onde é ramo
+// paralelo. Réguas distintas, ambas declaradas nas telas.
+// Histórico do RD é confiável só de MAIO/2026 em diante.
+const METAS_CFG = {
+  dataStart: '2026-05-01',
+  metaVendasAno: 3.88,          // 1 franquia a cada ~3 meses
+  basePctMeta: 51,              // base histórica: 1,96 vendas/ano = 51% da meta
+  minAmostra: 20,
+  // Bloco A — ritmo de mídia (7d, evento). ga4:true = depende da conexão nova
+  // do GA4 (hostName=franquiaclinicadacidade.com.br + evento lead_prospecta),
+  // que ainda não existe: exibe "—" e preenche sozinho quando o ETL emitir
+  // DATA.metas.ga4_semana = {sessoes, leads_prospecta}.
+  blocoA: [
+    { key:'invest',  label:'Investimento',     base:5774, meta:5774, dir:'manter', kind:'currency' },
+    { key:'sessoes', label:'Sessões na LP',    base:1716, meta:1897, dir:'maior', kind:'num', ga4:true },
+    { key:'cps',     label:'CPS',              base:3.37, meta:3.04, dir:'menor', kind:'currency', ga4:true },
+    { key:'convlp',  label:'Conversão da LP',  base:1.92, meta:2.12, dir:'maior', kind:'pct2', ga4:true },
+    { key:'cpl',     label:'CPL (CRM)',        base:165,  meta:135,  dir:'menor', kind:'currency' },
+    { key:'leads',   label:'Leads de entrada', base:35.0, meta:42.8, dir:'maior', kind:'num' },
+  ],
+  // Bloco B — volume comercial (7d, evento). Precisa da DATA DO EVENTO de cada
+  // mudança de etapa (deal_stage_histories do RD), que o dashboard ainda não
+  // coleta. Campos reservados: preenchem sozinhos quando o ETL emitir
+  // DATA.metas.eventos_semana = {qualificacoes, qual_nao_agendada,
+  // reunioes_agendadas, reunioes_realizadas}.
+  blocoB: [
+    { key:'qualificacoes',       label:'Qualificações',            base:15.2, meta:22.3 },
+    { key:'qual_nao_agendada',   label:'Qualificado não agendada', base:5.9,  meta:8.7  },
+    { key:'reunioes_agendadas',  label:'Reuniões agendadas',       base:4.1,  meta:6.5  },
+    { key:'reunioes_realizadas', label:'Reuniões realizadas',      base:1.38, meta:2.73 },
+  ],
+  // Bloco C — a ORDEM deste array é a cadeia do funil: a linha k tem índice
+  // k+1 na cadeia e o denominador dela é quem atingiu o índice k (linha de
+  // cima), sempre dentro da janela DELA. base/meta em %.
+  safra: [
+    { n:'2',  etapa:'Tentativa de Contato',         sub:'sobre negócios de entrada',   jan:7,   base:94.9, meta:94.9, cad:'semanal' },
+    { n:'3',  etapa:'Qualificação',                 sub:'taxa em 14 dias móveis',      jan:14,  base:45.7, meta:55.0, cad:'semanal' },
+    { n:'4',  etapa:'Qualificado Não agendada',     sub:'taxa em 14 dias móveis',      jan:14,  base:38.8, meta:38.8, cad:'semanal' },
+    { n:'5',  etapa:'1ª Reunião Agendada',          sub:'safra criada há até 30 dias', jan:30,  base:70.2, meta:75.0, cad:'semanal' },
+    { n:'6',  etapa:'1ª Reunião Realizada',         sub:'safra criada há até 60 dias', jan:60,  base:33.3, meta:42.0, cad:'semanal' },
+    { n:'7',  etapa:'Reunião de BP Agendada',       sub:'', jan:90,  base:60.0, meta:60.0, cad:'mensal',     premissa:true },
+    { n:'8',  etapa:'Reunião de BP Realizada',      sub:'', jan:90,  base:80.0, meta:80.0, cad:'mensal',     premissa:true },
+    { n:'9',  etapa:'Envio de COF',                 sub:'', jan:90,  base:47.8, meta:47.8, cad:'mensal' },
+    { n:'10', etapa:'Visita / Reunião com Jamil',   sub:'', jan:150, base:36.4, meta:36.4, cad:'trimestral' },
+    { n:'11', etapa:'Análise Financeira/Jurídica',  sub:'', jan:150, base:80.0, meta:80.0, cad:'trimestral', premissa:true },
+    { n:'12', etapa:'Comitê Final',                 sub:'', jan:150, base:63.0, meta:63.0, cad:'trimestral', premissa:true },
+    { n:'—',  etapa:'Venda fechada',                sub:'', jan:180, base:65.0, meta:65.0, cad:'trimestral', venda:true },
+  ],
+};
+const METAS_STAGES = ['entrada de lead', 'tentativa de contato', 'qualificação', 'qualificado não agendada', '1ª reunião agendada', '1ª reunião realizada', 'reunião de bp agendada', 'reunião de bp realizada', 'envio de cof', 'visita / reunião com jamil', 'análise financeira/jurídica', 'comitê final'];
+
+function renderMetas() {
+  const CFG = METAS_CFG;
+  const dm = (DATA.crm && DATA.crm.deals_minimal) || [];
+  const RESERVADO = DATA.metas || {};          // bloco futuro do ETL (GA4 novo + eventos)
+
+  // helpers de data em UTC puro — imune ao fuso do navegador do viewer
+  const toUTC = (iso) => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10));
+  const addDays = (iso, n) => new Date(toUTC(iso) + n * 86400000).toISOString().slice(0, 10);
+  const diffDays = (a, b) => Math.round((toUTC(b) - toUTC(a)) / 86400000);
+  const fmtBR = s => s ? s.slice(0, 10).split('-').reverse().join('/') : '';
+
+  // índice na cadeia (12 = venda fechada; ganho passou por todas as etapas).
+  // Etapa vazia, "sem etapa", descarte ou legada = 0 (Entrada): sob funil
+  // acumulado, todo negócio criado atingiu a entrada — devolver -1 sumia com
+  // ele até do denominador e inflava a linha 2.
+  const sIdxMt = (e) => {
+    const el = (e || '').toLowerCase().trim();
+    if (!el) return 0;
+    for (let i = 0; i < METAS_STAGES.length; i++) {
+      const s = METAS_STAGES[i];
+      if (el === s || el.includes(s) || s.includes(el)) return i;
+    }
+    return 0;
+  };
+  const reachedIdx = (d) => d.st === 'ganho' ? METAS_STAGES.length : sIdxMt(d.etapa);
+
+  // "hoje" da aba = último dia com dado coletado (o summary atualiza 3x/dia)
+  const lastOf = (arr, f) => (arr || []).reduce((mx, r) => ((r[f] || '') > mx ? r[f] : mx), '');
+  const anchor = [lastOf(DATA.leads.daily, 'data'), lastOf((DATA.meta_ads || {}).daily, 'data'), lastOf((DATA.google_ads || {}).daily, 'data')]
+    .sort().pop() || new Date().toISOString().slice(0, 10);
+  const d7ini = addDays(anchor, -6);
+  const perEl = document.getElementById('metas-periodo');
+  if (perEl) perEl.textContent = `Semana ${fmtBR(d7ini)} – ${fmtBR(anchor)} · ancorada no último dia com dado coletado`;
+
+  // farol dos cartões: verde ≥ meta, âmbar entre base e meta, vermelho < base
+  // (invertido quando menor é melhor; "manter" = verde a ±10% da meta, âmbar
+  // até ±30%, vermelho além disso — verba muito fora do ritmo é problema
+  // nas DUAS direções, inclusive mídia parada)
+  const farolCard = (real, base, meta, dir) => {
+    if (real == null) return 'n';
+    if (dir === 'manter') {
+      const desvio = Math.abs(real - meta) / meta;
+      return desvio <= 0.10 ? 'g' : (desvio <= 0.30 ? 'a' : 'v');
+    }
+    if (dir === 'menor') return real <= meta ? 'g' : (real <= base ? 'a' : 'v');
+    return real >= meta ? 'g' : (real >= base ? 'a' : 'v');
+  };
+  const CARD_CLS = { g: 'green', a: 'orange', v: 'red', n: '' };
+  const fmtVal = (v, kind) => v == null ? '—'
+    : kind === 'currency' ? fmt.currency(v)
+    : kind === 'pct2' ? v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'
+    : fmt.num(Math.round(v));
+  const fmtRef = (v, kind) => kind === 'currency' ? fmt.currency(v)
+    : kind === 'pct2' ? v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'
+    : v.toLocaleString('pt-BR');
+
+  // ── Bloco A: ritmo de mídia (evento, 7d) ──────────────────────────────────
+  const sum7 = (arr, f) => (arr || []).filter(r => r.data >= d7ini && r.data <= anchor).reduce((s, r) => s + (r[f] || 0), 0);
+  const invest7 = sum7((DATA.meta_ads || {}).daily, 'gasto') + sum7((DATA.google_ads || {}).daily, 'gasto');
+  const leads7 = sum7(DATA.leads.daily, 'total');
+  const ga4w = RESERVADO.ga4_semana || null;    // {sessoes, leads_prospecta}
+  // CPL exige gasto COLETADO na janela: com coletor de mídia atrasado e leads
+  // entrando, invest7=0 daria CPL R$0 → farol verde falso. Sem gasto → neutro.
+  const valsA = {
+    invest: invest7,
+    sessoes: ga4w ? ga4w.sessoes : null,
+    cps: (ga4w && ga4w.sessoes > 0 && invest7 > 0) ? invest7 / ga4w.sessoes : null,
+    convlp: (ga4w && ga4w.sessoes > 0) ? ga4w.leads_prospecta / ga4w.sessoes * 100 : null,
+    cpl: (invest7 > 0 && leads7 > 0) ? invest7 / leads7 : null,
+    leads: leads7,
+  };
+  document.getElementById('metas-bloco-a').innerHTML = CFG.blocoA.map(c => {
+    const v = valsA[c.key];
+    const f = (c.ga4 && !ga4w) ? 'n' : farolCard(v, c.base, c.meta, c.dir);
+    const sub = (c.ga4 && !ga4w)
+      ? `Meta <b>${fmtRef(c.meta, c.kind)}</b> · base ${fmtRef(c.base, c.kind)}<br><em style="color:#b45309;">Aguardando conexão do GA4</em>`
+      : `Meta <b>${c.dir === 'menor' ? '≤ ' : ''}${fmtRef(c.meta, c.kind)}</b> · base ${fmtRef(c.base, c.kind)}`;
+    return `<div class="kpi-card ${CARD_CLS[f]}"><div class="kpi-label">${c.label}</div><div class="kpi-value">${fmtVal(v, c.kind)}</div><div class="kpi-sub">${sub}</div></div>`;
+  }).join('');
+
+  // ── Bloco B: volume comercial (evento, 7d) — reservado ────────────────────
+  const ev = RESERVADO.eventos_semana || null;
+  document.getElementById('metas-bloco-b').innerHTML = CFG.blocoB.map(c => {
+    const v = ev ? ev[c.key] : null;
+    const f = ev ? farolCard(v, c.base, c.meta, 'maior') : 'n';
+    return `<div class="kpi-card ${CARD_CLS[f]}"><div class="kpi-label">${c.label}</div><div class="kpi-value">${v == null ? '—' : fmt.num(v)}</div><div class="kpi-sub">Meta <b>${c.meta.toLocaleString('pt-BR')}</b> · base ${c.base.toLocaleString('pt-BR')}</div></div>`;
+  }).join('');
+  document.getElementById('metas-bloco-b-warn').innerHTML = ev ? '' :
+    '⏳ Estes números precisam da <strong>data do evento</strong> de cada mudança de etapa (histórico de movimentação do RD CRM), que o dashboard ainda não coleta. Os campos preenchem sozinhos quando o coletor for conectado — base e meta já valem como referência da reunião.';
+
+  // ── Bloco C: conversão por safra ──────────────────────────────────────────
+  // Âncora por cadência (§8 do doc): semanal lê até hoje; mensal consolida na
+  // virada do mês; trimestral na virada do trimestre. Como a régua é cumulativa
+  // (etapa atual ≥ etapa da linha), recalcular com âncora fixa dá o mesmo
+  // resultado de uma apuração armazenada.
+  const mesIni = anchor.slice(0, 8) + '01';
+  const qMes = Math.floor((parseInt(anchor.slice(5, 7), 10) - 1) / 3) * 3 + 1;
+  const triIni = anchor.slice(0, 5) + String(qMes).padStart(2, '0') + '-01';
+  const anchorDe = { semanal: anchor, mensal: addDays(mesIni, -1), trimestral: addDays(triIni, -1) };
+  const CAD_LBL = {
+    semanal: `Leitura semanal <span>· follow-up e agendamento</span>`,
+    mensal: `Leitura mensal <span>· última apuração ${fmtBR(mesIni)}</span>`,
+    trimestral: `Leitura trimestral <span>· última apuração ${fmtBR(triIni)}</span>`,
+  };
+  const pctBR = v => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+  let cadAtual = '';
+  let rowsC = '';
+  CFG.safra.forEach((r, k) => {
+    if (r.cad !== cadAtual) { cadAtual = r.cad; rowsC += `<tr class="mt-divisor"><td colspan="8">${CAD_LBL[r.cad]}</td></tr>`; }
+    // SAFRA MADURA (regra 4 do doc): a coorte é a mais recente que JÁ completou
+    // a própria janela — criados entre (âncora − 2·janela) e (âncora − janela).
+    // Ancorar a coorte em HOJE incluía negócios de 0-3 dias que ainda não
+    // tiveram tempo de virar a etapa → falso vermelho estrutural (validado:
+    // Tentativa de Contato lia 64% com a coorte de hoje e 98-100% nas safras
+    // completas). Todo membro da coorte tem pelo menos "janela" dias de idade,
+    // e semana contra semana compara safras de MESMA idade.
+    const aEnd = addDays(anchorDe[r.cad], -r.jan);
+    const aIni = addDays(aEnd, -(r.jan - 1));
+    const stageI = k + 1;                       // índice da linha na cadeia
+    const coorte = dm.filter(d => d.criado_em >= aIni && d.criado_em <= aEnd);
+    const den = coorte.filter(d => reachedIdx(d) >= stageI - 1).length;
+    const num = coorte.filter(d => reachedIdx(d) >= stageI).length;
+    // maturação: a coorte madura precisa caber no histórico confiável (≥ mai/26)
+    const matur = aIni < CFG.dataStart;
+    const real = (!matur && den > 0) ? num / den * 100 : null;
+    let f, lbl;
+    if (matur) { f = 'n'; lbl = 'Em maturação'; }
+    else if (den < CFG.minAmostra) { f = 'n'; lbl = 'Amostra insuficiente'; }
+    else if (real >= r.meta) { f = 'g'; lbl = 'Meta batida'; }
+    else if (real >= r.base) { f = 'a'; lbl = 'Acima da base'; }
+    else { f = 'v'; lbl = 'Abaixo da base'; }
+    const mudo = f === 'n' ? ' class="mt-mudo"' : '';
+    const subTxt = matur
+      ? `safra madura ainda não cabe no histórico (começa em ${fmtBR(CFG.dataStart)})`
+      : `safra ${fmtBR(aIni)} – ${fmtBR(aEnd)}, lida com a janela completa`;
+    rowsC += `<tr${mudo}>
+      <td style="color:#94a3b8;">${r.n}</td>
+      <td><strong>${r.etapa}</strong>${r.premissa ? '<span class="mt-premissa">premissa</span>' : ''}<span class="mt-sub">${subTxt}</span></td>
+      <td><span class="mt-jan" title="Coorte: criados ${fmtBR(aIni)}–${fmtBR(aEnd)} · todos com ≥ ${r.jan} dias de maturação">${r.jan} dias</span></td>
+      <td style="text-align:right;">${matur ? '—' : fmt.num(den)}</td>
+      <td style="text-align:right;color:#94a3b8;">${pctBR(r.base)}</td>
+      <td style="text-align:right;color:var(--primary);font-weight:700;">${pctBR(r.meta)}</td>
+      <td style="text-align:right;font-weight:700;">${real == null ? '—' : pctBR(real)}</td>
+      <td style="text-align:center;"><span class="mt-farol ${f}"><span class="mt-dot"></span>${lbl}</span></td>
+    </tr>`;
+  });
+  document.getElementById('metas-safra-body').innerHTML = rowsC;
+
+  // ── Bloco D: % da meta de vendas (fechamento mensal) ──────────────────────
+  // vendas/mês = negócios de ENTRADA do mês × Π(taxas da cadeia). O volume usa
+  // a MESMA população que alimenta as taxas (negócios do CRM) — usar "leads do
+  // mês" misturava populações (lead sem negócio, importados sem casamento) e
+  // injetava um fator oculto de ±20% na série. Cada taxa usa o REALIZADO da
+  // safra do mês quando (a) amostra ≥ 20 e (b) a safra já maturou a janela da
+  // etapa; senão usa a base histórica (declarado na tela).
+  const lastDayOf = (m) => { const [y, mo] = m.split('-').map(Number); return `${m}-${String(new Date(y, mo, 0).getDate()).padStart(2, '0')}`; };
+  const nextMonth = (m) => { const [y, mo] = m.split('-').map(Number); return mo === 12 ? `${y + 1}-01` : `${y}-${String(mo + 1).padStart(2, '0')}`; };
+  const mesAtual = anchor.slice(0, 7);
+  const mesesFech = [];
+  for (let m = '2026-05'; m < mesAtual; m = nextMonth(m)) mesesFech.push(m);
+
+  const projAno = (mes, parcial) => {
+    const ini = mes + '-01', fim = lastDayOf(mes);
+    const coorte = dm.filter(d => d.criado_em >= ini && d.criado_em <= fim);
+    const idadeSafra = Math.max(0, diffDays(fim, anchor));
+    let chain = 1;
+    CFG.safra.forEach((r, k) => {
+      const stageI = k + 1;
+      const den = coorte.filter(d => reachedIdx(d) >= stageI - 1).length;
+      const num = coorte.filter(d => reachedIdx(d) >= stageI).length;
+      const usaReal = den >= CFG.minAmostra && idadeSafra >= r.jan;
+      chain *= usaReal ? (num / den) : (r.base / 100);
+    });
+    let entradas = coorte.length;               // todo negócio criado atingiu a Entrada
+    if (parcial) {                              // projeta o ritmo do mês em curso
+      const diasDecorridos = parseInt(anchor.slice(8, 10), 10);
+      const diasMes = parseInt(lastDayOf(mes).slice(8, 10), 10);
+      entradas = diasDecorridos > 0 ? entradas / diasDecorridos * diasMes : 0;
+    }
+    return entradas * chain * 12;
+  };
+
+  const serie = mesesFech.map(m => ({ mes: m, proj: projAno(m, false) }));
+  const parcialAtual = { mes: mesAtual, proj: projAno(mesAtual, true) };
+  const pctDe = p => p / CFG.metaVendasAno * 100;
+  const corDe = p => pctDe(p) >= 100 ? '#22C55E' : (pctDe(p) >= CFG.basePctMeta ? '#F59E0B' : '#EF4444');
+
+  const topEl = document.getElementById('metas-mensal-top');
+  if (serie.length) {
+    const ult = serie[serie.length - 1];
+    const ant = serie.length > 1 ? serie[serie.length - 2] : null;
+    const deltaPP = ant ? (pctDe(ult.proj) - pctDe(ant.proj)) : null;
+    topEl.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;">
+      <div>
+        <span style="font-size:34px;font-weight:800;letter-spacing:-.02em;">${pctDe(ult.proj).toFixed(0)}%</span>
+        <span style="font-size:14px;color:#94a3b8;font-weight:600;"> da meta</span>
+        <div style="font-size:11.5px;color:#64748b;">${mesLabel(ult.mes)} fechado · projeta <strong>${ult.proj.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} vendas/ano</strong></div>
+      </div>
+      <div style="text-align:right;font-size:11.5px;color:#64748b;line-height:1.7;">
+        Meta anual <strong>3,88 vendas/ano</strong> · 1 a cada ~3 meses<br>
+        Base histórica <strong>1,96 vendas/ano</strong> = 51% da meta${deltaPP == null ? '' : `<br>Variação sobre ${mesLabel(ant.mes)} <strong>${deltaPP >= 0 ? '+' : ''}${deltaPP.toFixed(0)} p.p.</strong>`}
+      </div>
+    </div>`;
+  } else {
+    topEl.innerHTML = '<p style="font-size:12px;color:#94a3b8;">Ainda não há mês fechado desde mai/2026 — a série consolida na virada de cada mês.</p>';
+  }
+
+  makeChart('chart-metas-mensal', {
+    type: 'bar',
+    data: {
+      labels: [...serie.map(s => mesLabel(s.mes)), mesLabel(parcialAtual.mes) + ' (parcial)'],
+      datasets: [
+        { type: 'bar', label: '% da meta', data: [...serie.map(s => pctDe(s.proj)), pctDe(parcialAtual.proj)],
+          backgroundColor: [...serie.map(s => corDe(s.proj) + 'CC'), '#94a3b866'],
+          borderColor: [...serie.map(s => corDe(s.proj)), '#94a3b8'],
+          borderWidth: 1, borderRadius: 4 },
+        { type: 'line', label: 'Meta · 100%', data: [...serie, parcialAtual].map(() => 100), borderColor: '#0B6B70', borderDash: [6, 4], borderWidth: 1.5, pointRadius: 0 },
+        { type: 'line', label: 'Base · 51%', data: [...serie, parcialAtual].map(() => CFG.basePctMeta), borderColor: '#94a3b8', borderDash: [4, 4], borderWidth: 1.5, pointRadius: 0 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 14, font: { size: 10.5 } } },
+        tooltip: { callbacks: { label: ctx => ctx.datasetIndex === 0 ? ` ${ctx.parsed.y.toFixed(0)}% da meta` : ` ${ctx.dataset.label}` } } },
+      scales: { y: { beginAtZero: true, ticks: { callback: v => v + '%' } } },
+    },
+  });
+}
+
 // ─── PREVISIBILIDADE 2026 ────────────────────────────────────────────────────
 let _prevCenario = 'base';   // conservador | base | otimista (afeta Jul–Dez)
 
@@ -5806,8 +6181,8 @@ loadData();
     <a href="#" data-section="perdas">
       <i class="icon">⚠️</i><span>Gargalos & Perdas</span>
     </a>
-    <a href="#" data-section="previsibilidade">
-      <i class="icon">📈</i><span>Previsibilidade 2026</span>
+    <a href="#" data-section="metas">
+      <i class="icon">🎯</i><span>Metas e Conversão</span>
     </a>
     <a href="#" data-section="criativos">
       <i class="icon">🎨</i><span>Criativos</span>
