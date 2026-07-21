@@ -2819,6 +2819,32 @@ def main():
     except Exception as e:
         print(f"    ga4_metas_daily indisponível ({e}) — cartões da aba Metas ficam reservados")
 
+    # Eventos de movimentação de etapa (crm_stage_events) → série diária do
+    # "Volume comercial" da aba Metas. Aba pode não existir até o coletor rodar.
+    print("  Lendo eventos de etapa do CRM (aba Metas)...")
+    metas_eventos_daily = []
+    try:
+        TIPO_POR_ETAPA = {
+            "Qualificação": "qualificacoes",
+            "Qualificado Não agendada": "qual_nao_agendada",
+            "1ª Reunião Agendada": "reunioes_agendadas",
+            "1ª Reunião Realizada": "reunioes_realizadas",
+        }
+        ev_por_dia = defaultdict(lambda: {
+            "qualificacoes": 0, "qual_nao_agendada": 0,
+            "reunioes_agendadas": 0, "reunioes_realizadas": 0,
+        })
+        for row in read_sheet(gc, "crm_stage_events"):
+            tipo = TIPO_POR_ETAPA.get(normalize_etapa(row.get("etapa") or ""))
+            dia = parse_date_to_day(row.get("data"))
+            if tipo and dia:
+                ev_por_dia[dia][tipo] += 1
+        metas_eventos_daily = [{"data": d, **v} for d, v in sorted(ev_por_dia.items())]
+        tot_ev = sum(sum(v.values()) for v in ev_por_dia.values())
+        print(f"    crm_stage_events: {tot_ev} eventos em {len(metas_eventos_daily)} dias")
+    except Exception as e:
+        print(f"    crm_stage_events indisponível ({e}) — Volume comercial fica reservado")
+
     print("  Lendo Previsibilidade 2026 (espelho planilha — legado/produção)...")
     previsibilidade_data = None
     try:
@@ -2968,7 +2994,8 @@ def main():
         "google_ads": google_agg,
         "ga4": aggregate_ga4(ga4),
         "ga4_lps": aggregate_ga4_lps(ga4),
-        "metas": {"ga4_daily": metas_ga4_daily},   # aba Metas e Conversão
+        "metas": {"ga4_daily": metas_ga4_daily,
+                  "eventos_daily": metas_eventos_daily},   # aba Metas e Conversão
         "utm": utm_agg,
         "google_ads_creatives": gc_agg,
         "creative_quality": creative_quality,

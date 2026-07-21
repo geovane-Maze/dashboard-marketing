@@ -1958,17 +1958,17 @@
     <div id="sec-metas" class="section">
       <div class="section-title">🎯 Metas e Conversão — Expansão CDC</div>
       <p id="metas-periodo" style="font-size:12px;color:#888;margin:-10px 0 6px;"></p>
-      <p style="font-size:11px;color:#64748b;margin:0 0 14px;">📐 Duas réguas convivem nesta aba e <strong>nunca se misturam</strong>: <strong>evento</strong> (aconteceu na janela de 7 dias) e <strong>safra</strong> (leads criados dentro da janela própria de cada etapa). As linhas da tabela de conversão <strong>não encadeiam</strong> entre si. Variações menores que 10 p.p. entre semanas provavelmente são variação de amostra, não mudança de desempenho.</p>
+      <p style="font-size:11px;color:#64748b;margin:0 0 14px;">📐 Duas réguas convivem nesta aba e <strong>nunca se misturam</strong>: <strong>evento</strong> (aconteceu dentro do período selecionado no filtro) e <strong>safra</strong> (leads criados dentro da janela própria de cada etapa, ancorada no fim do período). As linhas da tabela de conversão <strong>não encadeiam</strong> entre si. Variações menores que 10 p.p. entre semanas provavelmente são variação de amostra, não mudança de desempenho.</p>
 
       <!-- Bloco A: Ritmo de mídia -->
       <div class="chart-card" style="margin-bottom:14px;">
-        <h3>Ritmo de mídia <span style="font-weight:400;font-size:11px;color:#94a3b8;">· últimos 7 dias · por data do evento · sem maturação</span></h3>
+        <h3>Ritmo de mídia <span style="font-weight:400;font-size:11px;color:#94a3b8;">· período do filtro · por data do evento · sem maturação · metas semanais pro-rata</span></h3>
         <div class="kpi-grid" id="metas-bloco-a" style="margin-top:10px;"></div>
       </div>
 
       <!-- Bloco B: Volume comercial -->
       <div class="chart-card" style="margin-bottom:14px;">
-        <h3>Volume comercial <span style="font-weight:400;font-size:11px;color:#94a3b8;">· últimos 7 dias · por data do evento · cobrança de follow-up, não julga taxa</span></h3>
+        <h3>Volume comercial <span style="font-weight:400;font-size:11px;color:#94a3b8;">· período do filtro · por data do evento · cobrança de follow-up, não julga taxa</span></h3>
         <div class="kpi-grid" id="metas-bloco-b" style="margin-top:10px;"></div>
         <p id="metas-bloco-b-warn" style="font-size:11px;color:#b45309;margin:8px 0 0;"></p>
       </div>
@@ -5375,12 +5375,12 @@ const METAS_CFG = {
   // que ainda não existe: exibe "—" e preenche sozinho quando o ETL emitir
   // DATA.metas.ga4_semana = {sessoes, leads_prospecta}.
   blocoA: [
-    { key:'invest',  label:'Investimento',     base:5774, meta:5774, dir:'manter', kind:'currency' },
-    { key:'sessoes', label:'Sessões na LP',    base:1716, meta:1897, dir:'maior', kind:'num', ga4:true },
+    { key:'invest',  label:'Investimento',     base:5774, meta:5774, dir:'manter', kind:'currency', vol:true },
+    { key:'sessoes', label:'Sessões na LP',    base:1716, meta:1897, dir:'maior', kind:'num', ga4:true, vol:true },
     { key:'cps',     label:'CPS',              base:3.37, meta:3.04, dir:'menor', kind:'currency', ga4:true },
     { key:'convlp',  label:'Conversão da LP',  base:1.92, meta:2.12, dir:'maior', kind:'pct2', ga4:true },
     { key:'cpl',     label:'CPL (CRM)',        base:165,  meta:135,  dir:'menor', kind:'currency' },
-    { key:'leads',   label:'Leads de entrada', base:35.0, meta:42.8, dir:'maior', kind:'num' },
+    { key:'leads',   label:'Leads de entrada', base:35.0, meta:42.8, dir:'maior', kind:'num', vol:true },
   ],
   // Bloco B — volume comercial (7d, evento). Precisa da DATA DO EVENTO de cada
   // mudança de etapa (deal_stage_histories do RD), que o dashboard ainda não
@@ -5439,13 +5439,27 @@ function renderMetas() {
   };
   const reachedIdx = (d) => d.st === 'ganho' ? METAS_STAGES.length : sIdxMt(d.etapa);
 
-  // "hoje" da aba = último dia com dado coletado (o summary atualiza 3x/dia)
+  // "hoje" dos DADOS = último dia com dado coletado (o summary atualiza 3x/dia)
   const lastOf = (arr, f) => (arr || []).reduce((mx, r) => ((r[f] || '') > mx ? r[f] : mx), '');
-  const anchor = [lastOf(DATA.leads.daily, 'data'), lastOf((DATA.meta_ads || {}).daily, 'data'), lastOf((DATA.google_ads || {}).daily, 'data')]
+  const dataMax = [lastOf(DATA.leads.daily, 'data'), lastOf((DATA.meta_ads || {}).daily, 'data'), lastOf((DATA.google_ads || {}).daily, 'data')]
     .sort().pop() || new Date().toISOString().slice(0, 10);
-  const d7ini = addDays(anchor, -6);
+
+  // ── Período: SEGUE o filtro global de datas (igual às demais páginas) ─────
+  // Blocos A/B somam os eventos do período selecionado e comparam com meta
+  // PRO-RATA (meta semanal ÷ 7 × dias); taxas (CPS/Conv/CPL) comparam direto,
+  // pois independem do tamanho da janela. Sem filtro → últimos 7 dias.
+  // O fim é limitado ao último dia com dado (fim futuro esvaziaria a janela).
+  const fsv = document.getElementById('filter-date-start')?.value || '';
+  const fev = document.getElementById('filter-date-end')?.value || '';
+  const fim = (fev && fev < dataMax) ? fev : dataMax;
+  let ini = fsv || addDays(fim, -6);
+  if (ini > fim) ini = fim;
+  const dias = diffDays(ini, fim) + 1;
+  const fator = dias / 7;
   const perEl = document.getElementById('metas-periodo');
-  if (perEl) perEl.textContent = `Semana ${fmtBR(d7ini)} – ${fmtBR(anchor)} · ancorada no último dia com dado coletado`;
+  if (perEl) perEl.textContent = `Período ${fmtBR(ini)} – ${fmtBR(fim)} · ${dias} dias · segue o filtro de datas do topo`
+    + (fev && fev > dataMax ? ` (fim limitado a ${fmtBR(dataMax)}, último dia com dado)` : '')
+    + (dias !== 7 ? ` · metas semanais escaladas ×${fator.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}` : '');
 
   // farol dos cartões: verde ≥ meta, âmbar entre base e meta, vermelho < base
   // (invertido quando menor é melhor; "manter" = verde a ±10% da meta, âmbar
@@ -5467,16 +5481,16 @@ function renderMetas() {
     : fmt.num(Math.round(v));
   const fmtRef = (v, kind) => kind === 'currency' ? fmt.currency(v)
     : kind === 'pct2' ? v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'
-    : v.toLocaleString('pt-BR');
+    : v.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
 
-  // ── Bloco A: ritmo de mídia (evento, 7d) ──────────────────────────────────
-  const sum7 = (arr, f) => (arr || []).filter(r => r.data >= d7ini && r.data <= anchor).reduce((s, r) => s + (r[f] || 0), 0);
+  // ── Bloco A: ritmo de mídia (evento, período do filtro) ───────────────────
+  const sum7 = (arr, f) => (arr || []).filter(r => r.data >= ini && r.data <= fim).reduce((s, r) => s + (r[f] || 0), 0);
   const invest7 = sum7((DATA.meta_ads || {}).daily, 'gasto') + sum7((DATA.google_ads || {}).daily, 'gasto');
   const leads7 = sum7(DATA.leads.daily, 'total');
   // GA4 da aba (site de expansão via hostName + evento lead_prospecta):
-  // preferência pela série diária metas.ga4_daily (soma a MESMA janela de 7d);
+  // preferência pela série diária metas.ga4_daily (soma o MESMO período);
   // fallback pro agregado ga4_semana; sem nenhum → cartões reservados.
-  const g4rows = (RESERVADO.ga4_daily || []).filter(r => r.data >= d7ini && r.data <= anchor);
+  const g4rows = (RESERVADO.ga4_daily || []).filter(r => r.data >= ini && r.data <= fim);
   const ga4w = g4rows.length
     ? { sessoes: g4rows.reduce((s, r) => s + (r.sessoes || 0), 0),
         leads_prospecta: g4rows.reduce((s, r) => s + (r.lead_prospecta || 0), 0) }
@@ -5493,21 +5507,33 @@ function renderMetas() {
   };
   document.getElementById('metas-bloco-a').innerHTML = CFG.blocoA.map(c => {
     const v = valsA[c.key];
-    const f = (c.ga4 && !ga4w) ? 'n' : farolCard(v, c.base, c.meta, c.dir);
+    // métricas de VOLUME comparam com meta pro-rata do período; taxas não escalam
+    const baseE = c.vol ? c.base * fator : c.base;
+    const metaE = c.vol ? c.meta * fator : c.meta;
+    const f = (c.ga4 && !ga4w) ? 'n' : farolCard(v, baseE, metaE, c.dir);
+    const semNota = (c.vol && dias !== 7) ? ` <span style="color:#94a3b8;">(sem.: ${fmtRef(c.meta, c.kind)})</span>` : '';
     const sub = (c.ga4 && !ga4w)
-      ? `Meta <b>${fmtRef(c.meta, c.kind)}</b> · base ${fmtRef(c.base, c.kind)}<br><em style="color:#b45309;">Aguardando conexão do GA4</em>`
-      : `Meta <b>${c.dir === 'menor' ? '≤ ' : ''}${fmtRef(c.meta, c.kind)}</b> · base ${fmtRef(c.base, c.kind)}`;
+      ? `Meta <b>${fmtRef(metaE, c.kind)}</b> · base ${fmtRef(baseE, c.kind)}<br><em style="color:#b45309;">Aguardando conexão do GA4</em>`
+      : `Meta <b>${c.dir === 'menor' ? '≤ ' : ''}${fmtRef(metaE, c.kind)}</b>${semNota} · base ${fmtRef(baseE, c.kind)}`;
     return `<div class="kpi-card ${CARD_CLS[f]}"><div class="kpi-label">${c.label}</div><div class="kpi-value">${fmtVal(v, c.kind)}</div><div class="kpi-sub">${sub}</div></div>`;
   }).join('');
 
-  // ── Bloco B: volume comercial (evento, 7d) — reservado ────────────────────
-  const ev = RESERVADO.eventos_semana || null;
+  // ── Bloco B: volume comercial (evento, período do filtro) ─────────────────
+  // Série real: metas.eventos_daily (datas de movimentação de etapa coletadas
+  // do deal_stage_histories do RD). Fallback: agregado eventos_semana; sem
+  // nenhum dos dois → cartões reservados. Metas pro-rata do período.
+  const evRows = (RESERVADO.eventos_daily || []).filter(r => r.data >= ini && r.data <= fim);
+  const temEv = (RESERVADO.eventos_daily || []).length > 0;
+  const evSem = RESERVADO.eventos_semana || null;
+  const somaEv = (k) => evRows.reduce((s, r) => s + (r[k] || 0), 0);
   document.getElementById('metas-bloco-b').innerHTML = CFG.blocoB.map(c => {
-    const v = ev ? ev[c.key] : null;
-    const f = ev ? farolCard(v, c.base, c.meta, 'maior') : 'n';
-    return `<div class="kpi-card ${CARD_CLS[f]}"><div class="kpi-label">${c.label}</div><div class="kpi-value">${v == null ? '—' : fmt.num(v)}</div><div class="kpi-sub">Meta <b>${c.meta.toLocaleString('pt-BR')}</b> · base ${c.base.toLocaleString('pt-BR')}</div></div>`;
+    const v = temEv ? somaEv(c.key) : (evSem ? evSem[c.key] : null);
+    const baseE = c.base * fator, metaE = c.meta * fator;
+    const f = v == null ? 'n' : farolCard(v, baseE, metaE, 'maior');
+    const semNota = dias !== 7 ? ` <span style="color:#94a3b8;">(sem.: ${c.meta.toLocaleString('pt-BR')})</span>` : '';
+    return `<div class="kpi-card ${CARD_CLS[f]}"><div class="kpi-label">${c.label}</div><div class="kpi-value">${v == null ? '—' : fmt.num(v)}</div><div class="kpi-sub">Meta <b>${metaE.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</b>${semNota} · base ${baseE.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</div></div>`;
   }).join('');
-  document.getElementById('metas-bloco-b-warn').innerHTML = ev ? '' :
+  document.getElementById('metas-bloco-b-warn').innerHTML = (temEv || evSem) ? '' :
     '⏳ Estes números precisam da <strong>data do evento</strong> de cada mudança de etapa (histórico de movimentação do RD CRM), que o dashboard ainda não coleta. Os campos preenchem sozinhos quando o coletor for conectado — base e meta já valem como referência da reunião.';
 
   // ── Bloco C: conversão por safra ──────────────────────────────────────────
@@ -5515,10 +5541,11 @@ function renderMetas() {
   // virada do mês; trimestral na virada do trimestre. Como a régua é cumulativa
   // (etapa atual ≥ etapa da linha), recalcular com âncora fixa dá o mesmo
   // resultado de uma apuração armazenada.
-  const mesIni = anchor.slice(0, 8) + '01';
-  const qMes = Math.floor((parseInt(anchor.slice(5, 7), 10) - 1) / 3) * 3 + 1;
-  const triIni = anchor.slice(0, 5) + String(qMes).padStart(2, '0') + '-01';
-  const anchorDe = { semanal: anchor, mensal: addDays(mesIni, -1), trimestral: addDays(triIni, -1) };
+  // âncoras derivam do FIM do período selecionado (viajar no tempo funciona)
+  const mesIni = fim.slice(0, 8) + '01';
+  const qMes = Math.floor((parseInt(fim.slice(5, 7), 10) - 1) / 3) * 3 + 1;
+  const triIni = fim.slice(0, 5) + String(qMes).padStart(2, '0') + '-01';
+  const anchorDe = { semanal: fim, mensal: addDays(mesIni, -1), trimestral: addDays(triIni, -1) };
   const CAD_LBL = {
     semanal: `Leitura semanal <span>· follow-up e agendamento</span>`,
     mensal: `Leitura mensal <span>· última apuração ${fmtBR(mesIni)}</span>`,
@@ -5577,14 +5604,14 @@ function renderMetas() {
   // etapa; senão usa a base histórica (declarado na tela).
   const lastDayOf = (m) => { const [y, mo] = m.split('-').map(Number); return `${m}-${String(new Date(y, mo, 0).getDate()).padStart(2, '0')}`; };
   const nextMonth = (m) => { const [y, mo] = m.split('-').map(Number); return mo === 12 ? `${y + 1}-01` : `${y}-${String(mo + 1).padStart(2, '0')}`; };
-  const mesAtual = anchor.slice(0, 7);
+  const mesAtual = fim.slice(0, 7);             // série vai até o fim do período filtrado
   const mesesFech = [];
   for (let m = '2026-05'; m < mesAtual; m = nextMonth(m)) mesesFech.push(m);
 
   const projAno = (mes, parcial) => {
-    const ini = mes + '-01', fim = lastDayOf(mes);
-    const coorte = dm.filter(d => d.criado_em >= ini && d.criado_em <= fim);
-    const idadeSafra = Math.max(0, diffDays(fim, anchor));
+    const iniM = mes + '-01', fimM = lastDayOf(mes);
+    const coorte = dm.filter(d => d.criado_em >= iniM && d.criado_em <= fimM);
+    const idadeSafra = Math.max(0, diffDays(fimM, fim));   // "relógio" = fim do período
     let chain = 1;
     CFG.safra.forEach((r, k) => {
       const stageI = k + 1;
@@ -5595,8 +5622,8 @@ function renderMetas() {
     });
     let entradas = coorte.length;               // todo negócio criado atingiu a Entrada
     if (parcial) {                              // projeta o ritmo do mês em curso
-      const diasDecorridos = parseInt(anchor.slice(8, 10), 10);
-      const diasMes = parseInt(lastDayOf(mes).slice(8, 10), 10);
+      const diasDecorridos = Math.min(parseInt(fim.slice(8, 10), 10), parseInt(fimM.slice(8, 10), 10));
+      const diasMes = parseInt(fimM.slice(8, 10), 10);
       entradas = diasDecorridos > 0 ? entradas / diasDecorridos * diasMes : 0;
     }
     return entradas * chain * 12;

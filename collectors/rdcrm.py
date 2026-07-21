@@ -152,3 +152,57 @@ def get_all_crm_data():
         "atividades": get_activities(),
         "tarefas": get_tasks(),
     }
+
+
+def get_stage_events(deal_ids):
+    """Datas de MOVIMENTAÇÃO de etapa de cada negócio (deal_stage_histories).
+
+    Alimenta o "Volume comercial" da aba Metas e Conversão — eventos contados
+    pela data em que ACONTECERAM (≠ data de criação do negócio). 1 GET
+    /deals/{id} por negócio, respeitando o máximo de 4 workers do RD.
+
+    Só há histórico a partir de maio/2026 (negócios importados não têm) — o
+    que serve, porque a régua de eventos da aba é semanal e recente.
+
+    Dedupe por (negócio, etapa) ficando com a PRIMEIRA entrada: o RD às vezes
+    grava a mesma etapa 2x no mesmo segundo, e re-entradas raras não são um
+    "evento novo" pra régua da reunião.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    print("Coletando histórico de etapas (deal_stage_histories)...")
+    data = _get("deal_pipelines")
+    pipes = data if isinstance(data, list) else data.get("deal_pipelines", [])
+    smap = {}
+    for p in pipes:
+        for st in p.get("deal_stages", []):
+            smap[st["id"]] = st["name"]
+
+    def one(did):
+        try:
+            r = requests.get(f"{BASE_URL}/deals/{did}",
+                             params={"token": config.RD_CRM_TOKEN}, timeout=30)
+            if r.status_code != 200:
+                return did, []
+            return did, (r.json().get("deal_stage_histories") or [])
+        except Exception:
+            return did, []
+
+    rows, seen, done = [], set(), 0
+    with ThreadPoolExecutor(max_workers=4) as ex:   # regra de ouro: máx 4 workers RD
+        for did, hist in ex.map(one, deal_ids):
+            done += 1
+            if done % 100 == 0:
+                print(f"    {done}/{len(deal_ids)} negócios...")
+            for h in sorted(hist, key=lambda x: x.get("start_date") or ""):
+                etapa = smap.get(h.get("deal_stage_id")) or ""
+                dia = (h.get("start_date") or "")[:10]
+                if not etapa or not dia:
+                    continue
+                k = (did, etapa)
+                if k in seen:
+                    continue
+                seen.add(k)
+                rows.append({"deal_id": did, "etapa": etapa, "data": dia})
+    print(f"  Eventos de etapa: {len(rows)} (de {len(deal_ids)} negócios)")
+    return rows

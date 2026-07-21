@@ -29,6 +29,11 @@ def run():
         writer.write_sheet("crm_deals", crm_data["deals"])
         writer.write_sheet("crm_atividades", crm_data["atividades"])
         writer.write_sheet("crm_tarefas", crm_data["tarefas"])
+        # Datas de movimentação de etapa — alimenta o "Volume comercial" da
+        # aba Metas (eventos por data em que aconteceram).
+        stage_events = rdcrm.get_stage_events(
+            [d.get("id") for d in crm_data["deals"] if d.get("id")])
+        writer.write_sheet("crm_stage_events", stage_events)
     except Exception as e:
         print(f"  ERRO RD CRM: {e}")
 
