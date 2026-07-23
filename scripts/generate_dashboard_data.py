@@ -819,6 +819,7 @@ def aggregate_leads(leads):
     by_capital = defaultdict(int)
     by_prazo = defaultdict(int)
     prazo_daily = defaultdict(lambda: defaultdict(int))     # dia → prazo → count
+    capital_daily = defaultdict(lambda: defaultdict(int))   # dia → capital → count (filtro de período no front)
     canal_monthly = defaultdict(lambda: defaultdict(int))
     canal_daily = defaultdict(lambda: defaultdict(int))
 
@@ -865,6 +866,8 @@ def aggregate_leads(leads):
 
         capital = lead.get("capital_disponivel") or "não informado"
         by_capital[capital] += 1
+        if dia:
+            capital_daily[dia][capital] += 1
 
         prazo = lead.get("prazo_abertura") or "não informado"
         by_prazo[prazo] += 1
@@ -906,6 +909,11 @@ def aggregate_leads(leads):
             {"data": dia, "prazo": p, "total": count}
             for dia, prazos in sorted(prazo_daily.items())
             for p, count in prazos.items()
+        ],
+        "capital_daily": [
+            {"data": dia, "capital": c, "total": count}
+            for dia, capitais in sorted(capital_daily.items())
+            for c, count in capitais.items()
         ],
         "canal_monthly": [
             {"mes": mes, "canal": c, "total": count}

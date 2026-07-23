@@ -3839,8 +3839,20 @@ function renderCRM() {
     options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { position: 'bottom' } } }
   });
 
-  // Capital
-  const cap = DATA.leads.by_capital.slice(0, 8);
+  // Capital Disponível — RESPEITA o filtro de período (capital_daily, mesmo
+  // padrão do prazo na página de Perdas). Antes usava o agregado global
+  // by_capital e ignorava as datas. Fallback pro agregado se o dado do
+  // Supabase ainda não tiver a série diária.
+  let cap;
+  if (datePredCRM && (DATA.leads.capital_daily || []).length) {
+    const mCap = {};
+    DATA.leads.capital_daily.filter(r => datePredCRM(r.data))
+      .forEach(r => { if (r.capital !== 'não informado') mCap[r.capital] = (mCap[r.capital] || 0) + r.total; });
+    cap = Object.entries(mCap).map(([k, v]) => ({ capital: k, total: v }))
+      .sort((a, b) => b.total - a.total).slice(0, 8);
+  } else {
+    cap = (DATA.leads.by_capital || []).slice(0, 8);
+  }
   makeChart('chart-capital', {
     type: 'doughnut',
     data: { labels: cap.map(r => r.capital), datasets: [{ data: cap.map(r => r.total), backgroundColor: PALETTE }] },
